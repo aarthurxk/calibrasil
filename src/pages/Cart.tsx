@@ -7,18 +7,25 @@ import { Button } from '@/components/ui/button';
 const Cart = () => {
   const { items, removeItem, updateQuantity, total, clearCart } = useCart();
 
+  const formatPrice = (price: number) => {
+    return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
+  const shipping = total >= 250 ? 0 : 29.90;
+  const finalTotal = total + shipping;
+
   if (items.length === 0) {
     return (
       <MainLayout>
         <div className="container py-20 text-center">
           <ShoppingBag className="h-16 w-16 text-muted-foreground mx-auto mb-6" />
-          <h1 className="text-2xl font-bold mb-4">Your cart is empty</h1>
+          <h1 className="text-2xl font-bold mb-4">Ih, tá vazio aqui! 😅</h1>
           <p className="text-muted-foreground mb-8">
-            Looks like you haven't added anything yet.
+            Parece que você ainda não escolheu nada. Bora lá conferir nossos produtos!
           </p>
           <Link to="/shop">
             <Button className="bg-gradient-ocean text-primary-foreground">
-              Start Shopping
+              Começar a Comprar
             </Button>
           </Link>
         </div>
@@ -29,7 +36,7 @@ const Cart = () => {
   return (
     <MainLayout>
       <div className="container py-12">
-        <h1 className="text-3xl font-bold mb-8">Shopping Cart</h1>
+        <h1 className="text-3xl font-bold mb-8">Sua Sacola 🛍️</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Cart Items */}
@@ -61,7 +68,7 @@ const Cart = () => {
                     </p>
                   )}
                   <p className="text-lg font-bold text-primary mt-2">
-                    ${item.price.toFixed(2)}
+                    {formatPrice(item.price)}
                   </p>
                 </div>
                 <div className="flex flex-col items-end justify-between">
@@ -95,50 +102,50 @@ const Cart = () => {
               onClick={clearCart}
               className="text-muted-foreground hover:text-destructive"
             >
-              Clear Cart
+              Limpar Sacola
             </Button>
           </div>
 
           {/* Order Summary */}
           <div className="lg:col-span-1">
             <div className="bg-card rounded-xl border border-border p-6 sticky top-24">
-              <h2 className="text-xl font-semibold mb-6">Order Summary</h2>
+              <h2 className="text-xl font-semibold mb-6">Resumo do Pedido</h2>
               
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between text-muted-foreground">
                   <span>Subtotal</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>{formatPrice(total)}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
-                  <span>Shipping</span>
-                  <span>{total >= 75 ? 'Free' : '$9.99'}</span>
+                  <span>Frete</span>
+                  <span>{shipping === 0 ? 'Grátis 🎉' : formatPrice(shipping)}</span>
                 </div>
                 <div className="border-t border-border pt-4">
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total</span>
                     <span className="text-primary">
-                      ${(total + (total >= 75 ? 0 : 9.99)).toFixed(2)}
+                      {formatPrice(finalTotal)}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {total < 75 && (
+              {total < 250 && (
                 <p className="text-sm text-muted-foreground mb-4 p-3 bg-cali-teal-light rounded-lg">
-                  Add ${(75 - total).toFixed(2)} more to get free shipping!
+                  Adiciona mais {formatPrice(250 - total)} e ganha frete grátis! 🚚
                 </p>
               )}
 
               <Link to="/checkout">
                 <Button className="w-full bg-gradient-ocean text-primary-foreground hover:opacity-90">
-                  Proceed to Checkout
+                  Finalizar Compra
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
 
               <Link to="/shop">
                 <Button variant="ghost" className="w-full mt-3">
-                  Continue Shopping
+                  Continuar Comprando
                 </Button>
               </Link>
             </div>

@@ -14,7 +14,7 @@ const Footer = () => {
               <span className="text-xl font-bold text-sidebar-primary">Cali</span>
             </div>
             <p className="text-sm text-sidebar-foreground/70">
-              Where beach vibes meet cutting-edge technology. Sustainable, innovative gear for the modern coastal lifestyle.
+              Onde a vibe da praia encontra tecnologia de ponta. Produtos sustentáveis e inovadores pro seu lifestyle praiano. Cola com a gente!
             </p>
             <div className="flex gap-4">
               <a href="#" className="text-sidebar-foreground/70 hover:text-sidebar-primary transition-colors">
@@ -31,36 +31,36 @@ const Footer = () => {
 
           {/* Shop */}
           <div>
-            <h3 className="font-semibold mb-4">Shop</h3>
+            <h3 className="font-semibold mb-4">Loja</h3>
             <ul className="space-y-2 text-sm text-sidebar-foreground/70">
-              <li><Link to="/shop" className="hover:text-sidebar-primary transition-colors">All Products</Link></li>
-              <li><Link to="/shop?category=tech" className="hover:text-sidebar-primary transition-colors">Tech Gear</Link></li>
-              <li><Link to="/shop?category=accessories" className="hover:text-sidebar-primary transition-colors">Accessories</Link></li>
-              <li><Link to="/shop?sale=true" className="hover:text-sidebar-primary transition-colors">Sale</Link></li>
+              <li><Link to="/shop" className="hover:text-sidebar-primary transition-colors">Todos os Produtos</Link></li>
+              <li><Link to="/shop?category=tech" className="hover:text-sidebar-primary transition-colors">Tech</Link></li>
+              <li><Link to="/shop?category=acessorios" className="hover:text-sidebar-primary transition-colors">Acessórios</Link></li>
+              <li><Link to="/shop?sale=true" className="hover:text-sidebar-primary transition-colors">Promoções</Link></li>
             </ul>
           </div>
 
           {/* Support */}
           <div>
-            <h3 className="font-semibold mb-4">Support</h3>
+            <h3 className="font-semibold mb-4">Suporte</h3>
             <ul className="space-y-2 text-sm text-sidebar-foreground/70">
-              <li><Link to="/contact" className="hover:text-sidebar-primary transition-colors">Contact Us</Link></li>
-              <li><Link to="/faq" className="hover:text-sidebar-primary transition-colors">FAQ</Link></li>
-              <li><Link to="/shipping" className="hover:text-sidebar-primary transition-colors">Shipping</Link></li>
-              <li><Link to="/returns" className="hover:text-sidebar-primary transition-colors">Returns</Link></li>
+              <li><Link to="/contact" className="hover:text-sidebar-primary transition-colors">Fala com a Gente</Link></li>
+              <li><Link to="/faq" className="hover:text-sidebar-primary transition-colors">Dúvidas Frequentes</Link></li>
+              <li><Link to="/shipping" className="hover:text-sidebar-primary transition-colors">Entrega</Link></li>
+              <li><Link to="/returns" className="hover:text-sidebar-primary transition-colors">Trocas e Devoluções</Link></li>
             </ul>
           </div>
 
           {/* Newsletter */}
           <div>
-            <h3 className="font-semibold mb-4">Stay Connected</h3>
+            <h3 className="font-semibold mb-4">Fica Ligado!</h3>
             <p className="text-sm text-sidebar-foreground/70 mb-4">
-              Subscribe for exclusive deals and beach tech updates.
+              Cadastra aí e recebe ofertas exclusivas e novidades quentinhas direto no seu e-mail!
             </p>
             <div className="flex gap-2">
               <input
                 type="email"
-                placeholder="Your email"
+                placeholder="Seu melhor e-mail"
                 className="flex-1 px-3 py-2 text-sm rounded-lg bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/50 border border-sidebar-border focus:outline-none focus:ring-2 focus:ring-sidebar-primary"
               />
               <button className="px-4 py-2 bg-gradient-ocean text-primary-foreground rounded-lg hover:opacity-90 transition-opacity">
@@ -71,7 +71,7 @@ const Footer = () => {
         </div>
 
         <div className="mt-12 pt-8 border-t border-sidebar-border text-center text-sm text-sidebar-foreground/50">
-          <p>&copy; {new Date().getFullYear()} Cali. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Cali. Todos os direitos reservados.</p>
         </div>
       </div>
     </footer>

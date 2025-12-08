@@ -7,37 +7,37 @@ import { toast } from 'sonner';
 
 const Settings = () => {
   const handleSave = () => {
-    toast.info('Settings management requires backend setup. Connect Lovable Cloud to enable this feature.');
+    toast.info('Gerenciamento de configurações requer backend. Conecte o Lovable Cloud pra ativar essa função.');
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Manage your store configuration</p>
+        <h1 className="text-3xl font-bold">Configurações</h1>
+        <p className="text-muted-foreground">Gerencie as configurações da sua loja</p>
       </div>
 
       {/* Store Information */}
       <Card>
         <CardHeader>
-          <CardTitle>Store Information</CardTitle>
+          <CardTitle>Informações da Loja</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="storeName">Store Name</Label>
+              <Label htmlFor="storeName">Nome da Loja</Label>
               <Input id="storeName" defaultValue="Cali Beach Tech" />
             </div>
             <div>
-              <Label htmlFor="storeEmail">Store Email</Label>
-              <Input id="storeEmail" type="email" defaultValue="hello@cali.com" />
+              <Label htmlFor="storeEmail">E-mail da Loja</Label>
+              <Input id="storeEmail" type="email" defaultValue="oi@cali.com.br" />
             </div>
           </div>
           <div>
-            <Label htmlFor="storeDescription">Store Description</Label>
+            <Label htmlFor="storeDescription">Descrição da Loja</Label>
             <Input
               id="storeDescription"
-              defaultValue="Premium beach-tech products for the modern coastal lifestyle"
+              defaultValue="Produtos beach-tech premium pro lifestyle praiano moderno"
             />
           </div>
         </CardContent>
@@ -46,41 +46,41 @@ const Settings = () => {
       {/* Notifications */}
       <Card>
         <CardHeader>
-          <CardTitle>Notifications</CardTitle>
+          <CardTitle>Notificações</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">Order Notifications</p>
+              <p className="font-medium">Notificações de Pedidos</p>
               <p className="text-sm text-muted-foreground">
-                Receive email notifications for new orders
+                Receba notificações por e-mail para novos pedidos
               </p>
             </div>
             <Switch defaultChecked />
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">Low Stock Alerts</p>
+              <p className="font-medium">Alertas de Estoque Baixo</p>
               <p className="text-sm text-muted-foreground">
-                Get notified when products are running low
+                Seja notificado quando produtos estiverem acabando
               </p>
             </div>
             <Switch defaultChecked />
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">Customer Messages</p>
+              <p className="font-medium">Mensagens de Clientes</p>
               <p className="text-sm text-muted-foreground">
-                Receive notifications for customer inquiries
+                Receba notificações de dúvidas dos clientes
               </p>
             </div>
             <Switch defaultChecked />
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">Abandoned Cart Emails</p>
+              <p className="font-medium">E-mails de Carrinho Abandonado</p>
               <p className="text-sm text-muted-foreground">
-                Automatically send recovery emails to customers
+                Envie automaticamente e-mails de recuperação pros clientes
               </p>
             </div>
             <Switch />
@@ -91,23 +91,23 @@ const Settings = () => {
       {/* Payment Settings */}
       <Card>
         <CardHeader>
-          <CardTitle>Payment Settings</CardTitle>
+          <CardTitle>Configurações de Pagamento</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="currency">Currency</Label>
-              <Input id="currency" defaultValue="USD" />
+              <Label htmlFor="currency">Moeda</Label>
+              <Input id="currency" defaultValue="BRL" />
             </div>
             <div>
-              <Label htmlFor="taxRate">Tax Rate (%)</Label>
-              <Input id="taxRate" type="number" defaultValue="8.25" />
+              <Label htmlFor="taxRate">Taxa de Impostos (%)</Label>
+              <Input id="taxRate" type="number" defaultValue="12" />
             </div>
           </div>
           <div className="p-4 bg-cali-teal-light rounded-lg">
             <p className="text-sm text-muted-foreground">
-              <strong className="text-primary">Payment Gateway:</strong> Connect Lovable Cloud 
-              and enable Stripe to configure payment processing.
+              <strong className="text-primary">Gateway de Pagamento:</strong> Conecte o Lovable Cloud 
+              e ative o Stripe ou PagSeguro pra configurar o processamento de pagamentos.
             </p>
           </div>
         </CardContent>
@@ -116,17 +116,17 @@ const Settings = () => {
       {/* Shipping */}
       <Card>
         <CardHeader>
-          <CardTitle>Shipping</CardTitle>
+          <CardTitle>Entrega</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="freeShipping">Free Shipping Threshold ($)</Label>
-              <Input id="freeShipping" type="number" defaultValue="75" />
+              <Label htmlFor="freeShipping">Frete Grátis a partir de (R$)</Label>
+              <Input id="freeShipping" type="number" defaultValue="250" />
             </div>
             <div>
-              <Label htmlFor="standardShipping">Standard Shipping Rate ($)</Label>
-              <Input id="standardShipping" type="number" defaultValue="9.99" />
+              <Label htmlFor="standardShipping">Taxa de Frete Padrão (R$)</Label>
+              <Input id="standardShipping" type="number" defaultValue="29.90" />
             </div>
           </div>
         </CardContent>
@@ -134,7 +134,7 @@ const Settings = () => {
 
       <div className="flex justify-end">
         <Button onClick={handleSave} className="bg-gradient-ocean text-primary-foreground">
-          Save Settings
+          Salvar Configurações
         </Button>
       </div>
     </div>

@@ -12,13 +12,13 @@ const Shop = () => {
   const [sortBy, setSortBy] = useState('featured');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  const selectedCategory = searchParams.get('category') || 'All';
+  const selectedCategory = searchParams.get('category') || 'Todos';
 
   const filteredProducts = useMemo(() => {
     let result = [...products];
 
     // Filter by category
-    if (selectedCategory && selectedCategory !== 'All') {
+    if (selectedCategory && selectedCategory !== 'Todos') {
       result = result.filter(
         (p) => p.category.toLowerCase() === selectedCategory.toLowerCase()
       );
@@ -44,7 +44,7 @@ const Shop = () => {
   }, [selectedCategory, sortBy]);
 
   const handleCategoryChange = (category: string) => {
-    if (category === 'All') {
+    if (category === 'Todos') {
       searchParams.delete('category');
     } else {
       searchParams.set('category', category.toLowerCase());
@@ -56,9 +56,9 @@ const Shop = () => {
     <MainLayout>
       <div className="bg-muted py-12">
         <div className="container">
-          <h1 className="text-4xl font-bold text-foreground mb-2">Shop</h1>
+          <h1 className="text-4xl font-bold text-foreground mb-2">Loja</h1>
           <p className="text-muted-foreground">
-            Discover our collection of beach-tech essentials
+            Descubra nossa coleção de essenciais beach-tech. É só escolher e partir pro abraço!
           </p>
         </div>
       </div>
@@ -68,7 +68,7 @@ const Shop = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 p-4 bg-card rounded-xl border border-border">
           <div className="flex items-center gap-2">
             <Filter className="h-5 w-5 text-muted-foreground" />
-            <span className="text-sm font-medium">Filter:</span>
+            <span className="text-sm font-medium">Filtrar:</span>
             <div className="flex gap-2">
               {categories.map((category) => (
                 <Button
@@ -90,13 +90,13 @@ const Shop = () => {
           <div className="flex items-center gap-4">
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Sort by" />
+                <SelectValue placeholder="Ordenar por" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="featured">Featured</SelectItem>
-                <SelectItem value="price-low">Price: Low to High</SelectItem>
-                <SelectItem value="price-high">Price: High to Low</SelectItem>
-                <SelectItem value="rating">Highest Rated</SelectItem>
+                <SelectItem value="featured">Destaques</SelectItem>
+                <SelectItem value="price-low">Menor Preço</SelectItem>
+                <SelectItem value="price-high">Maior Preço</SelectItem>
+                <SelectItem value="rating">Mais Avaliados</SelectItem>
               </SelectContent>
             </Select>
 
@@ -121,7 +121,7 @@ const Shop = () => {
 
         {/* Results count */}
         <p className="text-sm text-muted-foreground mb-6">
-          Showing {filteredProducts.length} products
+          Mostrando {filteredProducts.length} produtos
         </p>
 
         {/* Products Grid */}
@@ -146,7 +146,7 @@ const Shop = () => {
         {filteredProducts.length === 0 && (
           <div className="text-center py-20">
             <p className="text-muted-foreground">
-              No products found. Try adjusting your filters.
+              Ops! Nenhum produto encontrado. Tenta outro filtro aí!
             </p>
           </div>
         )}

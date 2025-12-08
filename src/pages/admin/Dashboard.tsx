@@ -20,51 +20,51 @@ import {
 } from 'recharts';
 
 const salesData = [
-  { name: 'Jan', sales: 4000 },
-  { name: 'Feb', sales: 3000 },
-  { name: 'Mar', sales: 5000 },
-  { name: 'Apr', sales: 4500 },
-  { name: 'May', sales: 6000 },
-  { name: 'Jun', sales: 5500 },
-  { name: 'Jul', sales: 7000 },
+  { name: 'Jan', sales: 20000 },
+  { name: 'Fev', sales: 15000 },
+  { name: 'Mar', sales: 25000 },
+  { name: 'Abr', sales: 22500 },
+  { name: 'Mai', sales: 30000 },
+  { name: 'Jun', sales: 27500 },
+  { name: 'Jul', sales: 35000 },
 ];
 
 const categoryData = [
-  { name: 'Tech', sales: 12000 },
-  { name: 'Accessories', sales: 8500 },
+  { name: 'Tech', sales: 60000 },
+  { name: 'Acessórios', sales: 42500 },
 ];
 
 const recentOrders = [
-  { id: '#1234', customer: 'John Doe', total: 299.99, status: 'Completed' },
-  { id: '#1235', customer: 'Jane Smith', total: 149.99, status: 'Processing' },
-  { id: '#1236', customer: 'Bob Wilson', total: 459.99, status: 'Shipped' },
-  { id: '#1237', customer: 'Alice Brown', total: 89.99, status: 'Pending' },
+  { id: '#1234', customer: 'João Silva', total: 1499.90, status: 'Entregue' },
+  { id: '#1235', customer: 'Maria Santos', total: 749.90, status: 'Processando' },
+  { id: '#1236', customer: 'Pedro Oliveira', total: 2299.90, status: 'Enviado' },
+  { id: '#1237', customer: 'Ana Costa', total: 449.90, status: 'Pendente' },
 ];
 
 const stats = [
   {
-    title: 'Total Revenue',
-    value: '$45,231',
+    title: 'Receita Total',
+    value: 'R$ 226.159',
     change: '+12.5%',
     trend: 'up',
     icon: DollarSign,
   },
   {
-    title: 'Orders',
-    value: '1,234',
+    title: 'Pedidos',
+    value: '1.234',
     change: '+8.2%',
     trend: 'up',
     icon: ShoppingCart,
   },
   {
-    title: 'Customers',
-    value: '5,678',
+    title: 'Clientes',
+    value: '5.678',
     change: '+15.3%',
     trend: 'up',
     icon: Users,
   },
   {
-    title: 'Conversion Rate',
+    title: 'Taxa de Conversão',
     value: '3.2%',
     change: '-2.1%',
     trend: 'down',
@@ -72,12 +72,16 @@ const stats = [
   },
 ];
 
+const formatPrice = (price: number) => {
+  return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+};
+
 const Dashboard = () => {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back to Cali Admin</p>
+        <h1 className="text-3xl font-bold">Painel</h1>
+        <p className="text-muted-foreground">Bem-vindo de volta ao Admin da Cali! 🤙</p>
       </div>
 
       {/* Stats Grid */}
@@ -102,7 +106,7 @@ const Dashboard = () => {
                 ) : (
                   <ArrowDownRight className="h-4 w-4" />
                 )}
-                {stat.change} from last month
+                {stat.change} desde o mês passado
               </div>
             </CardContent>
           </Card>
@@ -113,7 +117,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Sales Overview</CardTitle>
+            <CardTitle>Visão Geral de Vendas</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -128,6 +132,7 @@ const Dashboard = () => {
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '8px',
                     }}
+                    formatter={(value) => [formatPrice(value as number), 'Vendas']}
                   />
                   <Line
                     type="monotone"
@@ -144,7 +149,7 @@ const Dashboard = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Sales by Category</CardTitle>
+            <CardTitle>Vendas por Categoria</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -159,6 +164,7 @@ const Dashboard = () => {
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '8px',
                     }}
+                    formatter={(value) => [formatPrice(value as number), 'Vendas']}
                   />
                   <Bar
                     dataKey="sales"
@@ -175,7 +181,7 @@ const Dashboard = () => {
       {/* Recent Orders */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Orders</CardTitle>
+          <CardTitle>Pedidos Recentes</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -183,10 +189,10 @@ const Dashboard = () => {
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    Order ID
+                    ID do Pedido
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    Customer
+                    Cliente
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
                     Total
@@ -201,15 +207,15 @@ const Dashboard = () => {
                   <tr key={order.id} className="border-b border-border last:border-0">
                     <td className="py-3 px-4 font-medium">{order.id}</td>
                     <td className="py-3 px-4">{order.customer}</td>
-                    <td className="py-3 px-4">${order.total.toFixed(2)}</td>
+                    <td className="py-3 px-4">{formatPrice(order.total)}</td>
                     <td className="py-3 px-4">
                       <span
                         className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                          order.status === 'Completed'
+                          order.status === 'Entregue'
                             ? 'bg-green-100 text-green-800'
-                            : order.status === 'Processing'
+                            : order.status === 'Processando'
                             ? 'bg-blue-100 text-blue-800'
-                            : order.status === 'Shipped'
+                            : order.status === 'Enviado'
                             ? 'bg-purple-100 text-purple-800'
                             : 'bg-yellow-100 text-yellow-800'
                         }`}

@@ -3,23 +3,23 @@ import { Leaf, Shield, Truck, Headphones } from 'lucide-react';
 const features = [
   {
     icon: Leaf,
-    title: 'Sustainable',
-    description: 'Eco-friendly materials and carbon-neutral shipping',
+    title: 'Sustentável',
+    description: 'Materiais eco-friendly e entrega carbono neutro. A gente ama o planeta!',
   },
   {
     icon: Shield,
-    title: '2-Year Warranty',
-    description: 'Full coverage on all tech products',
+    title: '2 Anos de Garantia',
+    description: 'Cobertura total nos produtos tech. Pode usar sem medo!',
   },
   {
     icon: Truck,
-    title: 'Free Shipping',
-    description: 'On orders over $75, worldwide delivery',
+    title: 'Frete Grátis',
+    description: 'Acima de R$250, entrega em todo Brasil. É mole ou quer mais?',
   },
   {
     icon: Headphones,
-    title: '24/7 Support',
-    description: 'Expert help whenever you need it',
+    title: 'Suporte 24h',
+    description: 'Tamo junto sempre que você precisar. É só chamar!',
   },
 ];
 
@@ -29,10 +29,10 @@ const WhyChooseUs = () => {
       <div className="container">
         <div className="text-center mb-12">
           <p className="text-sm font-medium text-accent uppercase tracking-widest mb-2">
-            Why Cali?
+            Por que a Cali?
           </p>
           <h2 className="text-3xl md:text-4xl font-bold text-foreground">
-            Built for the Beach Life
+            Feito pra Vida na Praia
           </h2>
         </div>
 

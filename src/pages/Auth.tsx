@@ -15,9 +15,8 @@ const Auth = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simulate login
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    toast.info('Authentication requires backend setup. Connect Lovable Cloud to enable login.');
+    toast.info('Autenticação requer configuração do backend. Conecte o Lovable Cloud pra ativar o login.');
     setIsLoading(false);
   };
 
@@ -25,7 +24,7 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    toast.info('Authentication requires backend setup. Connect Lovable Cloud to enable signup.');
+    toast.info('Autenticação requer configuração do backend. Conecte o Lovable Cloud pra criar contas.');
     setIsLoading(false);
   };
 
@@ -37,7 +36,7 @@ const Auth = () => {
           className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-8"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Home
+          Voltar pro Início
         </Link>
 
         <div className="max-w-md mx-auto">
@@ -47,36 +46,36 @@ const Auth = () => {
               alt="Cali"
               className="h-16 w-16 rounded-xl mx-auto mb-4"
             />
-            <h1 className="text-2xl font-bold">Welcome to Cali</h1>
+            <h1 className="text-2xl font-bold">E aí, bem-vindo à Cali! 🤙</h1>
             <p className="text-muted-foreground">
-              Sign in to your account or create a new one
+              Entra na sua conta ou cria uma nova pra fazer parte da nossa tribo
             </p>
           </div>
 
           <div className="bg-card rounded-xl border border-border p-6">
             <Tabs defaultValue="login">
               <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="login">Login</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+                <TabsTrigger value="login">Entrar</TabsTrigger>
+                <TabsTrigger value="signup">Criar Conta</TabsTrigger>
               </TabsList>
 
               <TabsContent value="login">
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div>
-                    <Label htmlFor="login-email">Email</Label>
+                    <Label htmlFor="login-email">E-mail</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="login-email"
                         type="email"
-                        placeholder="your@email.com"
+                        placeholder="seu@email.com"
                         className="pl-10"
                         required
                       />
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="login-password">Password</Label>
+                    <Label htmlFor="login-password">Senha</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -93,7 +92,7 @@ const Auth = () => {
                       type="button"
                       className="text-sm text-primary hover:underline"
                     >
-                      Forgot password?
+                      Esqueceu a senha?
                     </button>
                   </div>
                   <Button
@@ -101,7 +100,7 @@ const Auth = () => {
                     className="w-full bg-gradient-ocean text-primary-foreground"
                     disabled={isLoading}
                   >
-                    {isLoading ? 'Signing in...' : 'Sign In'}
+                    {isLoading ? 'Entrando...' : 'Entrar'}
                   </Button>
                 </form>
               </TabsContent>
@@ -110,37 +109,37 @@ const Auth = () => {
                 <form onSubmit={handleSignup} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="first-name">First Name</Label>
+                      <Label htmlFor="first-name">Nome</Label>
                       <div className="relative">
                         <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                           id="first-name"
-                          placeholder="John"
+                          placeholder="Seu nome"
                           className="pl-10"
                           required
                         />
                       </div>
                     </div>
                     <div>
-                      <Label htmlFor="last-name">Last Name</Label>
-                      <Input id="last-name" placeholder="Doe" required />
+                      <Label htmlFor="last-name">Sobrenome</Label>
+                      <Input id="last-name" placeholder="Sobrenome" required />
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="signup-email">Email</Label>
+                    <Label htmlFor="signup-email">E-mail</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="signup-email"
                         type="email"
-                        placeholder="your@email.com"
+                        placeholder="seu@email.com"
                         className="pl-10"
                         required
                       />
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="signup-password">Password</Label>
+                    <Label htmlFor="signup-password">Senha</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -157,7 +156,7 @@ const Auth = () => {
                     className="w-full bg-gradient-ocean text-primary-foreground"
                     disabled={isLoading}
                   >
-                    {isLoading ? 'Creating account...' : 'Create Account'}
+                    {isLoading ? 'Criando conta...' : 'Criar Conta'}
                   </Button>
                 </form>
               </TabsContent>
