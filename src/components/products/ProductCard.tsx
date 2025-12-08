@@ -24,7 +24,11 @@ const ProductCard = ({ product }: ProductCardProps) => {
       price: product.price,
       image: product.image,
     });
-    toast.success(`${product.name} added to cart!`);
+    toast.success(`${product.name} adicionado à sacola! 🛍️`);
+  };
+
+  const formatPrice = (price: number) => {
+    return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
   return (
@@ -44,7 +48,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
           )}
           {product.featured && (
             <Badge className="absolute top-3 right-3 bg-primary text-primary-foreground">
-              Featured
+              Destaque
             </Badge>
           )}
           
@@ -55,7 +59,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <ShoppingCart className="mr-2 h-4 w-4" />
-              Add to Cart
+              Joga na Sacola
             </Button>
           </div>
         </div>
@@ -75,11 +79,11 @@ const ProductCard = ({ product }: ProductCardProps) => {
           </div>
           <div className="flex items-center gap-2">
             <span className="font-bold text-lg text-primary">
-              ${product.price.toFixed(2)}
+              {formatPrice(product.price)}
             </span>
             {product.originalPrice && (
               <span className="text-sm text-muted-foreground line-through">
-                ${product.originalPrice.toFixed(2)}
+                {formatPrice(product.originalPrice)}
               </span>
             )}
           </div>

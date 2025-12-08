@@ -15,6 +15,10 @@ import {
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
+const formatPrice = (price: number) => {
+  return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+};
+
 const Products = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -25,7 +29,7 @@ const Products = () => {
 
   const handleAddProduct = (e: React.FormEvent) => {
     e.preventDefault();
-    toast.info('Product management requires backend setup. Connect Lovable Cloud to enable this feature.');
+    toast.info('Gerenciamento de produtos requer backend. Conecte o Lovable Cloud pra ativar essa função.');
     setIsDialogOpen(false);
   };
 
@@ -33,39 +37,39 @@ const Products = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Products</h1>
-          <p className="text-muted-foreground">Manage your product inventory</p>
+          <h1 className="text-3xl font-bold">Produtos</h1>
+          <p className="text-muted-foreground">Gerencie seu inventário de produtos</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-gradient-ocean text-primary-foreground">
               <Plus className="h-4 w-4 mr-2" />
-              Add Product
+              Adicionar Produto
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
-              <DialogTitle>Add New Product</DialogTitle>
+              <DialogTitle>Novo Produto</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleAddProduct} className="space-y-4">
               <div>
-                <Label htmlFor="name">Product Name</Label>
+                <Label htmlFor="name">Nome do Produto</Label>
                 <Input id="name" required />
               </div>
               <div>
-                <Label htmlFor="price">Price</Label>
+                <Label htmlFor="price">Preço</Label>
                 <Input id="price" type="number" step="0.01" required />
               </div>
               <div>
-                <Label htmlFor="category">Category</Label>
+                <Label htmlFor="category">Categoria</Label>
                 <Input id="category" required />
               </div>
               <div>
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description">Descrição</Label>
                 <Input id="description" required />
               </div>
               <Button type="submit" className="w-full bg-gradient-ocean text-primary-foreground">
-                Add Product
+                Adicionar Produto
               </Button>
             </form>
           </DialogContent>
@@ -78,7 +82,7 @@ const Products = () => {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search products..."
+              placeholder="Buscar produtos..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -90,7 +94,7 @@ const Products = () => {
       {/* Products Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Products ({filteredProducts.length})</CardTitle>
+          <CardTitle>Todos os Produtos ({filteredProducts.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -98,19 +102,19 @@ const Products = () => {
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    Product
+                    Produto
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    Category
+                    Categoria
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    Price
+                    Preço
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
                     Status
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    Actions
+                    Ações
                   </th>
                 </tr>
               </thead>
@@ -129,17 +133,17 @@ const Products = () => {
                         <div>
                           <p className="font-medium">{product.name}</p>
                           <p className="text-sm text-muted-foreground">
-                            {product.reviews} reviews
+                            {product.reviews} avaliações
                           </p>
                         </div>
                       </div>
                     </td>
                     <td className="py-3 px-4">{product.category}</td>
                     <td className="py-3 px-4">
-                      <span className="font-medium">${product.price.toFixed(2)}</span>
+                      <span className="font-medium">{formatPrice(product.price)}</span>
                       {product.originalPrice && (
                         <span className="text-sm text-muted-foreground ml-2 line-through">
-                          ${product.originalPrice.toFixed(2)}
+                          {formatPrice(product.originalPrice)}
                         </span>
                       )}
                     </td>
@@ -147,7 +151,7 @@ const Products = () => {
                       <Badge
                         variant={product.inStock ? 'default' : 'destructive'}
                       >
-                        {product.inStock ? 'In Stock' : 'Out of Stock'}
+                        {product.inStock ? 'Em Estoque' : 'Esgotado'}
                       </Badge>
                     </td>
                     <td className="py-3 px-4">

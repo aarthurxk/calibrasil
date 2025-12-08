@@ -6,44 +6,48 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 const mockCustomers = [
   {
     id: '1',
-    name: 'John Doe',
-    email: 'john@example.com',
+    name: 'João Silva',
+    email: 'joao@exemplo.com',
     orders: 12,
-    totalSpent: 1299.99,
+    totalSpent: 6499.90,
     joined: '2024-01-15',
   },
   {
     id: '2',
-    name: 'Jane Smith',
-    email: 'jane@example.com',
+    name: 'Maria Santos',
+    email: 'maria@exemplo.com',
     orders: 8,
-    totalSpent: 899.99,
+    totalSpent: 4499.90,
     joined: '2024-02-20',
   },
   {
     id: '3',
-    name: 'Bob Wilson',
-    email: 'bob@example.com',
+    name: 'Pedro Oliveira',
+    email: 'pedro@exemplo.com',
     orders: 5,
-    totalSpent: 459.99,
+    totalSpent: 2299.90,
     joined: '2024-03-10',
   },
   {
     id: '4',
-    name: 'Alice Brown',
-    email: 'alice@example.com',
+    name: 'Ana Costa',
+    email: 'ana@exemplo.com',
     orders: 3,
-    totalSpent: 289.99,
+    totalSpent: 1449.90,
     joined: '2024-04-05',
   },
 ];
+
+const formatPrice = (price: number) => {
+  return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+};
 
 const Customers = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Customers</h1>
-        <p className="text-muted-foreground">Manage your customer relationships</p>
+        <h1 className="text-3xl font-bold">Clientes</h1>
+        <p className="text-muted-foreground">Gerencie o relacionamento com seus clientes</p>
       </div>
 
       {/* Stats */}
@@ -51,34 +55,34 @@ const Customers = () => {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Customers
+              Total de Clientes
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">5,678</div>
-            <p className="text-sm text-green-600">+15% from last month</p>
+            <div className="text-2xl font-bold">5.678</div>
+            <p className="text-sm text-green-600">+15% desde o mês passado</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Returning Customers
+              Clientes Recorrentes
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">2,345</div>
-            <p className="text-sm text-muted-foreground">41% of total</p>
+            <div className="text-2xl font-bold">2.345</div>
+            <p className="text-sm text-muted-foreground">41% do total</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Avg. Customer Value
+              Valor Médio por Cliente
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$187.50</div>
-            <p className="text-sm text-green-600">+8% from last month</p>
+            <div className="text-2xl font-bold">R$ 937,50</div>
+            <p className="text-sm text-green-600">+8% desde o mês passado</p>
           </CardContent>
         </Card>
       </div>
@@ -88,7 +92,7 @@ const Customers = () => {
         <CardContent className="pt-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search customers..." className="pl-10" />
+            <Input placeholder="Buscar clientes..." className="pl-10" />
           </div>
         </CardContent>
       </Card>
@@ -96,7 +100,7 @@ const Customers = () => {
       {/* Customers Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Customers</CardTitle>
+          <CardTitle>Todos os Clientes</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -104,19 +108,19 @@ const Customers = () => {
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    Customer
+                    Cliente
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    Orders
+                    Pedidos
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    Total Spent
+                    Total Gasto
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    Joined
+                    Membro Desde
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    Actions
+                    Ações
                   </th>
                 </tr>
               </thead>
@@ -138,10 +142,10 @@ const Customers = () => {
                     </td>
                     <td className="py-3 px-4">{customer.orders}</td>
                     <td className="py-3 px-4 font-medium">
-                      ${customer.totalSpent.toFixed(2)}
+                      {formatPrice(customer.totalSpent)}
                     </td>
                     <td className="py-3 px-4 text-muted-foreground">
-                      {new Date(customer.joined).toLocaleDateString()}
+                      {new Date(customer.joined).toLocaleDateString('pt-BR')}
                     </td>
                     <td className="py-3 px-4">
                       <Button variant="ghost" size="icon">

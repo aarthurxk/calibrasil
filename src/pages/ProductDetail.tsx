@@ -17,13 +17,17 @@ const ProductDetail = () => {
 
   const product = products.find((p) => p.id === id);
 
+  const formatPrice = (price: number) => {
+    return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
   if (!product) {
     return (
       <MainLayout>
         <div className="container py-20 text-center">
-          <h1 className="text-2xl font-bold mb-4">Product Not Found</h1>
+          <h1 className="text-2xl font-bold mb-4">Ops! Produto não encontrado</h1>
           <Link to="/shop">
-            <Button>Back to Shop</Button>
+            <Button>Voltar pra Loja</Button>
           </Link>
         </div>
       </MainLayout>
@@ -45,7 +49,7 @@ const ProductDetail = () => {
         color: selectedColor || undefined,
       });
     }
-    toast.success(`Added ${quantity} ${product.name} to cart!`);
+    toast.success(`${quantity}x ${product.name} adicionado à sacola! 🛍️`);
   };
 
   return (
@@ -57,7 +61,7 @@ const ProductDetail = () => {
           className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-8"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Shop
+          Voltar pra Loja
         </Link>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -99,18 +103,18 @@ const ProductDetail = () => {
                 </div>
                 <span className="font-medium">{product.rating}</span>
                 <span className="text-muted-foreground">
-                  ({product.reviews} reviews)
+                  ({product.reviews} avaliações)
                 </span>
               </div>
             </div>
 
             <div className="flex items-baseline gap-4">
               <span className="text-4xl font-bold text-primary">
-                ${product.price.toFixed(2)}
+                {formatPrice(product.price)}
               </span>
               {product.originalPrice && (
                 <span className="text-xl text-muted-foreground line-through">
-                  ${product.originalPrice.toFixed(2)}
+                  {formatPrice(product.originalPrice)}
                 </span>
               )}
             </div>
@@ -122,7 +126,7 @@ const ProductDetail = () => {
             {/* Colors */}
             {product.colors && (
               <div>
-                <p className="font-medium mb-3">Color</p>
+                <p className="font-medium mb-3">Cor</p>
                 <div className="flex gap-2">
                   {product.colors.map((color) => (
                     <button
@@ -144,7 +148,7 @@ const ProductDetail = () => {
             {/* Sizes */}
             {product.sizes && (
               <div>
-                <p className="font-medium mb-3">Size</p>
+                <p className="font-medium mb-3">Tamanho</p>
                 <div className="flex gap-2">
                   {product.sizes.map((size) => (
                     <button
@@ -165,7 +169,7 @@ const ProductDetail = () => {
 
             {/* Quantity */}
             <div>
-              <p className="font-medium mb-3">Quantity</p>
+              <p className="font-medium mb-3">Quantidade</p>
               <div className="flex items-center gap-4">
                 <div className="flex items-center border border-border rounded-lg">
                   <button
@@ -193,7 +197,7 @@ const ProductDetail = () => {
                 onClick={handleAddToCart}
               >
                 <ShoppingCart className="mr-2 h-5 w-5" />
-                Add to Cart
+                Joga na Sacola
               </Button>
               <Button size="lg" variant="outline">
                 <Heart className="h-5 w-5" />
@@ -204,11 +208,11 @@ const ProductDetail = () => {
             <div className="grid grid-cols-2 gap-4 pt-6 border-t border-border">
               <div className="flex items-center gap-3">
                 <Truck className="h-5 w-5 text-primary" />
-                <span className="text-sm">Free shipping over $75</span>
+                <span className="text-sm">Frete grátis acima de R$250</span>
               </div>
               <div className="flex items-center gap-3">
                 <Shield className="h-5 w-5 text-primary" />
-                <span className="text-sm">2-year warranty</span>
+                <span className="text-sm">2 anos de garantia</span>
               </div>
             </div>
           </div>

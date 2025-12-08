@@ -15,13 +15,13 @@ import { Button } from '@/components/ui/button';
 import caliLogo from '@/assets/cali-logo.jpeg';
 
 const sidebarItems = [
-  { name: 'Dashboard', icon: LayoutDashboard, path: '/admin' },
-  { name: 'Products', icon: Package, path: '/admin/products' },
-  { name: 'Orders', icon: ShoppingCart, path: '/admin/orders' },
-  { name: 'Customers', icon: Users, path: '/admin/customers' },
-  { name: 'Payments', icon: CreditCard, path: '/admin/payments' },
-  { name: 'Reports', icon: BarChart3, path: '/admin/reports' },
-  { name: 'Settings', icon: Settings, path: '/admin/settings' },
+  { name: 'Painel', icon: LayoutDashboard, path: '/admin' },
+  { name: 'Produtos', icon: Package, path: '/admin/products' },
+  { name: 'Pedidos', icon: ShoppingCart, path: '/admin/orders' },
+  { name: 'Clientes', icon: Users, path: '/admin/customers' },
+  { name: 'Pagamentos', icon: CreditCard, path: '/admin/payments' },
+  { name: 'Relatórios', icon: BarChart3, path: '/admin/reports' },
+  { name: 'Configurações', icon: Settings, path: '/admin/settings' },
 ];
 
 const AdminLayout = () => {
@@ -48,7 +48,7 @@ const AdminLayout = () => {
               <div>
                 <span className="font-bold text-sidebar-foreground">Cali</span>
                 <span className="text-xs block text-sidebar-foreground/60">
-                  Admin Panel
+                  Painel Admin
                 </span>
               </div>
             </Link>
@@ -83,7 +83,7 @@ const AdminLayout = () => {
               className="flex items-center gap-3 px-4 py-3 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
             >
               <LogOut className="h-5 w-5" />
-              <span className="font-medium">Exit Admin</span>
+              <span className="font-medium">Sair do Admin</span>
             </Link>
           </div>
         </div>
@@ -111,7 +111,7 @@ const AdminLayout = () => {
               <Menu className="h-5 w-5" />
             </Button>
             <div className="flex items-center gap-4 ml-auto">
-              <span className="text-sm text-muted-foreground">Admin User</span>
+              <span className="text-sm text-muted-foreground">Usuário Admin</span>
               <div className="w-8 h-8 rounded-full bg-gradient-ocean" />
             </div>
           </div>

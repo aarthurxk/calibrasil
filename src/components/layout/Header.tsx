@@ -11,10 +11,10 @@ const Header = () => {
   const { itemCount } = useCart();
 
   const navLinks = [
-    { name: 'Home', path: '/' },
-    { name: 'Shop', path: '/shop' },
-    { name: 'About', path: '/about' },
-    { name: 'Contact', path: '/contact' },
+    { name: 'Início', path: '/' },
+    { name: 'Loja', path: '/shop' },
+    { name: 'Nossa Vibe', path: '/about' },
+    { name: 'Fala com a Gente', path: '/contact' },
   ];
 
   return (

@@ -18,48 +18,52 @@ import {
 } from 'recharts';
 
 const monthlyData = [
-  { month: 'Jan', revenue: 12000, orders: 120 },
-  { month: 'Feb', revenue: 15000, orders: 145 },
-  { month: 'Mar', revenue: 18000, orders: 178 },
-  { month: 'Apr', revenue: 16000, orders: 156 },
-  { month: 'May', revenue: 21000, orders: 203 },
-  { month: 'Jun', revenue: 24000, orders: 234 },
-  { month: 'Jul', revenue: 28000, orders: 267 },
+  { month: 'Jan', revenue: 60000, orders: 120 },
+  { month: 'Fev', revenue: 75000, orders: 145 },
+  { month: 'Mar', revenue: 90000, orders: 178 },
+  { month: 'Abr', revenue: 80000, orders: 156 },
+  { month: 'Mai', revenue: 105000, orders: 203 },
+  { month: 'Jun', revenue: 120000, orders: 234 },
+  { month: 'Jul', revenue: 140000, orders: 267 },
 ];
 
 const categoryData = [
-  { name: 'Tech Gear', value: 65 },
-  { name: 'Accessories', value: 35 },
+  { name: 'Tech', value: 65 },
+  { name: 'Acessórios', value: 35 },
 ];
 
 const topProducts = [
-  { name: 'Wave Rider Smart Watch', sales: 245 },
-  { name: 'UV Smart Glasses', sales: 189 },
-  { name: 'Ocean Breeze Earbuds', sales: 156 },
-  { name: 'Solar Beach Charger', sales: 134 },
-  { name: 'Beach Tech Backpack', sales: 112 },
+  { name: 'Smartwatch Onda Perfeita', sales: 245 },
+  { name: 'Óculos Smart Anti-UV', sales: 189 },
+  { name: 'Fones Brisa do Mar', sales: 156 },
+  { name: 'Carregador Solar de Praia', sales: 134 },
+  { name: 'Mochila Tech de Praia', sales: 112 },
 ];
 
 const COLORS = ['hsl(174, 42%, 45%)', 'hsl(16, 80%, 60%)'];
+
+const formatPrice = (price: number) => {
+  return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+};
 
 const Reports = () => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Reports</h1>
-          <p className="text-muted-foreground">Analyze your business performance</p>
+          <h1 className="text-3xl font-bold">Relatórios</h1>
+          <p className="text-muted-foreground">Analise a performance do seu negócio</p>
         </div>
         <Button variant="outline">
           <Download className="h-4 w-4 mr-2" />
-          Download Report
+          Baixar Relatório
         </Button>
       </div>
 
       {/* Revenue & Orders Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Revenue & Orders Overview</CardTitle>
+          <CardTitle>Visão Geral de Receita e Pedidos</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-[400px]">
@@ -75,13 +79,17 @@ const Reports = () => {
                     border: '1px solid hsl(var(--border))',
                     borderRadius: '8px',
                   }}
+                  formatter={(value, name) => [
+                    name === 'revenue' ? formatPrice(value as number) : value,
+                    name === 'revenue' ? 'Receita' : 'Pedidos'
+                  ]}
                 />
-                <Legend />
+                <Legend formatter={(value) => value === 'revenue' ? 'Receita (R$)' : 'Pedidos'} />
                 <Line
                   yAxisId="left"
                   type="monotone"
                   dataKey="revenue"
-                  name="Revenue ($)"
+                  name="revenue"
                   stroke="hsl(var(--primary))"
                   strokeWidth={2}
                   dot={{ fill: 'hsl(var(--primary))' }}
@@ -90,7 +98,7 @@ const Reports = () => {
                   yAxisId="right"
                   type="monotone"
                   dataKey="orders"
-                  name="Orders"
+                  name="orders"
                   stroke="hsl(var(--accent))"
                   strokeWidth={2}
                   dot={{ fill: 'hsl(var(--accent))' }}
@@ -105,7 +113,7 @@ const Reports = () => {
         {/* Category Distribution */}
         <Card>
           <CardHeader>
-            <CardTitle>Sales by Category</CardTitle>
+            <CardTitle>Vendas por Categoria</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -134,7 +142,7 @@ const Reports = () => {
         {/* Top Products */}
         <Card>
           <CardHeader>
-            <CardTitle>Top Selling Products</CardTitle>
+            <CardTitle>Produtos Mais Vendidos</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -155,6 +163,7 @@ const Reports = () => {
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '8px',
                     }}
+                    formatter={(value) => [value, 'Vendas']}
                   />
                   <Bar
                     dataKey="sales"
@@ -173,45 +182,45 @@ const Reports = () => {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Avg. Order Value
+              Ticket Médio
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$124.50</div>
-            <p className="text-sm text-green-600">+5.2% from last period</p>
+            <div className="text-2xl font-bold">R$ 622,50</div>
+            <p className="text-sm text-green-600">+5.2% desde o período anterior</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Cart Abandonment Rate
+              Taxa de Abandono de Carrinho
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">24.3%</div>
-            <p className="text-sm text-green-600">-3.1% from last period</p>
+            <p className="text-sm text-green-600">-3.1% desde o período anterior</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Customer Lifetime Value
+              Valor Vitalício do Cliente
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$456.78</div>
-            <p className="text-sm text-green-600">+8.7% from last period</p>
+            <div className="text-2xl font-bold">R$ 2.283,90</div>
+            <p className="text-sm text-green-600">+8.7% desde o período anterior</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Repeat Customer Rate
+              Taxa de Clientes Recorrentes
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">41.2%</div>
-            <p className="text-sm text-green-600">+2.4% from last period</p>
+            <p className="text-sm text-green-600">+2.4% desde o período anterior</p>
           </CardContent>
         </Card>
       </div>
