@@ -8,89 +8,115 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Beach-Tech Cali Theme - Teal & Coral */
+    --background: 180 20% 99%;
+    --foreground: 180 50% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 180 50% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 180 50% 10%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary - Cali Teal */
+    --primary: 174 42% 45%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary - Soft Sand */
+    --secondary: 40 30% 95%;
+    --secondary-foreground: 180 50% 10%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Muted - Ocean Mist */
+    --muted: 180 15% 94%;
+    --muted-foreground: 180 20% 40%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Accent - Coral Sunset */
+    --accent: 16 80% 60%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 180 20% 88%;
+    --input: 180 20% 88%;
+    --ring: 174 42% 45%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Sidebar - Deep Ocean */
+    --sidebar-background: 180 40% 12%;
+    --sidebar-foreground: 180 10% 95%;
+    --sidebar-primary: 174 50% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 180 30% 20%;
+    --sidebar-accent-foreground: 180 10% 95%;
+    --sidebar-border: 180 30% 22%;
+    --sidebar-ring: 174 50% 55%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Custom Cali tokens */
+    --cali-teal: 174 42% 45%;
+    --cali-teal-light: 174 40% 92%;
+    --cali-coral: 16 80% 60%;
+    --cali-coral-light: 16 80% 95%;
+    --cali-sand: 40 30% 95%;
+    --cali-ocean-dark: 180 40% 12%;
+    --cali-wave: 180 50% 65%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Gradients */
+    --gradient-ocean: linear-gradient(135deg, hsl(174 42% 45%) 0%, hsl(180 50% 65%) 100%);
+    --gradient-sunset: linear-gradient(135deg, hsl(16 80% 60%) 0%, hsl(40 80% 70%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(180 20% 99% / 0) 0%, hsl(180 20% 99%) 100%);
 
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Shadows */
+    --shadow-soft: 0 4px 20px -4px hsl(180 40% 12% / 0.1);
+    --shadow-glow: 0 0 30px hsl(174 42% 45% / 0.2);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 180 40% 6%;
+    --foreground: 180 10% 95%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 180 35% 10%;
+    --card-foreground: 180 10% 95%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 180 35% 10%;
+    --popover-foreground: 180 10% 95%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 174 50% 55%;
+    --primary-foreground: 180 40% 6%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 180 30% 15%;
+    --secondary-foreground: 180 10% 95%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 180 25% 15%;
+    --muted-foreground: 180 15% 60%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 16 70% 55%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --border: 180 25% 18%;
+    --input: 180 25% 18%;
+    --ring: 174 50% 55%;
+
+    --sidebar-background: 180 45% 5%;
+    --sidebar-foreground: 180 10% 95%;
+    --sidebar-primary: 174 50% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 180 30% 12%;
+    --sidebar-accent-foreground: 180 10% 95%;
+    --sidebar-border: 180 30% 15%;
+    --sidebar-ring: 174 50% 55%;
+
+    --cali-teal: 174 50% 55%;
+    --cali-teal-light: 174 40% 15%;
+    --cali-coral: 16 70% 55%;
+    --cali-coral-light: 16 70% 15%;
+    --cali-sand: 40 20% 15%;
+    --cali-ocean-dark: 180 45% 5%;
+    --cali-wave: 180 45% 45%;
   }
 }
 
