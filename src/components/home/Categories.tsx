@@ -3,17 +3,17 @@ import { Cpu, Backpack, ArrowRight } from 'lucide-react';
 
 const categories = [
   {
-    name: 'Tech Gear',
-    description: 'Smart devices designed for beach life',
+    name: 'Tech da Hora',
+    description: 'Gadgets espertos pra vida na praia',
     icon: Cpu,
     path: '/shop?category=tech',
     gradient: 'bg-gradient-ocean',
   },
   {
-    name: 'Accessories',
-    description: 'Essential beach-tech companions',
+    name: 'Acessórios Irados',
+    description: 'O combo perfeito pro seu rolê praiano',
     icon: Backpack,
-    path: '/shop?category=accessories',
+    path: '/shop?category=acessórios',
     gradient: 'bg-gradient-sunset',
   },
 ];
@@ -24,10 +24,10 @@ const Categories = () => {
       <div className="container">
         <div className="text-center mb-12">
           <p className="text-sm font-medium text-accent uppercase tracking-widest mb-2">
-            Browse By Category
+            Escolhe tua Vibe
           </p>
           <h2 className="text-3xl md:text-4xl font-bold text-foreground">
-            Shop Our Collections
+            Nossas Coleções 🏄
           </h2>
         </div>
 
