@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, ArrowLeft } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -7,26 +7,117 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
+import { z } from 'zod';
 import caliLogo from '@/assets/cali-logo.jpeg';
+
+const loginSchema = z.object({
+  email: z.string().trim().email('E-mail inválido').max(255, 'E-mail muito longo'),
+  password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
+});
+
+const signupSchema = z.object({
+  firstName: z.string().trim().min(1, 'Nome é obrigatório').max(100, 'Nome muito longo'),
+  lastName: z.string().trim().min(1, 'Sobrenome é obrigatório').max(100, 'Sobrenome muito longo'),
+  email: z.string().trim().email('E-mail inválido').max(255, 'E-mail muito longo'),
+  password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
+});
 
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  
+  const { signIn, signUp, user, role, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (role === 'admin' || role === 'manager') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
+    }
+  }, [user, role, authLoading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const validation = loginSchema.safeParse({
+      email: loginEmail,
+      password: loginPassword,
+    });
+
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    toast.info('Autenticação requer configuração do backend. Conecte o Lovable Cloud pra ativar o login.');
+    const { error } = await signIn(loginEmail, loginPassword);
     setIsLoading(false);
+
+    if (error) {
+      if (error.message.includes('Invalid login credentials')) {
+        toast.error('E-mail ou senha incorretos');
+      } else if (error.message.includes('Email not confirmed')) {
+        toast.error('Confirme seu e-mail antes de fazer login');
+      } else {
+        toast.error('Erro ao fazer login. Tente novamente.');
+      }
+      return;
+    }
+
+    toast.success('Bem-vindo de volta! 🤙');
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const validation = signupSchema.safeParse({
+      firstName,
+      lastName,
+      email: signupEmail,
+      password: signupPassword,
+    });
+
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    toast.info('Autenticação requer configuração do backend. Conecte o Lovable Cloud pra criar contas.');
+    const fullName = `${firstName} ${lastName}`;
+    const { error } = await signUp(signupEmail, signupPassword, fullName);
     setIsLoading(false);
+
+    if (error) {
+      if (error.message.includes('User already registered')) {
+        toast.error('Este e-mail já está cadastrado');
+      } else {
+        toast.error('Erro ao criar conta. Tente novamente.');
+      }
+      return;
+    }
+
+    toast.success('Conta criada com sucesso! Bem-vindo à Cali! 🤙');
   };
+
+  if (authLoading) {
+    return (
+      <MainLayout>
+        <div className="container py-12 flex items-center justify-center min-h-[60vh]">
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -70,6 +161,8 @@ const Auth = () => {
                         type="email"
                         placeholder="seu@email.com"
                         className="pl-10"
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
                         required
                       />
                     </div>
@@ -83,17 +176,11 @@ const Auth = () => {
                         type="password"
                         placeholder="••••••••"
                         className="pl-10"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
                         required
                       />
                     </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      className="text-sm text-primary hover:underline"
-                    >
-                      Esqueceu a senha?
-                    </button>
                   </div>
                   <Button
                     type="submit"
@@ -116,13 +203,21 @@ const Auth = () => {
                           id="first-name"
                           placeholder="Seu nome"
                           className="pl-10"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
                           required
                         />
                       </div>
                     </div>
                     <div>
                       <Label htmlFor="last-name">Sobrenome</Label>
-                      <Input id="last-name" placeholder="Sobrenome" required />
+                      <Input
+                        id="last-name"
+                        placeholder="Sobrenome"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        required
+                      />
                     </div>
                   </div>
                   <div>
@@ -134,6 +229,8 @@ const Auth = () => {
                         type="email"
                         placeholder="seu@email.com"
                         className="pl-10"
+                        value={signupEmail}
+                        onChange={(e) => setSignupEmail(e.target.value)}
                         required
                       />
                     </div>
@@ -147,6 +244,8 @@ const Auth = () => {
                         type="password"
                         placeholder="••••••••"
                         className="pl-10"
+                        value={signupPassword}
+                        onChange={(e) => setSignupPassword(e.target.value)}
                         required
                       />
                     </div>

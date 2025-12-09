@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Package,
@@ -12,21 +12,42 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
+import { Badge } from '@/components/ui/badge';
 import caliLogo from '@/assets/cali-logo.jpeg';
-
-const sidebarItems = [
-  { name: 'Painel', icon: LayoutDashboard, path: '/admin' },
-  { name: 'Produtos', icon: Package, path: '/admin/products' },
-  { name: 'Pedidos', icon: ShoppingCart, path: '/admin/orders' },
-  { name: 'Clientes', icon: Users, path: '/admin/customers' },
-  { name: 'Pagamentos', icon: CreditCard, path: '/admin/payments' },
-  { name: 'Relatórios', icon: BarChart3, path: '/admin/reports' },
-  { name: 'Configurações', icon: Settings, path: '/admin/settings' },
-];
 
 const AdminLayout = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user, role, signOut, isAdmin, canManageRoles } = useAuth();
+
+  // Define menu items based on role
+  const sidebarItems = [
+    { name: 'Painel', icon: LayoutDashboard, path: '/admin', showFor: ['admin', 'manager'] },
+    { name: 'Produtos', icon: Package, path: '/admin/products', showFor: ['admin', 'manager'] },
+    { name: 'Pedidos', icon: ShoppingCart, path: '/admin/orders', showFor: ['admin', 'manager'] },
+    { name: 'Clientes', icon: Users, path: '/admin/customers', showFor: ['admin', 'manager'] },
+    { name: 'Pagamentos', icon: CreditCard, path: '/admin/payments', showFor: ['admin', 'manager'] },
+    { name: 'Relatórios', icon: BarChart3, path: '/admin/reports', showFor: ['admin', 'manager'] },
+    { name: 'Configurações', icon: Settings, path: '/admin/settings', showFor: ['admin'] }, // Admin only
+  ];
+
+  const visibleItems = sidebarItems.filter(item => 
+    role && item.showFor.includes(role)
+  );
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/');
+  };
+
+  const getRoleBadge = () => {
+    if (isAdmin) {
+      return <Badge variant="default" className="bg-primary">Admin</Badge>;
+    }
+    return <Badge variant="secondary">Manager</Badge>;
+  };
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -56,7 +77,7 @@ const AdminLayout = () => {
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1">
-            {sidebarItems.map((item) => {
+            {visibleItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
                 <Link
@@ -77,14 +98,21 @@ const AdminLayout = () => {
           </nav>
 
           {/* Footer */}
-          <div className="p-4 border-t border-sidebar-border">
+          <div className="p-4 border-t border-sidebar-border space-y-2">
             <Link
               to="/"
               className="flex items-center gap-3 px-4 py-3 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
             >
-              <LogOut className="h-5 w-5" />
-              <span className="font-medium">Sair do Admin</span>
+              <Package className="h-5 w-5" />
+              <span className="font-medium">Ver Loja</span>
             </Link>
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+            >
+              <LogOut className="h-5 w-5" />
+              <span className="font-medium">Sair</span>
+            </button>
           </div>
         </div>
       </aside>
@@ -111,8 +139,15 @@ const AdminLayout = () => {
               <Menu className="h-5 w-5" />
             </Button>
             <div className="flex items-center gap-4 ml-auto">
-              <span className="text-sm text-muted-foreground">Usuário Admin</span>
-              <div className="w-8 h-8 rounded-full bg-gradient-ocean" />
+              <div className="text-right">
+                <p className="text-sm font-medium">{user?.email}</p>
+                <div className="flex items-center gap-2 justify-end">
+                  {getRoleBadge()}
+                </div>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-gradient-ocean flex items-center justify-center text-primary-foreground font-bold">
+                {user?.email?.charAt(0).toUpperCase()}
+              </div>
             </div>
           </div>
         </header>
