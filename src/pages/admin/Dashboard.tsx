@@ -5,6 +5,7 @@ import {
   TrendingUp,
   ArrowUpRight,
   ArrowDownRight,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -18,65 +19,150 @@ import {
   BarChart,
   Bar,
 } from 'recharts';
-
-const salesData = [
-  { name: 'Jan', sales: 20000 },
-  { name: 'Fev', sales: 15000 },
-  { name: 'Mar', sales: 25000 },
-  { name: 'Abr', sales: 22500 },
-  { name: 'Mai', sales: 30000 },
-  { name: 'Jun', sales: 27500 },
-  { name: 'Jul', sales: 35000 },
-];
-
-const categoryData = [
-  { name: 'Tech', sales: 60000 },
-  { name: 'Acessórios', sales: 42500 },
-];
-
-const recentOrders = [
-  { id: '#1234', customer: 'João Silva', total: 1499.90, status: 'Entregue' },
-  { id: '#1235', customer: 'Maria Santos', total: 749.90, status: 'Processando' },
-  { id: '#1236', customer: 'Pedro Oliveira', total: 2299.90, status: 'Enviado' },
-  { id: '#1237', customer: 'Ana Costa', total: 449.90, status: 'Pendente' },
-];
-
-const stats = [
-  {
-    title: 'Receita Total',
-    value: 'R$ 226.159',
-    change: '+12.5%',
-    trend: 'up',
-    icon: DollarSign,
-  },
-  {
-    title: 'Pedidos',
-    value: '1.234',
-    change: '+8.2%',
-    trend: 'up',
-    icon: ShoppingCart,
-  },
-  {
-    title: 'Clientes',
-    value: '5.678',
-    change: '+15.3%',
-    trend: 'up',
-    icon: Users,
-  },
-  {
-    title: 'Taxa de Conversão',
-    value: '3.2%',
-    change: '-2.1%',
-    trend: 'down',
-    icon: TrendingUp,
-  },
-];
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Badge } from '@/components/ui/badge';
 
 const formatPrice = (price: number) => {
   return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
 
 const Dashboard = () => {
+  // Fetch orders for stats
+  const { data: orders = [], isLoading: ordersLoading } = useQuery({
+    queryKey: ['admin-orders-stats'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch customers count
+  const { data: customersCount = 0, isLoading: customersLoading } = useQuery({
+    queryKey: ['admin-customers-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
+  // Fetch products by category
+  const { data: products = [], isLoading: productsLoading } = useQuery({
+    queryKey: ['admin-products-categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('category, price');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const isLoading = ordersLoading || customersLoading || productsLoading;
+
+  // Calculate stats
+  const totalRevenue = orders.reduce((sum, order) => sum + Number(order.total), 0);
+  const totalOrders = orders.length;
+  const pendingOrders = orders.filter(o => o.status === 'pending').length;
+  const completedOrders = orders.filter(o => o.status === 'delivered' || o.status === 'completed').length;
+
+  // Group orders by month for chart
+  const monthlyData = orders.reduce((acc, order) => {
+    const date = new Date(order.created_at);
+    const month = date.toLocaleString('pt-BR', { month: 'short' });
+    const existing = acc.find(item => item.name === month);
+    if (existing) {
+      existing.sales += Number(order.total);
+    } else {
+      acc.push({ name: month, sales: Number(order.total) });
+    }
+    return acc;
+  }, [] as { name: string; sales: number }[]).slice(-7);
+
+  // Group by category
+  const categoryData = products.reduce((acc, product) => {
+    const existing = acc.find(item => item.name === product.category);
+    if (existing) {
+      existing.sales += Number(product.price);
+    } else {
+      acc.push({ name: product.category, sales: Number(product.price) });
+    }
+    return acc;
+  }, [] as { name: string; sales: number }[]);
+
+  // Recent orders (last 5)
+  const recentOrders = orders.slice(0, 5);
+
+  const stats = [
+    {
+      title: 'Receita Total',
+      value: formatPrice(totalRevenue),
+      change: '+12.5%',
+      trend: 'up' as const,
+      icon: DollarSign,
+    },
+    {
+      title: 'Pedidos',
+      value: totalOrders.toString(),
+      change: '+8.2%',
+      trend: 'up' as const,
+      icon: ShoppingCart,
+    },
+    {
+      title: 'Clientes',
+      value: customersCount.toString(),
+      change: '+15.3%',
+      trend: 'up' as const,
+      icon: Users,
+    },
+    {
+      title: 'Pedidos Pendentes',
+      value: pendingOrders.toString(),
+      change: pendingOrders > 0 ? 'Atenção' : 'OK',
+      trend: pendingOrders > 0 ? 'down' as const : 'up' as const,
+      icon: TrendingUp,
+    },
+  ];
+
+  const getStatusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      delivered: 'bg-green-100 text-green-800',
+      completed: 'bg-green-100 text-green-800',
+      processing: 'bg-blue-100 text-blue-800',
+      shipped: 'bg-purple-100 text-purple-800',
+      pending: 'bg-yellow-100 text-yellow-800',
+      cancelled: 'bg-red-100 text-red-800',
+    };
+    return styles[status] || 'bg-muted text-muted-foreground';
+  };
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      delivered: 'Entregue',
+      completed: 'Concluído',
+      processing: 'Processando',
+      shipped: 'Enviado',
+      pending: 'Pendente',
+      cancelled: 'Cancelado',
+    };
+    return labels[status] || status;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -106,7 +192,7 @@ const Dashboard = () => {
                 ) : (
                   <ArrowDownRight className="h-4 w-4" />
                 )}
-                {stat.change} desde o mês passado
+                {stat.change}
               </div>
             </CardContent>
           </Card>
@@ -121,28 +207,34 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={salesData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="name" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                    formatter={(value) => [formatPrice(value as number), 'Vendas']}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="sales"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--primary))' }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {monthlyData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="name" className="text-xs" />
+                    <YAxis className="text-xs" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                      }}
+                      formatter={(value) => [formatPrice(value as number), 'Vendas']}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="sales"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--primary))' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  Sem dados de vendas ainda
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -153,26 +245,32 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={categoryData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="name" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                    formatter={(value) => [formatPrice(value as number), 'Vendas']}
-                  />
-                  <Bar
-                    dataKey="sales"
-                    fill="hsl(var(--accent))"
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              {categoryData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={categoryData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="name" className="text-xs" />
+                    <YAxis className="text-xs" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                      }}
+                      formatter={(value) => [formatPrice(value as number), 'Vendas']}
+                    />
+                    <Bar
+                      dataKey="sales"
+                      fill="hsl(var(--accent))"
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  Sem dados de categorias ainda
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -188,43 +286,35 @@ const Dashboard = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    ID do Pedido
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    Cliente
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    Total
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    Status
-                  </th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">ID</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Total</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Data</th>
                 </tr>
               </thead>
               <tbody>
-                {recentOrders.map((order) => (
-                  <tr key={order.id} className="border-b border-border last:border-0">
-                    <td className="py-3 px-4 font-medium">{order.id}</td>
-                    <td className="py-3 px-4">{order.customer}</td>
-                    <td className="py-3 px-4">{formatPrice(order.total)}</td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                          order.status === 'Entregue'
-                            ? 'bg-green-100 text-green-800'
-                            : order.status === 'Processando'
-                            ? 'bg-blue-100 text-blue-800'
-                            : order.status === 'Enviado'
-                            ? 'bg-purple-100 text-purple-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}
-                      >
-                        {order.status}
-                      </span>
+                {recentOrders.length > 0 ? (
+                  recentOrders.map((order) => (
+                    <tr key={order.id} className="border-b border-border last:border-0">
+                      <td className="py-3 px-4 font-medium">#{order.id.slice(0, 8)}</td>
+                      <td className="py-3 px-4">{formatPrice(Number(order.total))}</td>
+                      <td className="py-3 px-4">
+                        <Badge className={getStatusBadge(order.status)}>
+                          {getStatusLabel(order.status)}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">
+                        {new Date(order.created_at).toLocaleDateString('pt-BR')}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                      Nenhum pedido ainda
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
