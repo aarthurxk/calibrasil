@@ -1,11 +1,25 @@
-import { products } from '@/data/products';
-import ProductCard from '@/components/products/ProductCard';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import ProductCard from '@/components/products/ProductCard';
 import { Button } from '@/components/ui/button';
+import type { Product } from '@/types/product';
 
 const FeaturedProducts = () => {
-  const featuredProducts = products.filter((p) => p.featured).slice(0, 4);
+  const { data: featuredProducts = [], isLoading } = useQuery({
+    queryKey: ['featured-products'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('featured', true)
+        .limit(4);
+      
+      if (error) throw error;
+      return data as Product[];
+    },
+  });
 
   return (
     <section className="py-20 bg-background">
@@ -27,17 +41,27 @@ const FeaturedProducts = () => {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {featuredProducts.map((product, index) => (
-            <div
-              key={product.id}
-              className="animate-fade-in"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <ProductCard product={product} />
-            </div>
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : featuredProducts.length === 0 ? (
+          <p className="text-center text-muted-foreground py-12">
+            Nenhum produto em destaque ainda.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {featuredProducts.map((product, index) => (
+              <div
+                key={product.id}
+                className="animate-fade-in"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <ProductCard product={product} />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
