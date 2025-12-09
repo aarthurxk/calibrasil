@@ -209,6 +209,57 @@ export type Database = {
         }
         Relationships: []
       }
+      store_settings: {
+        Row: {
+          created_at: string
+          currency: string | null
+          free_shipping_threshold: number | null
+          id: string
+          notify_abandoned_cart: boolean | null
+          notify_low_stock: boolean | null
+          notify_messages: boolean | null
+          notify_orders: boolean | null
+          standard_shipping_rate: number | null
+          store_description: string | null
+          store_email: string | null
+          store_name: string | null
+          tax_rate: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string | null
+          free_shipping_threshold?: number | null
+          id?: string
+          notify_abandoned_cart?: boolean | null
+          notify_low_stock?: boolean | null
+          notify_messages?: boolean | null
+          notify_orders?: boolean | null
+          standard_shipping_rate?: number | null
+          store_description?: string | null
+          store_email?: string | null
+          store_name?: string | null
+          tax_rate?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string | null
+          free_shipping_threshold?: number | null
+          id?: string
+          notify_abandoned_cart?: boolean | null
+          notify_low_stock?: boolean | null
+          notify_messages?: boolean | null
+          notify_orders?: boolean | null
+          standard_shipping_rate?: number | null
+          store_description?: string | null
+          store_email?: string | null
+          store_name?: string | null
+          tax_rate?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
