@@ -13,15 +13,15 @@ const FeaturedProducts = () => {
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-12">
           <div>
             <p className="text-sm font-medium text-accent uppercase tracking-widest mb-2">
-              Curated Selection
+              Seleção Especial
             </p>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground">
-              Featured Products
+              Os Queridinhos 🔥
             </h2>
           </div>
           <Link to="/shop">
             <Button variant="ghost" className="text-primary hover:text-primary/80">
-              View All Products
+              Ver Tudo
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
