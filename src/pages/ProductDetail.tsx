@@ -1,11 +1,13 @@
 import { useParams, Link } from 'react-router-dom';
 import { useState } from 'react';
 import { Star, ShoppingCart, Heart, Truck, Shield, ArrowLeft, Minus, Plus } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import MainLayout from '@/components/layout/MainLayout';
-import { products } from '@/data/products';
+import { supabase } from '@/integrations/supabase/client';
 import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 
 const ProductDetail = () => {
@@ -15,13 +17,49 @@ const ProductDetail = () => {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
 
-  const product = products.find((p) => p.id === id);
+  const { data: product, isLoading, error } = useQuery({
+    queryKey: ['product', id],
+    queryFn: async () => {
+      if (!id) throw new Error('Product ID is required');
+      
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
 
   const formatPrice = (price: number) => {
     return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
-  if (!product) {
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="container py-8">
+          <Skeleton className="h-6 w-32 mb-8" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            <Skeleton className="aspect-square rounded-2xl" />
+            <div className="space-y-6">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-10 w-3/4" />
+              <Skeleton className="h-6 w-40" />
+              <Skeleton className="h-12 w-48" />
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (error || !product) {
     return (
       <MainLayout>
         <div className="container py-20 text-center">
@@ -34,9 +72,13 @@ const ProductDetail = () => {
     );
   }
 
-  const discount = product.originalPrice
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+  const discount = product.original_price
+    ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
     : 0;
+
+  // Convert color string to array for display
+  const colors = product.color ? [product.color] : null;
+  const sizes = product.sizes || null;
 
   const handleAddToCart = () => {
     for (let i = 0; i < quantity; i++) {
@@ -44,7 +86,7 @@ const ProductDetail = () => {
         id: product.id,
         name: product.name,
         price: product.price,
-        image: product.image,
+        image: product.image || '/placeholder.svg',
         size: selectedSize || undefined,
         color: selectedColor || undefined,
       });
@@ -68,7 +110,7 @@ const ProductDetail = () => {
           {/* Image */}
           <div className="relative aspect-square rounded-2xl overflow-hidden bg-muted">
             <img
-              src={product.image}
+              src={product.image || '/placeholder.svg'}
               alt={product.name}
               className="h-full w-full object-cover"
             />
@@ -94,17 +136,14 @@ const ProductDetail = () => {
                     <Star
                       key={i}
                       className={`h-5 w-5 ${
-                        i < Math.floor(product.rating)
+                        i < Math.floor(product.rating || 0)
                           ? 'fill-accent text-accent'
                           : 'text-muted'
                       }`}
                     />
                   ))}
                 </div>
-                <span className="font-medium">{product.rating}</span>
-                <span className="text-muted-foreground">
-                  ({product.reviews} avaliações)
-                </span>
+                <span className="font-medium">{product.rating || 0}</span>
               </div>
             </div>
 
@@ -112,9 +151,9 @@ const ProductDetail = () => {
               <span className="text-4xl font-bold text-primary">
                 {formatPrice(product.price)}
               </span>
-              {product.originalPrice && (
+              {product.original_price && (
                 <span className="text-xl text-muted-foreground line-through">
-                  {formatPrice(product.originalPrice)}
+                  {formatPrice(product.original_price)}
                 </span>
               )}
             </div>
@@ -124,11 +163,11 @@ const ProductDetail = () => {
             </p>
 
             {/* Colors */}
-            {product.colors && (
+            {colors && colors.length > 0 && (
               <div>
                 <p className="font-medium mb-3">Cor</p>
                 <div className="flex gap-2">
-                  {product.colors.map((color) => (
+                  {colors.map((color) => (
                     <button
                       key={color}
                       onClick={() => setSelectedColor(color)}
@@ -146,11 +185,11 @@ const ProductDetail = () => {
             )}
 
             {/* Sizes */}
-            {product.sizes && (
+            {sizes && sizes.length > 0 && (
               <div>
                 <p className="font-medium mb-3">Tamanho</p>
                 <div className="flex gap-2">
-                  {product.sizes.map((size) => (
+                  {sizes.map((size) => (
                     <button
                       key={size}
                       onClick={() => setSelectedSize(size)}
@@ -195,9 +234,10 @@ const ProductDetail = () => {
                 size="lg"
                 className="flex-1 bg-gradient-ocean text-primary-foreground hover:opacity-90"
                 onClick={handleAddToCart}
+                disabled={!product.in_stock}
               >
                 <ShoppingCart className="mr-2 h-5 w-5" />
-                Joga na Sacola
+                {product.in_stock ? 'Joga na Sacola' : 'Esgotado'}
               </Button>
               <Button size="lg" variant="outline">
                 <Heart className="h-5 w-5" />

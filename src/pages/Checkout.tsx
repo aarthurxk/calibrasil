@@ -1,17 +1,33 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CreditCard, Lock } from 'lucide-react';
+import { ArrowLeft, CreditCard, Lock, QrCode, Barcode } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
 import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from 'sonner';
+
+type PaymentMethod = 'pix' | 'boleto' | 'card';
 
 const Checkout = () => {
   const { items, total, clearCart } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Form state
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [zip, setZip] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix');
 
   const shipping = total >= 250 ? 0 : 29.90;
   const finalTotal = total + shipping;
@@ -24,13 +40,66 @@ const Checkout = () => {
     e.preventDefault();
     setIsProcessing(true);
     
-    // Simulate payment processing
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    
-    toast.success('Pedido realizado com sucesso! 🎉');
-    clearCart();
-    navigate('/');
-    setIsProcessing(false);
+    try {
+      // Validate required fields
+      if (!email || !firstName || !lastName || !address || !city || !zip) {
+        toast.error('Por favor, preencha todos os campos obrigatórios');
+        setIsProcessing(false);
+        return;
+      }
+
+      const orderData = {
+        items: items.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          image: item.image,
+          size: item.size,
+          color: item.color,
+        })),
+        email,
+        phone: phone || null,
+        shipping_address: {
+          firstName,
+          lastName,
+          address,
+          city,
+          zip,
+        },
+        user_id: user?.id || null,
+        total: finalTotal,
+        shipping,
+        payment_method: paymentMethod,
+      };
+
+      console.log('Sending order:', orderData);
+
+      const { data, error } = await supabase.functions.invoke('create-order', {
+        body: orderData,
+      });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Erro ao processar pedido');
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Erro ao criar pedido');
+      }
+
+      console.log('Order created:', data);
+      
+      toast.success('Pedido realizado com sucesso! 🎉');
+      clearCart();
+      navigate('/');
+      
+    } catch (error: any) {
+      console.error('Error creating order:', error);
+      toast.error(error.message || 'Erro ao processar pedido. Tente novamente.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   if (items.length === 0) {
@@ -67,17 +136,25 @@ const Checkout = () => {
               <div className="space-y-4">
                 <h2 className="text-xl font-semibold">Informações de Contato</h2>
                 <div>
-                  <Label htmlFor="email">E-mail</Label>
+                  <Label htmlFor="email">E-mail *</Label>
                   <Input
                     id="email"
                     type="email"
                     required
                     placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
                 <div>
                   <Label htmlFor="phone">Telefone</Label>
-                  <Input id="phone" type="tel" placeholder="(11) 99999-9999" />
+                  <Input 
+                    id="phone" 
+                    type="tel" 
+                    placeholder="(11) 99999-9999"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
                 </div>
               </div>
 
@@ -86,68 +163,122 @@ const Checkout = () => {
                 <h2 className="text-xl font-semibold">Endereço de Entrega</h2>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="firstName">Nome</Label>
-                    <Input id="firstName" required />
+                    <Label htmlFor="firstName">Nome *</Label>
+                    <Input 
+                      id="firstName" 
+                      required
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                    />
                   </div>
                   <div>
-                    <Label htmlFor="lastName">Sobrenome</Label>
-                    <Input id="lastName" required />
+                    <Label htmlFor="lastName">Sobrenome *</Label>
+                    <Input 
+                      id="lastName" 
+                      required
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                    />
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="address">Endereço</Label>
-                  <Input id="address" required placeholder="Rua, número, complemento" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="city">Cidade</Label>
-                    <Input id="city" required />
-                  </div>
-                  <div>
-                    <Label htmlFor="zip">CEP</Label>
-                    <Input id="zip" required placeholder="00000-000" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment */}
-              <div className="space-y-4">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Dados do Pagamento
-                </h2>
-                <p className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Lock className="h-4 w-4" />
-                  Pagamento 100% seguro com criptografia SSL
-                </p>
-                <div>
-                  <Label htmlFor="cardNumber">Número do Cartão</Label>
-                  <Input
-                    id="cardNumber"
-                    placeholder="1234 5678 9012 3456"
-                    required
+                  <Label htmlFor="address">Endereço *</Label>
+                  <Input 
+                    id="address" 
+                    required 
+                    placeholder="Rua, número, complemento"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="expiry">Validade</Label>
-                    <Input id="expiry" placeholder="MM/AA" required />
+                    <Label htmlFor="city">Cidade *</Label>
+                    <Input 
+                      id="city" 
+                      required
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                    />
                   </div>
                   <div>
-                    <Label htmlFor="cvv">CVV</Label>
-                    <Input id="cvv" placeholder="123" required />
+                    <Label htmlFor="zip">CEP *</Label>
+                    <Input 
+                      id="zip" 
+                      required 
+                      placeholder="00000-000"
+                      value={zip}
+                      onChange={(e) => setZip(e.target.value)}
+                    />
                   </div>
                 </div>
+              </div>
+
+              {/* Payment Method */}
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Forma de Pagamento
+                </h2>
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Lock className="h-4 w-4" />
+                  Pagamento 100% seguro
+                </p>
+                
+                <RadioGroup 
+                  value={paymentMethod} 
+                  onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
+                  className="space-y-3"
+                >
+                  <div className="flex items-center space-x-3 border border-border rounded-lg p-4 cursor-pointer hover:border-primary/50 transition-colors">
+                    <RadioGroupItem value="pix" id="pix" />
+                    <Label htmlFor="pix" className="flex items-center gap-3 cursor-pointer flex-1">
+                      <QrCode className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="font-medium">Pix</p>
+                        <p className="text-sm text-muted-foreground">Aprovação instantânea</p>
+                      </div>
+                    </Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3 border border-border rounded-lg p-4 cursor-pointer hover:border-primary/50 transition-colors">
+                    <RadioGroupItem value="boleto" id="boleto" />
+                    <Label htmlFor="boleto" className="flex items-center gap-3 cursor-pointer flex-1">
+                      <Barcode className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="font-medium">Boleto Bancário</p>
+                        <p className="text-sm text-muted-foreground">Aprovação em até 3 dias úteis</p>
+                      </div>
+                    </Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3 border border-border rounded-lg p-4 cursor-pointer hover:border-primary/50 transition-colors">
+                    <RadioGroupItem value="card" id="card" />
+                    <Label htmlFor="card" className="flex items-center gap-3 cursor-pointer flex-1">
+                      <CreditCard className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="font-medium">Cartão de Crédito</p>
+                        <p className="text-sm text-muted-foreground">Em breve</p>
+                      </div>
+                    </Label>
+                  </div>
+                </RadioGroup>
               </div>
 
               <Button
                 type="submit"
                 size="lg"
                 className="w-full bg-gradient-ocean text-primary-foreground hover:opacity-90"
-                disabled={isProcessing}
+                disabled={isProcessing || paymentMethod === 'card'}
               >
-                {isProcessing ? 'Processando...' : `Pagar ${formatPrice(finalTotal)}`}
+                {isProcessing ? 'Processando...' : `Finalizar Pedido ${formatPrice(finalTotal)}`}
               </Button>
+              
+              {paymentMethod === 'card' && (
+                <p className="text-sm text-muted-foreground text-center">
+                  Pagamento com cartão será integrado em breve. Por favor, escolha Pix ou Boleto.
+                </p>
+              )}
             </form>
           </div>
 

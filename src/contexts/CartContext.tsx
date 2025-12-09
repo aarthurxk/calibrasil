@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
 export interface CartItem {
   id: string;
@@ -20,10 +20,31 @@ interface CartContextType {
   itemCount: number;
 }
 
+const CART_STORAGE_KEY = 'cali-cart';
+
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<CartItem[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(CART_STORAGE_KEY);
+        return saved ? JSON.parse(saved) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  // Persist to localStorage whenever items change
+  useEffect(() => {
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    } catch (error) {
+      console.error('Error saving cart to localStorage:', error);
+    }
+  }, [items]);
 
   const addItem = useCallback((newItem: Omit<CartItem, 'quantity'>) => {
     setItems((prev) => {
@@ -53,6 +74,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearCart = useCallback(() => {
     setItems([]);
+    try {
+      localStorage.removeItem(CART_STORAGE_KEY);
+    } catch (error) {
+      console.error('Error clearing cart from localStorage:', error);
+    }
   }, []);
 
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);

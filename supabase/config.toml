@@ -2,3 +2,6 @@ project_id = "vbnazlnwudhewjgftxce"
 
 [functions.create-user]
 verify_jwt = true
+
+[functions.create-order]
+verify_jwt = false
