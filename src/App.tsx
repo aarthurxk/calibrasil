@@ -15,6 +15,7 @@ import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import Auth from "./pages/Auth";
 import About from "./pages/About";
+import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 
 // Admin Pages
@@ -46,6 +47,7 @@ const App = () => (
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
               
               {/* Admin Routes - Protected for admin and manager only */}
               <Route
