@@ -1,18 +1,42 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Filter, Grid3X3, List } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Filter, Grid3X3, List, Plus, Loader2 } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
 import ProductCard from '@/components/products/ProductCard';
-import { products, categories } from '@/data/products';
+import ProductForm from '@/components/admin/ProductForm';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { Product } from '@/types/product';
+
+const CATEGORIES = ['Todos', 'Tech', 'Acessórios', 'Vestuário', 'Esporte'];
 
 const Shop = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [sortBy, setSortBy] = useState('featured');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [showProductForm, setShowProductForm] = useState(false);
+  
+  const { isAdmin, isManager } = useAuth();
+  const canManageProducts = isAdmin || isManager;
 
   const selectedCategory = searchParams.get('category') || 'Todos';
+
+  // Fetch products from database
+  const { data: products = [], isLoading } = useQuery({
+    queryKey: ['shop-products'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as Product[];
+    },
+  });
 
   const filteredProducts = useMemo(() => {
     let result = [...products];
@@ -33,7 +57,7 @@ const Shop = () => {
         result.sort((a, b) => b.price - a.price);
         break;
       case 'rating':
-        result.sort((a, b) => b.rating - a.rating);
+        result.sort((a, b) => (b.rating || 0) - (a.rating || 0));
         break;
       case 'featured':
       default:
@@ -41,7 +65,7 @@ const Shop = () => {
     }
 
     return result;
-  }, [selectedCategory, sortBy]);
+  }, [products, selectedCategory, sortBy]);
 
   const handleCategoryChange = (category: string) => {
     if (category === 'Todos') {
@@ -66,11 +90,11 @@ const Shop = () => {
       <div className="container py-8">
         {/* Filters Bar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 p-4 bg-card rounded-xl border border-border">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Filter className="h-5 w-5 text-muted-foreground" />
             <span className="text-sm font-medium">Filtrar:</span>
-            <div className="flex gap-2">
-              {categories.map((category) => (
+            <div className="flex gap-2 flex-wrap">
+              {CATEGORIES.map((category) => (
                 <Button
                   key={category}
                   variant={
@@ -88,6 +112,13 @@ const Shop = () => {
           </div>
 
           <div className="flex items-center gap-4">
+            {canManageProducts && (
+              <Button onClick={() => setShowProductForm(true)} size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Produto
+              </Button>
+            )}
+            
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Ordenar por" />
@@ -121,36 +152,57 @@ const Shop = () => {
 
         {/* Results count */}
         <p className="text-sm text-muted-foreground mb-6">
-          Mostrando {filteredProducts.length} produtos
+          {isLoading ? 'Carregando...' : `Mostrando ${filteredProducts.length} produtos`}
         </p>
 
-        {/* Products Grid */}
-        <div
-          className={
-            viewMode === 'grid'
-              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
-              : 'flex flex-col gap-4'
-          }
-        >
-          {filteredProducts.map((product, index) => (
-            <div
-              key={product.id}
-              className="animate-fade-in"
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              <ProductCard product={product} />
-            </div>
-          ))}
-        </div>
+        {/* Loading state */}
+        {isLoading && (
+          <div className="flex justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
 
-        {filteredProducts.length === 0 && (
+        {/* Products Grid */}
+        {!isLoading && (
+          <div
+            className={
+              viewMode === 'grid'
+                ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
+                : 'flex flex-col gap-4'
+            }
+          >
+            {filteredProducts.map((product, index) => (
+              <div
+                key={product.id}
+                className="animate-fade-in"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <ProductCard product={product} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!isLoading && filteredProducts.length === 0 && (
           <div className="text-center py-20">
             <p className="text-muted-foreground">
               Ops! Nenhum produto encontrado. Tenta outro filtro aí!
             </p>
+            {canManageProducts && (
+              <Button className="mt-4" onClick={() => setShowProductForm(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Cadastrar Primeiro Produto
+              </Button>
+            )}
           </div>
         )}
       </div>
+
+      {/* Product Form Modal */}
+      <ProductForm
+        open={showProductForm}
+        onOpenChange={setShowProductForm}
+      />
     </MainLayout>
   );
 };
