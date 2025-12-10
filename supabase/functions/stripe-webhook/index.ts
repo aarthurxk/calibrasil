@@ -76,6 +76,78 @@ serve(async (req) => {
             console.error("Error updating order:", error);
           } else {
             console.log("Order updated successfully:", orderId);
+
+            // Fetch order details for email
+            const { data: orderData, error: orderError } = await supabase
+              .from("orders")
+              .select("*")
+              .eq("id", orderId)
+              .single();
+
+            if (orderError) {
+              console.error("Error fetching order for email:", orderError);
+            } else {
+              // Fetch order items
+              const { data: itemsData, error: itemsError } = await supabase
+                .from("order_items")
+                .select("*")
+                .eq("order_id", orderId);
+
+              if (itemsError) {
+                console.error("Error fetching order items:", itemsError);
+              } else {
+                // Send notification emails
+                const shippingAddress = orderData.shipping_address as any;
+                const customerEmail = orderData.guest_email || session.customer_email || "";
+                const customerName = shippingAddress?.name || "Cliente";
+                
+                const emailPayload = {
+                  orderId: orderId,
+                  customerEmail: customerEmail,
+                  customerName: customerName,
+                  customerPhone: orderData.phone || "",
+                  items: itemsData.map((item: any) => ({
+                    product_name: item.product_name,
+                    quantity: item.quantity,
+                    price: item.price,
+                  })),
+                  total: orderData.total,
+                  shippingAddress: {
+                    name: shippingAddress?.name || "",
+                    street: shippingAddress?.street || "",
+                    number: shippingAddress?.number || "",
+                    complement: shippingAddress?.complement || "",
+                    neighborhood: shippingAddress?.neighborhood || "",
+                    city: shippingAddress?.city || "",
+                    state: shippingAddress?.state || "",
+                    zipCode: shippingAddress?.zipCode || "",
+                  },
+                  paymentMethod: orderData.payment_method || "card",
+                };
+
+                console.log("Sending order emails with payload:", emailPayload);
+
+                // Call send-order-emails function
+                try {
+                  const emailResponse = await fetch(
+                    `${supabaseUrl}/functions/v1/send-order-emails`,
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${supabaseServiceKey}`,
+                      },
+                      body: JSON.stringify(emailPayload),
+                    }
+                  );
+
+                  const emailResult = await emailResponse.json();
+                  console.log("Email send result:", emailResult);
+                } catch (emailError) {
+                  console.error("Error sending emails:", emailError);
+                }
+              }
+            }
           }
         }
         break;
