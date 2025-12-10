@@ -4,6 +4,7 @@ import { CheckCircle, XCircle, Clock, Loader2, Package, ArrowRight } from 'lucid
 import MainLayout from '@/components/layout/MainLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { useCart } from '@/contexts/CartContext';
 
 type OrderStatus = 'loading' | 'success' | 'pending' | 'failed' | 'not_found';
 
@@ -21,6 +22,7 @@ const OrderConfirmation = () => {
   const orderId = searchParams.get('order_id');
   const [status, setStatus] = useState<OrderStatus>('loading');
   const [order, setOrder] = useState<OrderData | null>(null);
+  const { clearCart } = useCart();
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -45,10 +47,14 @@ const OrderConfirmation = () => {
 
         if (data.payment_status === 'paid' || data.status === 'confirmed') {
           setStatus('success');
+          // Clear cart after successful payment confirmation
+          clearCart();
         } else if (data.payment_status === 'failed') {
           setStatus('failed');
         } else {
           setStatus('pending');
+          // Also clear cart for pending orders (order was created)
+          clearCart();
         }
       } catch (err) {
         console.error('Error fetching order:', err);
@@ -57,7 +63,7 @@ const OrderConfirmation = () => {
     };
 
     fetchOrder();
-  }, [orderId]);
+  }, [orderId, clearCart]);
 
   const formatPrice = (price: number) => {
     return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });

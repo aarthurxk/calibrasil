@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, CreditCard, Lock, QrCode, Barcode, Loader2 } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
@@ -14,7 +14,8 @@ import { toast } from 'sonner';
 type PaymentMethod = 'pix' | 'boleto' | 'card';
 
 const Checkout = () => {
-  const { items, total, clearCart } = useCart();
+  const { items, total } = useCart();
+  const isRedirecting = useRef(false);
   const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   
@@ -93,12 +94,11 @@ const Checkout = () => {
 
       console.log('Checkout session created:', data);
       
-      // Clear cart before redirecting
-      clearCart();
-      
-      // Redirect to Stripe Checkout
+      // Redirect to Stripe Checkout FIRST (cart will be cleared on confirmation page)
       if (data.sessionUrl) {
+        isRedirecting.current = true;
         window.location.href = data.sessionUrl;
+        return; // Exit function - browser will navigate away
       } else {
         throw new Error('URL de pagamento não recebida');
       }
@@ -110,7 +110,8 @@ const Checkout = () => {
     }
   };
 
-  if (items.length === 0) {
+  // Don't show empty cart message if we're redirecting to payment
+  if (items.length === 0 && !isRedirecting.current) {
     return (
       <MainLayout>
         <div className="container py-20 text-center">
