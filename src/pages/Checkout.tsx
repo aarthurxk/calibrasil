@@ -94,11 +94,13 @@ const Checkout = () => {
 
       console.log('Checkout session created:', data);
       
-      // Redirect to Stripe Checkout FIRST (cart will be cleared on confirmation page)
+      // Open Stripe Checkout in new tab (works in preview and production)
       if (data.sessionUrl) {
         isRedirecting.current = true;
-        window.location.href = data.sessionUrl;
-        return; // Exit function - browser will navigate away
+        window.open(data.sessionUrl, '_blank');
+        toast.success('Abrindo página de pagamento...');
+        setIsProcessing(false);
+        return;
       } else {
         throw new Error('URL de pagamento não recebida');
       }
