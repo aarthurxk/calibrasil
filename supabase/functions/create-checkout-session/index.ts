@@ -67,6 +67,16 @@ serve(async (req) => {
       throw new Error("Email is required");
     }
 
+    // Helper function to validate if a string is a valid absolute URL
+    const isValidUrl = (url: string): boolean => {
+      try {
+        const parsed = new URL(url);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+      } catch {
+        return false;
+      }
+    };
+
     // Create line items for Stripe
     const lineItems: Array<{
       price_data: {
@@ -75,17 +85,22 @@ serve(async (req) => {
         unit_amount: number;
       };
       quantity: number;
-    }> = body.items.map((item) => ({
-      price_data: {
-        currency: "brl",
-        product_data: {
-          name: item.name,
-          images: item.image ? [item.image] : undefined,
+    }> = body.items.map((item) => {
+      // Only include images if it's a valid absolute URL
+      const validImage = item.image && isValidUrl(item.image) ? [item.image] : undefined;
+      
+      return {
+        price_data: {
+          currency: "brl",
+          product_data: {
+            name: item.name,
+            images: validImage,
+          },
+          unit_amount: Math.round(item.price * 100), // Convert to cents
         },
-        unit_amount: Math.round(item.price * 100), // Convert to cents
-      },
-      quantity: item.quantity,
-    }));
+        quantity: item.quantity,
+      };
+    });
 
     // Add shipping as a line item if applicable
     if (body.shipping > 0) {
