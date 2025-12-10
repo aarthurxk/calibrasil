@@ -6,9 +6,9 @@ WHERE user_id = 'ce3c515f-1307-4616-ae80-6765e6798d5c';
 -- Criar tabela de configurações da loja
 CREATE TABLE public.store_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  store_name TEXT DEFAULT 'Cali Beach Tech',
-  store_email TEXT DEFAULT 'oi@cali.com.br',
-  store_description TEXT DEFAULT 'Produtos beach-tech premium pro lifestyle praiano moderno',
+  store_name TEXT DEFAULT 'Cali Store',
+  store_email TEXT DEFAULT 'contato@calibrasil.com',
+  store_description TEXT DEFAULT 'Produtos Tech premium pro lifestyle moderno',
   currency TEXT DEFAULT 'BRL',
   tax_rate NUMERIC DEFAULT 12,
   free_shipping_threshold NUMERIC DEFAULT 250,
