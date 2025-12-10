@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CreditCard, Lock, QrCode, Barcode } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, CreditCard, Lock, QrCode, Barcode, Loader2 } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,7 +16,6 @@ type PaymentMethod = 'pix' | 'boleto' | 'card';
 const Checkout = () => {
   const { items, total, clearCart } = useCart();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   
   // Form state
@@ -48,7 +47,9 @@ const Checkout = () => {
         return;
       }
 
-      const orderData = {
+      const baseUrl = window.location.origin;
+      
+      const checkoutData = {
         items: items.map(item => ({
           id: item.id,
           name: item.name,
@@ -71,33 +72,40 @@ const Checkout = () => {
         total: finalTotal,
         shipping,
         payment_method: paymentMethod,
+        success_url: `${baseUrl}/order-confirmation`,
+        cancel_url: `${baseUrl}/checkout`,
       };
 
-      console.log('Sending order:', orderData);
+      console.log('Creating checkout session:', checkoutData);
 
-      const { data, error } = await supabase.functions.invoke('create-order', {
-        body: orderData,
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: checkoutData,
       });
 
       if (error) {
         console.error('Edge function error:', error);
-        throw new Error(error.message || 'Erro ao processar pedido');
+        throw new Error(error.message || 'Erro ao criar sessão de pagamento');
       }
 
       if (!data.success) {
-        throw new Error(data.error || 'Erro ao criar pedido');
+        throw new Error(data.error || 'Erro ao criar sessão de pagamento');
       }
 
-      console.log('Order created:', data);
+      console.log('Checkout session created:', data);
       
-      toast.success('Pedido realizado com sucesso! 🎉');
+      // Clear cart before redirecting
       clearCart();
-      navigate('/');
+      
+      // Redirect to Stripe Checkout
+      if (data.sessionUrl) {
+        window.location.href = data.sessionUrl;
+      } else {
+        throw new Error('URL de pagamento não recebida');
+      }
       
     } catch (error: any) {
-      console.error('Error creating order:', error);
-      toast.error(error.message || 'Erro ao processar pedido. Tente novamente.');
-    } finally {
+      console.error('Error creating checkout session:', error);
+      toast.error(error.message || 'Erro ao processar pagamento. Tente novamente.');
       setIsProcessing(false);
     }
   };
@@ -222,7 +230,7 @@ const Checkout = () => {
                 </h2>
                 <p className="text-sm text-muted-foreground flex items-center gap-2">
                   <Lock className="h-4 w-4" />
-                  Pagamento 100% seguro
+                  Pagamento 100% seguro via Stripe
                 </p>
                 
                 <RadioGroup 
@@ -258,7 +266,7 @@ const Checkout = () => {
                       <CreditCard className="h-5 w-5 text-primary" />
                       <div>
                         <p className="font-medium">Cartão de Crédito</p>
-                        <p className="text-sm text-muted-foreground">Em breve</p>
+                        <p className="text-sm text-muted-foreground">Aprovação instantânea</p>
                       </div>
                     </Label>
                   </div>
@@ -269,16 +277,17 @@ const Checkout = () => {
                 type="submit"
                 size="lg"
                 className="w-full bg-gradient-ocean text-primary-foreground hover:opacity-90"
-                disabled={isProcessing || paymentMethod === 'card'}
+                disabled={isProcessing}
               >
-                {isProcessing ? 'Processando...' : `Finalizar Pedido ${formatPrice(finalTotal)}`}
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Redirecionando para pagamento...
+                  </>
+                ) : (
+                  `Pagar ${formatPrice(finalTotal)}`
+                )}
               </Button>
-              
-              {paymentMethod === 'card' && (
-                <p className="text-sm text-muted-foreground text-center">
-                  Pagamento com cartão será integrado em breve. Por favor, escolha Pix ou Boleto.
-                </p>
-              )}
             </form>
           </div>
 
