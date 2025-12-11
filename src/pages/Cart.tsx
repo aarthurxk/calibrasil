@@ -1,17 +1,19 @@
 import { Link } from 'react-router-dom';
-import { Trash2, Minus, Plus, ShoppingBag, ArrowRight } from 'lucide-react';
+import { Trash2, Minus, Plus, ShoppingBag, ArrowRight, Loader2 } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
 import { useCart } from '@/contexts/CartContext';
+import { useStoreSettings } from '@/hooks/useStoreSettings';
 import { Button } from '@/components/ui/button';
 
 const Cart = () => {
   const { items, removeItem, updateQuantity, total, clearCart } = useCart();
+  const { settings, isLoading: isLoadingSettings } = useStoreSettings();
 
   const formatPrice = (price: number) => {
     return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
-  const shipping = total >= 250 ? 0 : 29.90;
+  const shipping = total >= settings.free_shipping_threshold ? 0 : settings.standard_shipping_rate;
   const finalTotal = total + shipping;
 
   if (items.length === 0) {
@@ -131,9 +133,9 @@ const Cart = () => {
                 </div>
               </div>
 
-              {total < 250 && (
+              {total < settings.free_shipping_threshold && (
                 <p className="text-sm text-muted-foreground mb-4 p-3 bg-cali-teal-light rounded-lg">
-                  Adiciona mais {formatPrice(250 - total)} e ganha frete grátis! 🚚
+                  Adiciona mais {formatPrice(settings.free_shipping_threshold - total)} e ganha frete grátis! 🚚
                 </p>
               )}
 
