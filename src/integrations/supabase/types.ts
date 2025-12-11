@@ -372,12 +372,7 @@ export type Database = {
       }
     }
     Views: {
-      store_public_info: {
-        Row: {
-          currency: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       has_role: {
