@@ -7,8 +7,9 @@ export interface Product {
   image: string | null;
   images: string[] | null;
   category: string;
-  color: string | null;
-  model: string | null;
+  color: string[] | null;
+  model: string[] | null;
+  color_codes: Record<string, string> | null;
   sizes: string[] | null;
   in_stock: boolean | null;
   featured: boolean | null;

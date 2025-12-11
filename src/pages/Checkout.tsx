@@ -59,6 +59,7 @@ const Checkout = () => {
           image: item.image,
           size: item.size,
           color: item.color,
+          model: item.model,
         })),
         email,
         phone: phone || null,
@@ -300,26 +301,34 @@ const Checkout = () => {
               <h2 className="text-xl font-semibold mb-6">Resumo do Pedido</h2>
 
               <div className="space-y-4 mb-6">
-                {items.map((item) => (
-                  <div key={item.id} className="flex gap-4">
-                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium line-clamp-1">{item.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Qtd: {item.quantity}
+                {items.map((item, index) => {
+                  const itemKey = `${item.id}-${item.size || ''}-${item.color || ''}-${item.model || ''}-${index}`;
+                  return (
+                    <div key={itemKey} className="flex gap-4">
+                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium line-clamp-1">{item.name}</p>
+                        {(item.color || item.model || item.size) && (
+                          <p className="text-xs text-muted-foreground">
+                            {[item.color, item.model, item.size].filter(Boolean).join(' / ')}
+                          </p>
+                        )}
+                        <p className="text-sm text-muted-foreground">
+                          Qtd: {item.quantity}
+                        </p>
+                      </div>
+                      <p className="font-medium">
+                        {formatPrice(item.price * item.quantity)}
                       </p>
                     </div>
-                    <p className="font-medium">
-                      {formatPrice(item.price * item.quantity)}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="space-y-3 pt-4 border-t border-border">
