@@ -10,42 +10,42 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Product } from '@/types/product';
-
 const CATEGORIES = ['Todos', 'Tech', 'Acessórios', 'Vestuário', 'Esporte'];
-
 const Shop = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [sortBy, setSortBy] = useState('featured');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showProductForm, setShowProductForm] = useState(false);
-  
-  const { isAdmin, isManager } = useAuth();
+  const {
+    isAdmin,
+    isManager
+  } = useAuth();
   const canManageProducts = isAdmin || isManager;
-
   const selectedCategory = searchParams.get('category') || 'Todos';
 
   // Fetch products from database
-  const { data: products = [], isLoading } = useQuery({
+  const {
+    data: products = [],
+    isLoading
+  } = useQuery({
     queryKey: ['shop-products'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
+      const {
+        data,
+        error
+      } = await supabase.from('products').select('*').order('created_at', {
+        ascending: false
+      });
       if (error) throw error;
       return data as Product[];
-    },
+    }
   });
-
   const filteredProducts = useMemo(() => {
     let result = [...products];
 
     // Filter by category
     if (selectedCategory && selectedCategory !== 'Todos') {
-      result = result.filter(
-        (p) => p.category.toLowerCase() === selectedCategory.toLowerCase()
-      );
+      result = result.filter(p => p.category.toLowerCase() === selectedCategory.toLowerCase());
     }
 
     // Sort
@@ -63,10 +63,8 @@ const Shop = () => {
       default:
         result.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
     }
-
     return result;
   }, [products, selectedCategory, sortBy]);
-
   const handleCategoryChange = (category: string) => {
     if (category === 'Todos') {
       searchParams.delete('category');
@@ -75,15 +73,11 @@ const Shop = () => {
     }
     setSearchParams(searchParams);
   };
-
-  return (
-    <MainLayout>
+  return <MainLayout>
       <div className="bg-muted py-12">
         <div className="container">
           <h1 className="text-4xl font-bold text-foreground mb-2">Loja</h1>
-          <p className="text-muted-foreground">
-            Descubra nossa coleção de essenciais beach-tech. É só escolher e partir pro abraço!
-          </p>
+          <p className="text-muted-foreground">Descubra nossa coleção de essenciais. É só escolher e partir pro abraço!</p>
         </div>
       </div>
 
@@ -94,30 +88,17 @@ const Shop = () => {
             <Filter className="h-5 w-5 text-muted-foreground" />
             <span className="text-sm font-medium">Filtrar:</span>
             <div className="flex gap-2 flex-wrap">
-              {CATEGORIES.map((category) => (
-                <Button
-                  key={category}
-                  variant={
-                    selectedCategory.toLowerCase() === category.toLowerCase()
-                      ? 'default'
-                      : 'outline'
-                  }
-                  size="sm"
-                  onClick={() => handleCategoryChange(category)}
-                >
+              {CATEGORIES.map(category => <Button key={category} variant={selectedCategory.toLowerCase() === category.toLowerCase() ? 'default' : 'outline'} size="sm" onClick={() => handleCategoryChange(category)}>
                   {category}
-                </Button>
-              ))}
+                </Button>)}
             </div>
           </div>
 
           <div className="flex items-center gap-4">
-            {canManageProducts && (
-              <Button onClick={() => setShowProductForm(true)} size="sm">
+            {canManageProducts && <Button onClick={() => setShowProductForm(true)} size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Novo Produto
-              </Button>
-            )}
+              </Button>}
             
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="w-[180px]">
@@ -132,18 +113,10 @@ const Shop = () => {
             </Select>
 
             <div className="hidden md:flex gap-1">
-              <Button
-                variant={viewMode === 'grid' ? 'default' : 'outline'}
-                size="icon"
-                onClick={() => setViewMode('grid')}
-              >
+              <Button variant={viewMode === 'grid' ? 'default' : 'outline'} size="icon" onClick={() => setViewMode('grid')}>
                 <Grid3X3 className="h-4 w-4" />
               </Button>
-              <Button
-                variant={viewMode === 'list' ? 'default' : 'outline'}
-                size="icon"
-                onClick={() => setViewMode('list')}
-              >
+              <Button variant={viewMode === 'list' ? 'default' : 'outline'} size="icon" onClick={() => setViewMode('list')}>
                 <List className="h-4 w-4" />
               </Button>
             </div>
@@ -156,55 +129,32 @@ const Shop = () => {
         </p>
 
         {/* Loading state */}
-        {isLoading && (
-          <div className="flex justify-center py-20">
+        {isLoading && <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        )}
+          </div>}
 
         {/* Products Grid */}
-        {!isLoading && (
-          <div
-            className={
-              viewMode === 'grid'
-                ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
-                : 'flex flex-col gap-4'
-            }
-          >
-            {filteredProducts.map((product, index) => (
-              <div
-                key={product.id}
-                className="animate-fade-in"
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
+        {!isLoading && <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6' : 'flex flex-col gap-4'}>
+            {filteredProducts.map((product, index) => <div key={product.id} className="animate-fade-in" style={{
+          animationDelay: `${index * 50}ms`
+        }}>
                 <ProductCard product={product} />
-              </div>
-            ))}
-          </div>
-        )}
+              </div>)}
+          </div>}
 
-        {!isLoading && filteredProducts.length === 0 && (
-          <div className="text-center py-20">
+        {!isLoading && filteredProducts.length === 0 && <div className="text-center py-20">
             <p className="text-muted-foreground">
               Ops! Nenhum produto encontrado. Tenta outro filtro aí!
             </p>
-            {canManageProducts && (
-              <Button className="mt-4" onClick={() => setShowProductForm(true)}>
+            {canManageProducts && <Button className="mt-4" onClick={() => setShowProductForm(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Cadastrar Primeiro Produto
-              </Button>
-            )}
-          </div>
-        )}
+              </Button>}
+          </div>}
       </div>
 
       {/* Product Form Modal */}
-      <ProductForm
-        open={showProductForm}
-        onOpenChange={setShowProductForm}
-      />
-    </MainLayout>
-  );
+      <ProductForm open={showProductForm} onOpenChange={setShowProductForm} />
+    </MainLayout>;
 };
-
 export default Shop;
