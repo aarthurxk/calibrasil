@@ -1,10 +1,8 @@
 import { Link } from 'react-router-dom';
 import { Instagram, Twitter, Facebook, Mail } from 'lucide-react';
 import caliLogo from '@/assets/cali-logo.jpeg';
-
 const Footer = () => {
-  return (
-    <footer className="bg-cali-ocean-dark text-sidebar-foreground mt-auto">
+  return <footer className="bg-cali-ocean-dark text-sidebar-foreground mt-auto">
       <div className="container py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
@@ -14,7 +12,8 @@ const Footer = () => {
               <span className="text-xl font-bold text-sidebar-primary">Cali</span>
             </div>
             <p className="text-sm text-sidebar-foreground/70">
-              Onde a vibe da praia encontra tecnologia de ponta. Produtos sustentáveis e inovadores pro seu lifestyle praiano. Cola com a gente!
+               Onde estilo encontra tecnologia. Produtos sustentáveis e inovadores criados para quem vive com liberdade, conforto e autenticidade. 
+ 
             </p>
             <div className="flex gap-4">
               <a href="#" className="text-sidebar-foreground/70 hover:text-sidebar-primary transition-colors">
@@ -58,11 +57,7 @@ const Footer = () => {
               Cadastra aí e recebe ofertas exclusivas e novidades quentinhas direto no seu e-mail!
             </p>
             <div className="flex gap-2">
-              <input
-                type="email"
-                placeholder="Seu melhor e-mail"
-                className="flex-1 px-3 py-2 text-sm rounded-lg bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/50 border border-sidebar-border focus:outline-none focus:ring-2 focus:ring-sidebar-primary"
-              />
+              <input type="email" placeholder="Seu melhor e-mail" className="flex-1 px-3 py-2 text-sm rounded-lg bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/50 border border-sidebar-border focus:outline-none focus:ring-2 focus:ring-sidebar-primary" />
               <button className="px-4 py-2 bg-gradient-ocean text-primary-foreground rounded-lg hover:opacity-90 transition-opacity">
                 <Mail className="h-4 w-4" />
               </button>
@@ -74,8 +69,6 @@ const Footer = () => {
           <p>&copy; {new Date().getFullYear()} Cali. Todos os direitos reservados.</p>
         </div>
       </div>
-    </footer>
-  );
+    </footer>;
 };
-
 export default Footer;
