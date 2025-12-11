@@ -13,42 +13,42 @@ import vibeProductsBeach from "@/assets/about/vibe-products-beach.jpg";
 import vibeSustainability from "@/assets/about/vibe-sustainability.jpg";
 import vibeHat from "@/assets/about/vibe-hat.jpg";
 import vibeGrass from "@/assets/about/vibe-grass.jpg";
-
 const About = () => {
-  const values = [
-    {
-      icon: Sparkles,
-      title: "Inovação",
-      description: "Tecnologia de ponta em cada detalhe"
-    },
-    {
-      icon: Palette,
-      title: "Criatividade",
-      description: "Design único que expressa quem você é"
-    },
-    {
-      icon: Leaf,
-      title: "Sustentabilidade",
-      description: "Compromisso real com o planeta"
-    }
-  ];
-
-  const galleryImages = [
-    { src: vibeSurf, alt: "Lifestyle surf Cali Brasil" },
-    { src: vibeProductsSand, alt: "Produtos Cali na areia" },
-    { src: vibeProductsBeach, alt: "Cases Cali na praia" },
-    { src: vibeHat, alt: "Estilo Cali lifestyle" },
-    { src: vibeGrass, alt: "Produtos Cali na natureza" }
-  ];
-
-  return (
-    <MainLayout>
+  const values = [{
+    icon: Sparkles,
+    title: "Inovação",
+    description: "Tecnologia de ponta em cada detalhe"
+  }, {
+    icon: Palette,
+    title: "Criatividade",
+    description: "Design único que expressa quem você é"
+  }, {
+    icon: Leaf,
+    title: "Sustentabilidade",
+    description: "Compromisso real com o planeta"
+  }];
+  const galleryImages = [{
+    src: vibeSurf,
+    alt: "Lifestyle surf Cali Brasil"
+  }, {
+    src: vibeProductsSand,
+    alt: "Produtos Cali na areia"
+  }, {
+    src: vibeProductsBeach,
+    alt: "Cases Cali na praia"
+  }, {
+    src: vibeHat,
+    alt: "Estilo Cali lifestyle"
+  }, {
+    src: vibeGrass,
+    alt: "Produtos Cali na natureza"
+  }];
+  return <MainLayout>
       {/* Hero Section */}
       <section className="relative min-h-[70vh] flex items-center justify-center overflow-hidden">
-        <div 
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${vibeHero})` }}
-        />
+        <div className="absolute inset-0 bg-cover bg-center" style={{
+        backgroundImage: `url(${vibeHero})`
+      }} />
         <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/60 to-background" />
         
         <div className="relative z-10 container mx-auto px-4 text-center py-20">
@@ -71,17 +71,10 @@ const About = () => {
               <h2 className="text-3xl md:text-4xl font-bold text-foreground">
                 Nossa Missão
               </h2>
-              <p className="text-lg text-muted-foreground leading-relaxed">
-                Empoderar a galera dos 20 aos 40 que vive com atitude, estilo e muita energia. 
-                Inovação e criatividade andam juntas aqui — porque a vida é muito curta pra ser sem graça.
-              </p>
+              <p className="text-lg text-muted-foreground leading-relaxed">Empoderar a todos que vivem com atitude, estilo e muita energia. Inovação e criatividade andam juntas aqui — porque a vida é muito curta pra ser sem graça.</p>
               
               <div className="grid gap-4 pt-4">
-                {values.map((value, index) => (
-                  <div 
-                    key={index}
-                    className="flex items-start gap-4 p-4 rounded-lg bg-card border border-border hover:border-primary/50 transition-colors"
-                  >
+                {values.map((value, index) => <div key={index} className="flex items-start gap-4 p-4 rounded-lg bg-card border border-border hover:border-primary/50 transition-colors">
                     <div className="p-2 rounded-lg bg-primary/10">
                       <value.icon className="w-6 h-6 text-primary" />
                     </div>
@@ -89,22 +82,13 @@ const About = () => {
                       <h3 className="font-semibold text-foreground">{value.title}</h3>
                       <p className="text-sm text-muted-foreground">{value.description}</p>
                     </div>
-                  </div>
-                ))}
+                  </div>)}
               </div>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
-              <img 
-                src={vibeHandFemale} 
-                alt="Case Cali em mãos femininas" 
-                className="rounded-2xl object-cover w-full h-64 md:h-80 shadow-lg"
-              />
-              <img 
-                src={vibeHandMale} 
-                alt="Case Cali em mãos masculinas" 
-                className="rounded-2xl object-cover w-full h-64 md:h-80 shadow-lg mt-8"
-              />
+              <img src={vibeHandFemale} alt="Case Cali em mãos femininas" className="rounded-2xl object-cover w-full h-64 md:h-80 shadow-lg" />
+              <img src={vibeHandMale} alt="Case Cali em mãos masculinas" className="rounded-2xl object-cover w-full h-64 md:h-80 shadow-lg mt-8" />
             </div>
           </div>
         </div>
@@ -115,11 +99,7 @@ const About = () => {
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="order-2 md:order-1">
-              <img 
-                src={vibeSustainability} 
-                alt="Sustentabilidade Cali Brasil - Stop Ocean Plastic Pollution" 
-                className="rounded-2xl object-cover w-full h-[400px] md:h-[500px] shadow-xl"
-              />
+              <img src={vibeSustainability} alt="Sustentabilidade Cali Brasil - Stop Ocean Plastic Pollution" className="rounded-2xl object-cover w-full h-[400px] md:h-[500px] shadow-xl" />
             </div>
             
             <div className="order-1 md:order-2 space-y-6">
@@ -160,19 +140,10 @@ const About = () => {
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {galleryImages.map((image, index) => (
-              <div 
-                key={index}
-                className="group relative overflow-hidden rounded-xl aspect-square"
-              >
-                <img 
-                  src={image.src} 
-                  alt={image.alt}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                />
+            {galleryImages.map((image, index) => <div key={index} className="group relative overflow-hidden rounded-xl aspect-square">
+                <img src={image.src} alt={image.alt} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                 <div className="absolute inset-0 bg-gradient-to-t from-background/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              </div>
-            ))}
+              </div>)}
           </div>
         </div>
       </section>
@@ -208,8 +179,6 @@ const About = () => {
           </Button>
         </div>
       </section>
-    </MainLayout>
-  );
+    </MainLayout>;
 };
-
 export default About;
