@@ -14,3 +14,12 @@ verify_jwt = false
 
 [functions.send-order-emails]
 verify_jwt = false
+
+[functions.send-abandoned-cart-email]
+verify_jwt = false
+
+[functions.send-low-stock-email]
+verify_jwt = false
+
+[functions.send-order-status-email]
+verify_jwt = false

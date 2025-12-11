@@ -170,6 +170,53 @@ serve(async (req) => {
 
     console.log('Order completed successfully:', order.id);
 
+    // Check for low stock after order and send alert if needed
+    try {
+      // Get all variants for ordered products with their current stock
+      const { data: variants, error: variantsError } = await supabase
+        .from('product_variants')
+        .select('*, products!inner(name)')
+        .in('product_id', productIds);
+
+      if (!variantsError && variants) {
+        const lowStockItems = variants
+          .filter(v => v.stock_quantity <= 5)
+          .map(v => ({
+            productName: (v.products as any).name,
+            productId: v.product_id,
+            color: v.color,
+            model: v.model,
+            currentStock: v.stock_quantity
+          }));
+
+        if (lowStockItems.length > 0) {
+          console.log(`[CREATE-ORDER] Found ${lowStockItems.length} low stock items, sending alert`);
+          
+          // Call low stock email function
+          const lowStockResponse = await fetch(
+            `${supabaseUrl}/functions/v1/send-low-stock-email`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${supabaseServiceKey}`,
+              },
+              body: JSON.stringify({ items: lowStockItems }),
+            }
+          );
+          
+          if (!lowStockResponse.ok) {
+            console.error('[CREATE-ORDER] Failed to send low stock email');
+          } else {
+            console.log('[CREATE-ORDER] Low stock alert sent');
+          }
+        }
+      }
+    } catch (lowStockError) {
+      console.error('[CREATE-ORDER] Error checking low stock:', lowStockError);
+      // Don't fail the order for low stock check errors
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
