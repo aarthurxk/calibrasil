@@ -16,6 +16,7 @@ const ProductDetail = () => {
   const [quantity, setQuantity] = useState(1);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
 
   const { data: product, isLoading, error } = useQuery({
     queryKey: ['product', id],
@@ -76,11 +77,27 @@ const ProductDetail = () => {
     ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
     : 0;
 
-  // Convert color string to array for display
-  const colors = product.color ? [product.color] : null;
-  const sizes = product.sizes || null;
+  // Parse arrays from database (now they're arrays, not strings)
+  const colors: string[] = Array.isArray(product.color) ? product.color : [];
+  const colorCodes: Record<string, string> = (product.color_codes as Record<string, string>) || {};
+  const models: string[] = Array.isArray(product.model) ? product.model : [];
+  const sizes: string[] = product.sizes || [];
 
   const handleAddToCart = () => {
+    // Validate required selections
+    if (colors.length > 0 && !selectedColor) {
+      toast.error('Selecione uma cor');
+      return;
+    }
+    if (models.length > 0 && !selectedModel) {
+      toast.error('Selecione um modelo de celular');
+      return;
+    }
+    if (sizes.length > 0 && !selectedSize) {
+      toast.error('Selecione um tamanho');
+      return;
+    }
+
     for (let i = 0; i < quantity; i++) {
       addItem({
         id: product.id,
@@ -89,6 +106,7 @@ const ProductDetail = () => {
         image: product.image || '/placeholder.svg',
         size: selectedSize || undefined,
         color: selectedColor || undefined,
+        model: selectedModel || undefined,
       });
     }
     toast.success(`${quantity}x ${product.name} adicionado à sacola! 🛍️`);
@@ -162,22 +180,53 @@ const ProductDetail = () => {
               {product.description}
             </p>
 
-            {/* Colors */}
-            {colors && colors.length > 0 && (
+            {/* Colors with Visual Swatches */}
+            {colors.length > 0 && (
               <div>
-                <p className="font-medium mb-3">Cor</p>
-                <div className="flex gap-2">
+                <p className="font-medium mb-3">
+                  Cor: <span className="text-primary">{selectedColor || 'Selecione'}</span>
+                </p>
+                <div className="flex gap-3 flex-wrap">
                   {colors.map((color) => (
                     <button
                       key={color}
                       onClick={() => setSelectedColor(color)}
-                      className={`px-4 py-2 rounded-lg border transition-all ${
-                        selectedColor === color
+                      className={`group relative flex flex-col items-center gap-1.5`}
+                      title={color}
+                    >
+                      <span
+                        className={`w-10 h-10 rounded-full border-2 transition-all ${
+                          selectedColor === color
+                            ? 'border-primary ring-2 ring-primary ring-offset-2 ring-offset-background'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                        style={{ backgroundColor: colorCodes[color] || '#888888' }}
+                      />
+                      <span className="text-xs text-muted-foreground">{color}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Phone Models */}
+            {models.length > 0 && (
+              <div>
+                <p className="font-medium mb-3">
+                  Modelo: <span className="text-primary">{selectedModel || 'Selecione'}</span>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {models.map((model) => (
+                    <button
+                      key={model}
+                      onClick={() => setSelectedModel(model)}
+                      className={`px-4 py-2 rounded-lg border text-sm transition-all ${
+                        selectedModel === model
                           ? 'border-primary bg-primary/10 text-primary'
                           : 'border-border hover:border-primary/50'
                       }`}
                     >
-                      {color}
+                      {model}
                     </button>
                   ))}
                 </div>
@@ -185,9 +234,11 @@ const ProductDetail = () => {
             )}
 
             {/* Sizes */}
-            {sizes && sizes.length > 0 && (
+            {sizes.length > 0 && (
               <div>
-                <p className="font-medium mb-3">Tamanho</p>
+                <p className="font-medium mb-3">
+                  Tamanho: <span className="text-primary">{selectedSize || 'Selecione'}</span>
+                </p>
                 <div className="flex gap-2">
                   {sizes.map((size) => (
                     <button

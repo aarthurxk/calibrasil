@@ -8,13 +8,14 @@ export interface CartItem {
   quantity: number;
   size?: string;
   color?: string;
+  model?: string;
 }
 
 interface CartContextType {
   items: CartItem[];
   addItem: (item: Omit<CartItem, 'quantity'>) => void;
-  removeItem: (id: string) => void;
-  updateQuantity: (id: string, quantity: number) => void;
+  removeItem: (id: string, size?: string, color?: string, model?: string) => void;
+  updateQuantity: (id: string, quantity: number, size?: string, color?: string, model?: string) => void;
   clearCart: () => void;
   total: number;
   itemCount: number;
@@ -23,6 +24,11 @@ interface CartContextType {
 const CART_STORAGE_KEY = 'cali-cart';
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
+
+// Generate unique key for cart item based on all variants
+const getItemKey = (id: string, size?: string, color?: string, model?: string) => {
+  return `${id}-${size || ''}-${color || ''}-${model || ''}`;
+};
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>(() => {
@@ -48,26 +54,46 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addItem = useCallback((newItem: Omit<CartItem, 'quantity'>) => {
     setItems((prev) => {
-      const existingItem = prev.find((item) => item.id === newItem.id);
+      // Find existing item with same id AND same variants
+      const existingItem = prev.find((item) => 
+        item.id === newItem.id && 
+        item.size === newItem.size && 
+        item.color === newItem.color &&
+        item.model === newItem.model
+      );
+      
       if (existingItem) {
         return prev.map((item) =>
-          item.id === newItem.id ? { ...item, quantity: item.quantity + 1 } : item
+          item.id === newItem.id && 
+          item.size === newItem.size && 
+          item.color === newItem.color &&
+          item.model === newItem.model
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
         );
       }
       return [...prev, { ...newItem, quantity: 1 }];
     });
   }, []);
 
-  const removeItem = useCallback((id: string) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
+  const removeItem = useCallback((id: string, size?: string, color?: string, model?: string) => {
+    setItems((prev) => prev.filter((item) => 
+      !(item.id === id && item.size === size && item.color === color && item.model === model)
+    ));
   }, []);
 
-  const updateQuantity = useCallback((id: string, quantity: number) => {
+  const updateQuantity = useCallback((id: string, quantity: number, size?: string, color?: string, model?: string) => {
     if (quantity <= 0) {
-      setItems((prev) => prev.filter((item) => item.id !== id));
+      setItems((prev) => prev.filter((item) => 
+        !(item.id === id && item.size === size && item.color === color && item.model === model)
+      ));
     } else {
       setItems((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, quantity } : item))
+        prev.map((item) => 
+          (item.id === id && item.size === size && item.color === color && item.model === model)
+            ? { ...item, quantity }
+            : item
+        )
       );
     }
   }, []);

@@ -41,61 +41,62 @@ const Cart = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
-            {items.map((item) => (
-              <div
-                key={item.id}
-                className="flex gap-4 p-4 bg-card rounded-xl border border-border"
-              >
-                <div className="w-24 h-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <Link
-                    to={`/product/${item.id}`}
-                    className="font-semibold text-card-foreground hover:text-primary transition-colors line-clamp-1"
-                  >
-                    {item.name}
-                  </Link>
-                  {(item.size || item.color) && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {item.color && <span>{item.color}</span>}
-                      {item.color && item.size && <span> / </span>}
-                      {item.size && <span>{item.size}</span>}
+            {items.map((item, index) => {
+              const itemKey = `${item.id}-${item.size || ''}-${item.color || ''}-${item.model || ''}-${index}`;
+              return (
+                <div
+                  key={itemKey}
+                  className="flex gap-4 p-4 bg-card rounded-xl border border-border"
+                >
+                  <div className="w-24 h-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <Link
+                      to={`/product/${item.id}`}
+                      className="font-semibold text-card-foreground hover:text-primary transition-colors line-clamp-1"
+                    >
+                      {item.name}
+                    </Link>
+                    {(item.size || item.color || item.model) && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {[item.color, item.model, item.size].filter(Boolean).join(' / ')}
+                      </p>
+                    )}
+                    <p className="text-lg font-bold text-primary mt-2">
+                      {formatPrice(item.price)}
                     </p>
-                  )}
-                  <p className="text-lg font-bold text-primary mt-2">
-                    {formatPrice(item.price)}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end justify-between">
-                  <button
-                    onClick={() => removeItem(item.id)}
-                    className="text-muted-foreground hover:text-destructive transition-colors"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
-                  <div className="flex items-center border border-border rounded-lg">
+                  </div>
+                  <div className="flex flex-col items-end justify-between">
                     <button
-                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      className="p-2 hover:bg-muted transition-colors"
+                      onClick={() => removeItem(item.id, item.size, item.color, item.model)}
+                      className="text-muted-foreground hover:text-destructive transition-colors"
                     >
-                      <Minus className="h-4 w-4" />
+                      <Trash2 className="h-5 w-5" />
                     </button>
-                    <span className="px-4 font-medium">{item.quantity}</span>
-                    <button
-                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      className="p-2 hover:bg-muted transition-colors"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center border border-border rounded-lg">
+                      <button
+                        onClick={() => updateQuantity(item.id, item.quantity - 1, item.size, item.color, item.model)}
+                        className="p-2 hover:bg-muted transition-colors"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                      <span className="px-4 font-medium">{item.quantity}</span>
+                      <button
+                        onClick={() => updateQuantity(item.id, item.quantity + 1, item.size, item.color, item.model)}
+                        className="p-2 hover:bg-muted transition-colors"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             <Button
               variant="ghost"
