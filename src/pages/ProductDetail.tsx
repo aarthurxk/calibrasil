@@ -1,22 +1,28 @@
 import { useParams, Link } from 'react-router-dom';
 import { useState } from 'react';
-import { Star, ShoppingCart, Heart, Truck, Shield, ArrowLeft, Minus, Plus } from 'lucide-react';
+import { Star, ShoppingCart, Heart, Truck, Shield, ArrowLeft, Minus, Plus, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import MainLayout from '@/components/layout/MainLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 
 const ProductDetail = () => {
   const { id } = useParams();
   const { addItem } = useCart();
+  const { user } = useAuth();
   const [quantity, setQuantity] = useState(1);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   const { data: product, isLoading, error } = useQuery({
     queryKey: ['product', id],
@@ -35,8 +41,124 @@ const ProductDetail = () => {
     enabled: !!id,
   });
 
+  // Fetch variant stock
+  const { data: variants = [] } = useQuery({
+    queryKey: ['product-variants', id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data, error } = await supabase
+        .from('product_variants')
+        .select('*')
+        .eq('product_id', id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
+  // Fetch reviews
+  const { data: reviews = [], refetch: refetchReviews } = useQuery({
+    queryKey: ['product-reviews', id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data, error } = await supabase
+        .from('product_reviews')
+        .select('*')
+        .eq('product_id', id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
+  // Check if user can review (has purchased and received the product)
+  const { data: canReview = false } = useQuery({
+    queryKey: ['can-review', id, user?.id],
+    queryFn: async () => {
+      if (!id || !user?.id) return false;
+      
+      // Check if user already reviewed this product
+      const { data: existingReview } = await supabase
+        .from('product_reviews')
+        .select('id')
+        .eq('product_id', id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (existingReview) return false;
+      
+      // Check if user has a delivered order with this product
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('status', 'delivered');
+      
+      if (!orders || orders.length === 0) return false;
+      
+      const orderIds = orders.map(o => o.id);
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('id')
+        .eq('product_id', id)
+        .in('order_id', orderIds);
+      
+      return (orderItems?.length ?? 0) > 0;
+    },
+    enabled: !!id && !!user?.id,
+  });
+
   const formatPrice = (price: number) => {
     return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
+  // Get stock for selected variant
+  const getSelectedVariantStock = (): number | null => {
+    if (variants.length === 0) return null;
+    
+    const variant = variants.find(v => 
+      (v.color === selectedColor || (!v.color && !selectedColor)) &&
+      (v.model === selectedModel || (!v.model && !selectedModel))
+    );
+    
+    return variant?.stock_quantity ?? 0;
+  };
+
+  const variantStock = getSelectedVariantStock();
+  const isOutOfStock = variantStock !== null && variantStock <= 0;
+
+  // Calculate average rating
+  const averageRating = reviews.length > 0
+    ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+    : (product?.rating || 0);
+
+  const handleSubmitReview = async () => {
+    if (!user?.id || !id) return;
+    
+    setIsSubmittingReview(true);
+    try {
+      const { error } = await supabase
+        .from('product_reviews')
+        .insert({
+          product_id: id,
+          user_id: user.id,
+          rating: reviewRating,
+          comment: reviewComment.trim() || null,
+        });
+      
+      if (error) throw error;
+      
+      toast.success('Avaliação enviada! Valeu! 🌴');
+      setReviewComment('');
+      setReviewRating(5);
+      refetchReviews();
+    } catch (error) {
+      console.error('Review error:', error);
+      toast.error('Erro ao enviar avaliação');
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   if (isLoading) {
@@ -77,7 +199,7 @@ const ProductDetail = () => {
     ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
     : 0;
 
-  // Parse arrays from database (now they're arrays, not strings)
+  // Parse arrays from database
   const colors: string[] = Array.isArray(product.color) ? product.color : [];
   const colorCodes: Record<string, string> = (product.color_codes as Record<string, string>) || {};
   const models: string[] = Array.isArray(product.model) ? product.model : [];
@@ -95,6 +217,12 @@ const ProductDetail = () => {
     }
     if (sizes.length > 0 && !selectedSize) {
       toast.error('Selecione um tamanho');
+      return;
+    }
+
+    // Check stock
+    if (isOutOfStock) {
+      toast.error('Esta variação está esgotada');
       return;
     }
 
@@ -154,14 +282,15 @@ const ProductDetail = () => {
                     <Star
                       key={i}
                       className={`h-5 w-5 ${
-                        i < Math.floor(product.rating || 0)
+                        i < Math.floor(averageRating)
                           ? 'fill-accent text-accent'
                           : 'text-muted'
                       }`}
                     />
                   ))}
                 </div>
-                <span className="font-medium">{product.rating || 0}</span>
+                <span className="font-medium">{averageRating.toFixed(1)}</span>
+                <span className="text-muted-foreground">({reviews.length} avaliações)</span>
               </div>
             </div>
 
@@ -257,6 +386,19 @@ const ProductDetail = () => {
               </div>
             )}
 
+            {/* Stock Info */}
+            {variantStock !== null && (
+              <div>
+                {isOutOfStock ? (
+                  <Badge variant="destructive">Esgotado</Badge>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {variantStock} unidades disponíveis
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Quantity */}
             <div>
               <p className="font-medium mb-3">Quantidade</p>
@@ -285,10 +427,10 @@ const ProductDetail = () => {
                 size="lg"
                 className="flex-1 bg-gradient-ocean text-primary-foreground hover:opacity-90"
                 onClick={handleAddToCart}
-                disabled={!product.in_stock}
+                disabled={!product.in_stock || isOutOfStock}
               >
                 <ShoppingCart className="mr-2 h-5 w-5" />
-                {product.in_stock ? 'Joga na Sacola' : 'Esgotado'}
+                {!product.in_stock || isOutOfStock ? 'Esgotado' : 'Joga na Sacola'}
               </Button>
               <Button size="lg" variant="outline">
                 <Heart className="h-5 w-5" />
@@ -307,6 +449,96 @@ const ProductDetail = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Reviews Section */}
+        <div className="mt-16 pt-8 border-t border-border">
+          <h2 className="text-2xl font-bold mb-6">Avaliações ({reviews.length})</h2>
+
+          {/* Review Form (only for eligible users) */}
+          {canReview && (
+            <div className="bg-muted/30 rounded-xl p-6 mb-8">
+              <h3 className="font-semibold mb-4">Curtiu o produto? Deixa sua avaliação! 🌴</h3>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Sua nota:</p>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setReviewRating(star)}
+                        className="p-1"
+                      >
+                        <Star
+                          className={`h-6 w-6 transition-colors ${
+                            star <= reviewRating
+                              ? 'fill-accent text-accent'
+                              : 'text-muted hover:text-accent'
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Textarea
+                    placeholder="Conta pra gente o que você achou..."
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+                <Button 
+                  onClick={handleSubmitReview} 
+                  disabled={isSubmittingReview}
+                >
+                  {isSubmittingReview ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    'Enviar Avaliação'
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Reviews List */}
+          {reviews.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">
+              Ainda não tem avaliações. Seja o primeiro! 🏄
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {reviews.map((review) => (
+                <div key={review.id} className="bg-card border border-border rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="flex">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={`h-4 w-4 ${
+                            star <= review.rating
+                              ? 'fill-accent text-accent'
+                              : 'text-muted'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(review.created_at).toLocaleDateString('pt-BR')}
+                    </span>
+                  </div>
+                  {review.comment && (
+                    <p className="text-sm text-foreground">{review.comment}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </MainLayout>

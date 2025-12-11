@@ -1,5 +1,8 @@
 import { Link } from 'react-router-dom';
 import { ShoppingCart, Star } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import useEmblaCarousel from 'embla-carousel-react';
+import Autoplay from 'embla-carousel-autoplay';
 import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,9 +15,30 @@ interface ProductCardProps {
 
 const ProductCard = ({ product }: ProductCardProps) => {
   const { addItem } = useCart();
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  
   const discount = product.original_price
     ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
     : 0;
+
+  // Get all images for the carousel
+  const images = product.images?.length ? product.images : (product.image ? [product.image] : ['/placeholder.svg']);
+  
+  const [emblaRef, emblaApi] = useEmblaCarousel(
+    { loop: true },
+    images.length > 1 ? [Autoplay({ delay: 4000, stopOnInteraction: false, stopOnMouseEnter: true })] : []
+  );
+
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return;
+    setSelectedIndex(emblaApi.selectedScrollSnap());
+  }, [emblaApi]);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    emblaApi.on('select', onSelect);
+    onSelect();
+  }, [emblaApi, onSelect]);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -22,7 +46,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
       id: product.id,
       name: product.name,
       price: product.price,
-      image: product.image || '/placeholder.svg',
+      image: images[0],
     });
     toast.success(`${product.name} adicionado à sacola! 🛍️`);
   };
@@ -31,32 +55,61 @@ const ProductCard = ({ product }: ProductCardProps) => {
     return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
-  // Get the main image (first from images array or fallback to image field)
-  const mainImage = product.images?.[0] || product.image || '/placeholder.svg';
+  // Format colors display: "Cores Variadas" if > 2, otherwise comma-separated
+  const displayColors = () => {
+    if (!product.color || !Array.isArray(product.color) || product.color.length === 0) return null;
+    if (product.color.length > 2) return "Cores Variadas";
+    return product.color.join(", ");
+  };
+
+  const colorsText = displayColors();
 
   return (
     <Link to={`/product/${product.id}`} className="group block">
       <div className="relative overflow-hidden rounded-xl bg-card border border-border shadow-soft transition-all duration-300 hover:shadow-glow hover:-translate-y-1">
-        {/* Image Container */}
+        {/* Image Carousel Container */}
         <div className="relative aspect-square overflow-hidden bg-muted">
-          <img
-            src={mainImage}
-            alt={product.name}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-          />
+          <div ref={emblaRef} className="overflow-hidden h-full">
+            <div className="flex h-full">
+              {images.map((img, index) => (
+                <div key={index} className="flex-[0_0_100%] min-w-0 h-full">
+                  <img
+                    src={img}
+                    alt={`${product.name} - Imagem ${index + 1}`}
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Carousel Indicators */}
+          {images.length > 1 && (
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+              {images.map((_, index) => (
+                <span
+                  key={index}
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    index === selectedIndex ? 'bg-primary w-4' : 'bg-background/60'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+
           {discount > 0 && (
-            <Badge className="absolute top-3 left-3 bg-accent text-accent-foreground">
+            <Badge className="absolute top-3 left-3 bg-accent text-accent-foreground z-10">
               -{discount}%
             </Badge>
           )}
           {product.featured && (
-            <Badge className="absolute top-3 right-3 bg-primary text-primary-foreground">
+            <Badge className="absolute top-3 right-3 bg-primary text-primary-foreground z-10">
               Destaque
             </Badge>
           )}
           
           {/* Quick Add Button */}
-          <div className="absolute inset-x-0 bottom-0 translate-y-full transition-transform duration-300 group-hover:translate-y-0 p-3">
+          <div className="absolute inset-x-0 bottom-0 translate-y-full transition-transform duration-300 group-hover:translate-y-0 p-3 z-20">
             <Button
               onClick={handleAddToCart}
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
@@ -73,18 +126,18 @@ const ProductCard = ({ product }: ProductCardProps) => {
             <p className="text-xs text-muted-foreground uppercase tracking-wide">
               {product.category}
             </p>
-            {product.color && (
+            {colorsText && (
               <p className="text-xs text-muted-foreground">
-                {product.color}
+                {colorsText}
               </p>
             )}
           </div>
           <h3 className="font-semibold text-card-foreground line-clamp-1 group-hover:text-primary transition-colors">
             {product.name}
           </h3>
-          {product.model && (
-            <p className="text-xs text-muted-foreground">
-              Modelo: {product.model}
+          {product.description && (
+            <p className="text-xs text-muted-foreground line-clamp-2">
+              {product.description}
             </p>
           )}
           {product.rating && product.rating > 0 && (
