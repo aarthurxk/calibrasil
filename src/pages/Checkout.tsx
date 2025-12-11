@@ -10,6 +10,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from 'sonner';
+import { z } from 'zod';
+
+// Validation schema for checkout form
+const checkoutSchema = z.object({
+  email: z.string().trim().email("Email inválido").max(255, "Email muito longo"),
+  phone: z.string().trim().regex(/^\(\d{2}\)\s?\d{4,5}-?\d{4}$/, "Telefone inválido (ex: (11) 99999-9999)").optional().or(z.literal("")),
+  firstName: z.string().trim().min(2, "Nome muito curto").max(100, "Nome muito longo"),
+  lastName: z.string().trim().min(2, "Sobrenome muito curto").max(100, "Sobrenome muito longo"),
+  address: z.string().trim().min(5, "Endereço muito curto").max(200, "Endereço muito longo"),
+  city: z.string().trim().min(2, "Cidade muito curta").max(100, "Cidade muito longa"),
+  zip: z.string().trim().regex(/^\d{5}-?\d{3}$/, "CEP inválido (ex: 12345-678)"),
+});
 
 type PaymentMethod = 'pix' | 'boleto' | 'card';
 
@@ -41,9 +53,20 @@ const Checkout = () => {
     setIsProcessing(true);
     
     try {
-      // Validate required fields
-      if (!email || !firstName || !lastName || !address || !city || !zip) {
-        toast.error('Por favor, preencha todos os campos obrigatórios');
+      // Validate form data with zod schema
+      const validationResult = checkoutSchema.safeParse({
+        email,
+        phone: phone || "",
+        firstName,
+        lastName,
+        address,
+        city,
+        zip,
+      });
+
+      if (!validationResult.success) {
+        const firstError = validationResult.error.errors[0];
+        toast.error(firstError.message);
         setIsProcessing(false);
         return;
       }

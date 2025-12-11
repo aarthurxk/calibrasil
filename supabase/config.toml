@@ -19,7 +19,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-low-stock-email]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-order-status-email]
-verify_jwt = false
+verify_jwt = true
