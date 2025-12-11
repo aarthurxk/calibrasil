@@ -16,6 +16,35 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
+// Helper to send order status email
+const sendOrderStatusEmail = async (
+  orderId: string,
+  customerEmail: string,
+  customerName: string,
+  oldStatus: string,
+  newStatus: string
+) => {
+  try {
+    const response = await supabase.functions.invoke('send-order-status-email', {
+      body: {
+        orderId,
+        customerEmail,
+        customerName,
+        oldStatus,
+        newStatus,
+      },
+    });
+    
+    if (response.error) {
+      console.error('Error sending status email:', response.error);
+    } else {
+      console.log('Status email sent successfully');
+    }
+  } catch (error) {
+    console.error('Failed to send status email:', error);
+  }
+};
+
 const getStatusBadge = (status: string) => {
   const styles: Record<string, string> = {
     delivered: 'bg-green-100 text-green-800',
@@ -68,16 +97,31 @@ const Orders = () => {
 
   // Update order status mutation
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
+    mutationFn: async ({ 
+      orderId, 
+      status, 
+      oldStatus,
+      customerEmail,
+      customerName 
+    }: { 
+      orderId: string; 
+      status: string;
+      oldStatus: string;
+      customerEmail: string;
+      customerName: string;
+    }) => {
       const { error } = await supabase
         .from('orders')
         .update({ status })
         .eq('id', orderId);
       if (error) throw error;
+      
+      // Send status update email to customer
+      await sendOrderStatusEmail(orderId, customerEmail, customerName, oldStatus, status);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
-      toast.success('Status atualizado!');
+      toast.success('Status atualizado e email enviado!');
     },
     onError: () => {
       toast.error('Erro ao atualizar status');
@@ -202,9 +246,22 @@ const Orders = () => {
                         {canEditOrders ? (
                           <Select
                             value={order.status}
-                            onValueChange={(value) => 
-                              updateStatusMutation.mutate({ orderId: order.id, status: value })
-                            }
+                            onValueChange={(value) => {
+                              // Get customer info from order
+                              const shippingAddress = order.shipping_address as any;
+                              const customerName = shippingAddress?.name || 
+                                `${shippingAddress?.firstName || ''} ${shippingAddress?.lastName || ''}`.trim() || 
+                                'Cliente';
+                              const customerEmail = order.guest_email || '';
+                              
+                              updateStatusMutation.mutate({ 
+                                orderId: order.id, 
+                                status: value,
+                                oldStatus: order.status,
+                                customerEmail,
+                                customerName
+                              });
+                            }}
                           >
                             <SelectTrigger className="w-[140px]">
                               <SelectValue />
