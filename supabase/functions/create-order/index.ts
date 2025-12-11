@@ -50,7 +50,14 @@ serve(async (req) => {
 
     const body: OrderRequest = await req.json();
     
-    console.log('Received order request:', JSON.stringify(body, null, 2));
+    // Log order request without sensitive data
+    console.log('Received order request:', {
+      itemCount: body.items?.length,
+      hasEmail: !!body.email,
+      hasPhone: !!body.phone,
+      hasShippingAddress: !!body.shipping_address,
+      paymentMethod: body.payment_method
+    });
 
     // Validate required fields
     if (!body.items || body.items.length === 0) {
@@ -70,11 +77,46 @@ serve(async (req) => {
       throw new Error('Todos os campos do endereço são obrigatórios');
     }
 
-    // Calculate total from items
-    const itemsTotal = body.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    // SECURITY: Fetch real prices from database to prevent price manipulation
+    const productIds = body.items.map(item => item.id);
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('id, price, name')
+      .in('id', productIds);
+
+    if (productsError) {
+      console.error('Error fetching products:', productsError);
+      throw new Error('Erro ao validar produtos');
+    }
+
+    // Validate all products exist
+    if (!products || products.length !== productIds.length) {
+      console.error('Product count mismatch:', { 
+        requested: productIds.length, 
+        found: products?.length || 0 
+      });
+      throw new Error('Um ou mais produtos não foram encontrados');
+    }
+
+    // Calculate total using real prices from database
+    const itemsTotal = body.items.reduce((sum, item) => {
+      const realProduct = products.find(p => p.id === item.id);
+      if (!realProduct) {
+        throw new Error(`Produto não encontrado: ${item.id}`);
+      }
+      return sum + (realProduct.price * item.quantity);
+    }, 0);
+    
     const finalTotal = itemsTotal + (body.shipping || 0);
 
-    // Create order
+    console.log('Price validation:', {
+      clientTotal: body.total,
+      calculatedTotal: finalTotal,
+      itemsTotal: itemsTotal,
+      shipping: body.shipping || 0
+    });
+
+    // Create order with validated prices
     const orderData = {
       user_id: body.user_id || null,
       guest_email: body.user_id ? null : body.email,
@@ -86,7 +128,7 @@ serve(async (req) => {
       shipping_address: body.shipping_address,
     };
 
-    console.log('Creating order:', JSON.stringify(orderData, null, 2));
+    console.log('Creating order with validated total:', finalTotal);
 
     const { data: order, error: orderError } = await supabase
       .from('orders')
@@ -101,16 +143,19 @@ serve(async (req) => {
 
     console.log('Order created:', order.id);
 
-    // Create order items
-    const orderItems = body.items.map(item => ({
-      order_id: order.id,
-      product_id: item.id,
-      product_name: item.name,
-      price: item.price,
-      quantity: item.quantity,
-    }));
+    // Create order items with validated prices from database
+    const orderItems = body.items.map(item => {
+      const realProduct = products.find(p => p.id === item.id)!;
+      return {
+        order_id: order.id,
+        product_id: item.id,
+        product_name: realProduct.name,
+        price: realProduct.price, // Use price from database
+        quantity: item.quantity,
+      };
+    });
 
-    console.log('Creating order items:', JSON.stringify(orderItems, null, 2));
+    console.log('Creating order items:', orderItems.length);
 
     const { error: itemsError } = await supabase
       .from('order_items')
@@ -123,7 +168,7 @@ serve(async (req) => {
       throw new Error(`Erro ao criar itens do pedido: ${itemsError.message}`);
     }
 
-    console.log('Order items created successfully');
+    console.log('Order completed successfully:', order.id);
 
     return new Response(
       JSON.stringify({ 
@@ -138,7 +183,7 @@ serve(async (req) => {
     );
 
   } catch (error: unknown) {
-    console.error('Error in create-order function:', error);
+    console.error('Error in create-order function:', error instanceof Error ? error.message : 'Unknown error');
     const errorMessage = error instanceof Error ? error.message : 'Erro interno do servidor';
     return new Response(
       JSON.stringify({ 

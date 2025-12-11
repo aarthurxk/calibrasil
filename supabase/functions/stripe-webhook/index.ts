@@ -125,7 +125,7 @@ serve(async (req) => {
                   paymentMethod: orderData.payment_method || "card",
                 };
 
-                console.log("Sending order emails with payload:", emailPayload);
+                console.log("Sending order emails for order:", orderId);
 
                 // Call send-order-emails function
                 try {
