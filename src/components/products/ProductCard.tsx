@@ -1,12 +1,9 @@
 import { Link } from "react-router-dom";
-import { ShoppingCart, Star } from "lucide-react";
+import { Star } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
-import { useCart } from "@/contexts/CartContext";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
 import type { Product } from "@/types/product";
 
 interface ProductCardProps {
@@ -14,7 +11,6 @@ interface ProductCardProps {
 }
 
 const ProductCard = ({ product }: ProductCardProps) => {
-  const { addItem } = useCart();
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const discount = product.original_price
@@ -39,17 +35,6 @@ const ProductCard = ({ product }: ProductCardProps) => {
     emblaApi.on("select", onSelect);
     onSelect();
   }, [emblaApi, onSelect]);
-
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      image: images[0],
-    });
-    toast.success(`${product.name} adicionado à sacola! 🛍️`);
-  };
 
   const formatPrice = (price: number) => {
     return price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -104,13 +89,6 @@ const ProductCard = ({ product }: ProductCardProps) => {
             <Badge className="absolute top-3 right-3 bg-primary text-primary-foreground z-10">Destaque</Badge>
           )}
 
-          {/* Quick Add Button */}
-          <div className="absolute inset-x-0 bottom-0 translate-y-full transition-transform duration-300 group-hover:translate-y-0 p-3 z-20">
-            <Button onClick={handleAddToCart} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-              <ShoppingCart className="mr-2 h-4 w-4" />
-              Joga na Sacola
-            </Button>
-          </div>
         </div>
 
         {/* Content */}

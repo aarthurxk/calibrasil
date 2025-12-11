@@ -4,6 +4,7 @@ import { ArrowLeft, CreditCard, Lock, QrCode, Barcode, Loader2 } from 'lucide-re
 import MainLayout from '@/components/layout/MainLayout';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useStoreSettings } from '@/hooks/useStoreSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +30,7 @@ const Checkout = () => {
   const { items, total } = useCart();
   const isRedirecting = useRef(false);
   const { user } = useAuth();
+  const { settings } = useStoreSettings();
   const [isProcessing, setIsProcessing] = useState(false);
   
   // Form state
@@ -41,7 +43,7 @@ const Checkout = () => {
   const [zip, setZip] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix');
 
-  const shipping = total >= 250 ? 0 : 29.90;
+  const shipping = total >= settings.free_shipping_threshold ? 0 : settings.standard_shipping_rate;
   const finalTotal = total + shipping;
 
   const formatPrice = (price: number) => {
