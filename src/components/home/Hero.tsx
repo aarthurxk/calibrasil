@@ -2,17 +2,11 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Waves } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import heroImage from '@/assets/hero-beach.jpg';
-
 const Hero = () => {
-  return (
-    <section className="relative min-h-[90vh] flex items-center overflow-hidden">
+  return <section className="relative min-h-[90vh] flex items-center overflow-hidden">
       {/* Background Image */}
       <div className="absolute inset-0">
-        <img
-          src={heroImage}
-          alt="Pôr do sol na praia com ondas"
-          className="h-full w-full object-cover"
-        />
+        <img src={heroImage} alt="Pôr do sol na praia com ondas" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-r from-cali-ocean-dark/90 via-cali-ocean-dark/60 to-transparent" />
       </div>
 
@@ -31,10 +25,7 @@ const Hero = () => {
             </span>
           </h1>
           
-          <p className="text-lg text-sidebar-foreground/80 max-w-lg">
-            Descubra produtos tech premium feitos pro surfista moderno. 
-            Sustentáveis, inovadores e prontos pra pegar a onda do futuro com você!
-          </p>
+          <p className="text-lg text-sidebar-foreground/80 max-w-lg">Produtos premium que elevam seu estilo e simplificam seu dia a dia. Inovação com conforto, sofisticação e alma livre.</p>
 
           <div className="flex flex-wrap gap-4">
             <Link to="/shop">
@@ -44,7 +35,7 @@ const Hero = () => {
               </Button>
             </Link>
             <Link to="/about">
-              <Button size="lg" variant="outline" className="border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent">
+              <Button size="lg" variant="outline" className="border-sidebar-border hover:bg-sidebar-accent text-primary">
                 Nossa História
               </Button>
             </Link>
@@ -67,8 +58,6 @@ const Hero = () => {
           </div>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
-
 export default Hero;
