@@ -77,7 +77,22 @@ serve(async (req) => {
       }
     };
 
-    // Create line items for Stripe
+    // SECURITY: Fetch real product prices from database to prevent price manipulation
+    const productIds = body.items.map((item) => item.id);
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('id, price, name')
+      .in('id', productIds);
+
+    if (productsError || !products) {
+      console.error("Error fetching products for price validation:", productsError);
+      throw new Error("Failed to validate product prices");
+    }
+
+    // Create a map of real prices from database
+    const priceMap = new Map(products.map(p => [p.id, { price: p.price, name: p.name }]));
+
+    // Validate all products exist and create line items with REAL prices
     const lineItems: Array<{
       price_data: {
         currency: string;
@@ -86,6 +101,16 @@ serve(async (req) => {
       };
       quantity: number;
     }> = body.items.map((item) => {
+      const realProduct = priceMap.get(item.id);
+      if (!realProduct) {
+        throw new Error(`Product not found: ${item.id}`);
+      }
+
+      // Log if client price differs from real price (potential manipulation attempt)
+      if (Math.abs(item.price - realProduct.price) > 0.01) {
+        console.warn(`SECURITY: Price mismatch detected for product ${item.id}: client=${item.price}, real=${realProduct.price}`);
+      }
+
       // Only include images if it's a valid absolute URL
       const validImage = item.image && isValidUrl(item.image) ? [item.image] : undefined;
       
@@ -93,10 +118,10 @@ serve(async (req) => {
         price_data: {
           currency: "brl",
           product_data: {
-            name: item.name,
+            name: realProduct.name, // Use name from database too
             images: validImage,
           },
-          unit_amount: Math.round(item.price * 100), // Convert to cents
+          unit_amount: Math.round(realProduct.price * 100), // Use REAL price from database
         },
         quantity: item.quantity,
       };

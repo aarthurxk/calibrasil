@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
@@ -18,6 +19,7 @@ interface LowStockItem {
 
 interface LowStockEmailRequest {
   items: LowStockItem[];
+  internalCall?: boolean; // Flag for calls from other edge functions using service role
 }
 
 const generateLowStockEmail = (items: LowStockItem[]): string => {
@@ -90,7 +92,57 @@ serve(async (req) => {
   }
 
   try {
-    const { items }: LowStockEmailRequest = await req.json();
+    const body = await req.json();
+    const { items, internalCall }: LowStockEmailRequest = body;
+
+    // SECURITY: If not an internal call (from another edge function with service role), verify authentication
+    if (!internalCall) {
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) {
+        console.error('[LOW-STOCK] No authorization header for external call');
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Check if this is a service role call (internal) or user call
+      const token = authHeader.replace('Bearer ', '');
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      
+      // If not using service role, verify user is admin
+      if (token !== serviceRoleKey) {
+        const supabase = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+          { global: { headers: { Authorization: authHeader } } }
+        );
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+          console.error('[LOW-STOCK] Auth error:', authError);
+          return new Response(
+            JSON.stringify({ error: 'Unauthorized' }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Check if user has admin role
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+
+        if (roleError || !roleData || roleData.role !== 'admin') {
+          console.error('[LOW-STOCK] User does not have admin permission');
+          return new Response(
+            JSON.stringify({ error: 'Forbidden - Admin role required' }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+    }
     
     if (!items || items.length === 0) {
       return new Response(
