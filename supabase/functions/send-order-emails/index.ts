@@ -192,27 +192,27 @@ serve(async (req) => {
 
   try {
     const data: OrderEmailRequest = await req.json();
-    console.log("[SEND-ORDER-EMAILS] Received request for order:", data.orderId);
+    console.log("[SEND-ORDER-EMAILS] Processing order:", data.orderId);
 
-    // Send email to buyer
-    console.log("[SEND-ORDER-EMAILS] Sending confirmation email to:", data.customerEmail);
+    // Send email to buyer (don't log email addresses)
+    console.log("[SEND-ORDER-EMAILS] Sending buyer confirmation...");
     const buyerEmailResult = await resend.emails.send({
       from: "Cali Brasil <pedidos@calibrasil.com>",
       to: [data.customerEmail],
       subject: `Pedido confirmado! 🎉 #${data.orderId.substring(0, 8).toUpperCase()}`,
       html: generateBuyerEmail(data),
     });
-    console.log("[SEND-ORDER-EMAILS] Buyer email result:", buyerEmailResult);
+    console.log("[SEND-ORDER-EMAILS] Buyer email sent");
 
     // Send email to seller
-    console.log("[SEND-ORDER-EMAILS] Sending sales alert to: arthur@calibrasil.com");
+    console.log("[SEND-ORDER-EMAILS] Sending seller notification...");
     const sellerEmailResult = await resend.emails.send({
       from: "Cali Brasil <pedidos@calibrasil.com>",
       to: ["arthur@calibrasil.com"],
       subject: `Nova venda! 💰 ${formatPrice(data.total)}`,
       html: generateSellerEmail(data),
     });
-    console.log("[SEND-ORDER-EMAILS] Seller email result:", sellerEmailResult);
+    console.log("[SEND-ORDER-EMAILS] Seller email sent");
 
     return new Response(
       JSON.stringify({ 
