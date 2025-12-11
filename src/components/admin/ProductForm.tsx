@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { X, Upload, Loader2, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+
+const MAX_IMAGES = 6;
 
 interface ProductFormData {
   id?: string;
@@ -28,6 +30,12 @@ interface ProductFormData {
   images: string[];
   in_stock: boolean;
   featured: boolean;
+}
+
+interface VariantStock {
+  model: string | null;
+  color: string | null;
+  stock_quantity: number;
 }
 
 interface ProductFormProps {
@@ -99,6 +107,7 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
   const [customColor, setCustomColor] = useState('');
   const [customColorHex, setCustomColorHex] = useState('#000000');
   const [customModel, setCustomModel] = useState('');
+  const [variantStocks, setVariantStocks] = useState<VariantStock[]>([]);
 
   const parseColors = (color: string[] | string | null | undefined): string[] => {
     if (!color) return [];
@@ -130,19 +139,89 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
 
   const [formData, setFormData] = useState<ProductFormData>(getInitialFormData());
 
+  // Fetch existing variants when editing
+  const { data: existingVariants = [] } = useQuery({
+    queryKey: ['product-variants', initialData?.id],
+    queryFn: async () => {
+      if (!initialData?.id) return [];
+      const { data, error } = await supabase
+        .from('product_variants')
+        .select('*')
+        .eq('product_id', initialData.id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!initialData?.id,
+  });
+
   useEffect(() => {
     setFormData(getInitialFormData());
   }, [initialData, open]);
+
+  useEffect(() => {
+    // Initialize variant stocks from existing data
+    if (existingVariants.length > 0) {
+      setVariantStocks(existingVariants.map(v => ({
+        model: v.model,
+        color: v.color,
+        stock_quantity: v.stock_quantity,
+      })));
+    } else {
+      setVariantStocks([]);
+    }
+  }, [existingVariants]);
+
+  // Generate variant combinations when colors/models change
+  useEffect(() => {
+    const colors = formData.colors.length > 0 ? formData.colors : [null];
+    const models = formData.models.length > 0 ? formData.models : [null];
+    
+    const newVariants: VariantStock[] = [];
+    for (const color of colors) {
+      for (const model of models) {
+        // Skip if both are null (no variants needed)
+        if (color === null && model === null) continue;
+        
+        // Check if variant already exists
+        const existing = variantStocks.find(
+          v => v.color === color && v.model === model
+        );
+        newVariants.push({
+          model,
+          color,
+          stock_quantity: existing?.stock_quantity ?? 0,
+        });
+      }
+    }
+    
+    if (newVariants.length > 0 || (formData.colors.length > 0 || formData.models.length > 0)) {
+      setVariantStocks(newVariants);
+    }
+  }, [formData.colors, formData.models]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    const currentCount = formData.images.length;
+    const remainingSlots = MAX_IMAGES - currentCount;
+
+    if (remainingSlots <= 0) {
+      toast.error(`Limite de ${MAX_IMAGES} fotos atingido`);
+      return;
+    }
+
+    const filesToUpload = Array.from(files).slice(0, remainingSlots);
+    
+    if (files.length > remainingSlots) {
+      toast.warning(`Apenas ${remainingSlots} foto(s) serão adicionadas (limite de ${MAX_IMAGES})`);
+    }
+
     setUploadingImages(true);
     const newImages: string[] = [];
 
     try {
-      for (const file of Array.from(files)) {
+      for (const file of filesToUpload) {
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         
@@ -241,6 +320,14 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
     setCustomModel('');
   };
 
+  const updateVariantStock = (model: string | null, color: string | null, quantity: number) => {
+    setVariantStocks(prev => prev.map(v => 
+      v.model === model && v.color === color
+        ? { ...v, stock_quantity: quantity }
+        : v
+    ));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -268,6 +355,8 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
         featured: formData.featured,
       };
 
+      let productId = initialData?.id;
+
       if (initialData?.id) {
         const { error } = await supabase
           .from('products')
@@ -275,18 +364,46 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
           .eq('id', initialData.id);
         
         if (error) throw error;
-        toast.success('Produto atualizado! 🎉');
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('products')
-          .insert(productData);
+          .insert(productData)
+          .select('id')
+          .single();
         
         if (error) throw error;
-        toast.success('Produto cadastrado! 🎉');
+        productId = data.id;
       }
+
+      // Save variant stocks
+      if (productId && variantStocks.length > 0) {
+        // Delete existing variants
+        await supabase.from('product_variants').delete().eq('product_id', productId);
+        
+        // Insert new variants
+        const variantsToInsert = variantStocks.map(v => ({
+          product_id: productId,
+          model: v.model,
+          color: v.color,
+          stock_quantity: v.stock_quantity,
+        }));
+        
+        const { error: variantError } = await supabase
+          .from('product_variants')
+          .insert(variantsToInsert);
+        
+        if (variantError) {
+          console.error('Variant save error:', variantError);
+          toast.error('Produto salvo, mas erro ao salvar estoque por variação');
+        }
+      }
+
+      toast.success(initialData?.id ? 'Produto atualizado! 🎉' : 'Produto cadastrado! 🎉');
 
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['shop-products'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-products'] });
+      queryClient.invalidateQueries({ queryKey: ['product-variants'] });
       onOpenChange(false);
       
     } catch (error) {
@@ -296,6 +413,9 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
       setIsSubmitting(false);
     }
   };
+
+  const imageCount = formData.images.length;
+  const canAddMoreImages = imageCount < MAX_IMAGES;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -309,7 +429,12 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Image Upload */}
           <div className="space-y-3">
-            <Label>Fotos do Produto</Label>
+            <div className="flex items-center justify-between">
+              <Label>Fotos do Produto</Label>
+              <span className={`text-sm ${imageCount >= MAX_IMAGES ? 'text-destructive' : 'text-muted-foreground'}`}>
+                {imageCount}/{MAX_IMAGES} fotos
+              </span>
+            </div>
             <div className="flex flex-wrap gap-3">
               {formData.images.map((img, index) => (
                 <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border border-border">
@@ -323,24 +448,26 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
                   </button>
                 </div>
               ))}
-              <label className="w-24 h-24 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors">
-                {uploadingImages ? (
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                ) : (
-                  <>
-                    <Upload className="h-6 w-6 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground mt-1">Adicionar</span>
-                  </>
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  disabled={uploadingImages}
-                />
-              </label>
+              {canAddMoreImages && (
+                <label className="w-24 h-24 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors">
+                  {uploadingImages ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  ) : (
+                    <>
+                      <Upload className="h-6 w-6 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground mt-1">Adicionar</span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    disabled={uploadingImages || !canAddMoreImages}
+                  />
+                </label>
+              )}
             </div>
           </div>
 
@@ -542,6 +669,63 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
               </div>
             )}
           </div>
+
+          {/* Stock per Variant */}
+          {variantStocks.length > 0 && (
+            <div className="space-y-3">
+              <Label>Estoque por Variação</Label>
+              <div className="border border-border rounded-lg overflow-hidden">
+                <div className="max-h-60 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted sticky top-0">
+                      <tr>
+                        {formData.colors.length > 0 && (
+                          <th className="text-left px-3 py-2 font-medium">Cor</th>
+                        )}
+                        {formData.models.length > 0 && (
+                          <th className="text-left px-3 py-2 font-medium">Modelo</th>
+                        )}
+                        <th className="text-left px-3 py-2 font-medium">Quantidade</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {variantStocks.map((variant, index) => (
+                        <tr key={index} className="border-t border-border">
+                          {formData.colors.length > 0 && (
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-4 h-4 rounded-full border border-border"
+                                  style={{ backgroundColor: formData.color_codes[variant.color || ''] || '#888' }}
+                                />
+                                {variant.color}
+                              </div>
+                            </td>
+                          )}
+                          {formData.models.length > 0 && (
+                            <td className="px-3 py-2">{variant.model}</td>
+                          )}
+                          <td className="px-3 py-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={variant.stock_quantity}
+                              onChange={(e) => updateVariantStock(
+                                variant.model,
+                                variant.color,
+                                parseInt(e.target.value) || 0
+                              )}
+                              className="w-24 h-8"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Sizes */}
           <div className="space-y-2">

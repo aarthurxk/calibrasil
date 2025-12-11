@@ -1,16 +1,9 @@
-import { useState, useRef } from 'react';
-import { Plus, Search, Edit, Trash2, Eye, Upload, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, Search, Edit, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,13 +14,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
+import ProductForm from '@/components/admin/ProductForm';
 
 type Product = Tables<'products'>;
 
@@ -37,24 +28,10 @@ const formatPrice = (price: number) => {
 
 const Products = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
-
-  // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    price: '',
-    original_price: '',
-    category: '',
-    description: '',
-    in_stock: true,
-    featured: false,
-  });
 
   // Fetch products
   const { data: products = [], isLoading } = useQuery({
@@ -70,77 +47,12 @@ const Products = () => {
     },
   });
 
-  // Upload image
-  const uploadImage = async (file: File): Promise<string | null> => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-    
-    const { error: uploadError } = await supabase.storage
-      .from('product-images')
-      .upload(fileName, file);
-
-    if (uploadError) {
-      console.error('Upload error:', uploadError);
-      return null;
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('product-images')
-      .getPublicUrl(fileName);
-
-    return publicUrl;
-  };
-
-  // Create/Update mutation
-  const saveMutation = useMutation({
-    mutationFn: async (data: typeof formData & { image?: string }) => {
-      let imageUrl = editingProduct?.image || null;
-
-      if (imageFile) {
-        const uploadedUrl = await uploadImage(imageFile);
-        if (uploadedUrl) {
-          imageUrl = uploadedUrl;
-        }
-      }
-
-      const productData = {
-        name: data.name,
-        price: parseFloat(data.price),
-        original_price: data.original_price ? parseFloat(data.original_price) : null,
-        category: data.category,
-        description: data.description,
-        in_stock: data.in_stock,
-        featured: data.featured,
-        image: imageUrl,
-      };
-
-      if (editingProduct) {
-        const { error } = await supabase
-          .from('products')
-          .update(productData)
-          .eq('id', editingProduct.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('products')
-          .insert(productData);
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-products'] });
-      toast.success(editingProduct ? 'Produto atualizado!' : 'Produto criado!');
-      closeDialog();
-    },
-    onError: (error) => {
-      console.error('Save error:', error);
-      toast.error('Erro ao salvar produto');
-    },
-  });
-
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
+      // Also delete related variants
+      await supabase.from('product_variants').delete().eq('product_id', id);
+      
       const { error } = await supabase
         .from('products')
         .delete()
@@ -149,6 +61,8 @@ const Products = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-products'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['shop-products'] });
       toast.success('Produto excluído!');
       setDeleteProduct(null);
     },
@@ -161,60 +75,22 @@ const Products = () => {
     product.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      price: '',
-      original_price: '',
-      category: '',
-      description: '',
-      in_stock: true,
-      featured: false,
-    });
-    setImageFile(null);
-    setImagePreview(null);
-  };
-
-  const closeDialog = () => {
-    setIsDialogOpen(false);
+  const openCreateDialog = () => {
     setEditingProduct(null);
-    resetForm();
+    setIsFormOpen(true);
   };
 
   const openEditDialog = (product: Product) => {
     setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      price: product.price.toString(),
-      original_price: product.original_price?.toString() || '',
-      category: product.category,
-      description: product.description || '',
-      in_stock: product.in_stock ?? true,
-      featured: product.featured ?? false,
-    });
-    setImagePreview(product.image);
-    setIsDialogOpen(true);
+    setIsFormOpen(true);
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+  const handleFormClose = (open: boolean) => {
+    setIsFormOpen(open);
+    if (!open) {
+      setEditingProduct(null);
+      queryClient.invalidateQueries({ queryKey: ['admin-products'] });
     }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.price || !formData.category) {
-      toast.error('Preencha todos os campos obrigatórios');
-      return;
-    }
-    saveMutation.mutate(formData);
   };
 
   if (isLoading) {
@@ -232,138 +108,10 @@ const Products = () => {
           <h1 className="text-3xl font-bold">Produtos</h1>
           <p className="text-muted-foreground">Gerencie seu inventário de produtos</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={(open) => {
-          if (!open) closeDialog();
-          else {
-            resetForm();
-            setIsDialogOpen(true);
-          }
-        }}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-ocean text-primary-foreground">
-              <Plus className="h-4 w-4 mr-2" />
-              Adicionar Produto
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{editingProduct ? 'Editar Produto' : 'Novo Produto'}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Image Upload */}
-              <div>
-                <Label>Imagem do Produto</Label>
-                <div 
-                  className="mt-2 border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:border-primary transition-colors"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {imagePreview ? (
-                    <img src={imagePreview} alt="Preview" className="max-h-32 mx-auto rounded" />
-                  ) : (
-                    <div className="py-4">
-                      <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                      <p className="text-sm text-muted-foreground">Clique para fazer upload</p>
-                    </div>
-                  )}
-                </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageChange}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="name">Nome do Produto *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="price">Preço *</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="original_price">Preço Original</Label>
-                  <Input
-                    id="original_price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.original_price}
-                    onChange={(e) => setFormData({ ...formData, original_price: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="category">Categoria *</Label>
-                <Input
-                  id="category"
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="description">Descrição</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label htmlFor="in_stock">Em Estoque</Label>
-                <Switch
-                  id="in_stock"
-                  checked={formData.in_stock}
-                  onCheckedChange={(checked) => setFormData({ ...formData, in_stock: checked })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label htmlFor="featured">Produto Destaque</Label>
-                <Switch
-                  id="featured"
-                  checked={formData.featured}
-                  onCheckedChange={(checked) => setFormData({ ...formData, featured: checked })}
-                />
-              </div>
-
-              <Button 
-                type="submit" 
-                className="w-full bg-gradient-ocean text-primary-foreground"
-                disabled={saveMutation.isPending}
-              >
-                {saveMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Salvando...
-                  </>
-                ) : editingProduct ? 'Atualizar Produto' : 'Adicionar Produto'}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={openCreateDialog} className="bg-gradient-ocean text-primary-foreground">
+          <Plus className="h-4 w-4 mr-2" />
+          Adicionar Produto
+        </Button>
       </div>
 
       {/* Search */}
@@ -463,6 +211,16 @@ const Products = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Product Form Dialog */}
+      <ProductForm
+        open={isFormOpen}
+        onOpenChange={handleFormClose}
+        initialData={editingProduct ? {
+          ...editingProduct,
+          color_codes: editingProduct.color_codes as Record<string, string> | null,
+        } : null}
+      />
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteProduct} onOpenChange={() => setDeleteProduct(null)}>
