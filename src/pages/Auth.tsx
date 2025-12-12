@@ -144,12 +144,14 @@ const Auth = () => {
         toast.error('Muitas tentativas. Aguarde alguns minutos e tente novamente.');
       } else if (errorMessage.includes('invalid') && errorMessage.includes('email')) {
         toast.error('Formato de e-mail inválido.');
+      } else if (errorMessage.includes('weak') || errorMessage.includes('pwned') || (error as any).code === 'weak_password') {
+        toast.error('Esta senha é muito comum ou já foi vazada. Por favor, escolha uma senha diferente.');
       } else if (errorMessage.includes('password should be at least')) {
         toast.error('A senha deve ter no mínimo 8 caracteres.');
       } else if (errorMessage.includes('password should contain')) {
         toast.error('A senha deve conter letras, números e caracteres especiais.');
       } else if (errorMessage.includes('password')) {
-        toast.error(`Erro na senha: ${error.message}`);
+        toast.error('Erro na senha. Tente uma senha mais forte.');
       } else if (errorMessage.includes('signup is disabled')) {
         toast.error('Cadastro temporariamente desabilitado.');
       } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
