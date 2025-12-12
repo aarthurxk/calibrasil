@@ -21,13 +21,22 @@ interface LowStockEmailRequest {
   items: LowStockItem[];
 }
 
+const escapeHtml = (str: string): string => {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
 const generateLowStockEmail = (items: LowStockItem[]): string => {
   const itemsHtml = items.map(item => `
     <tr>
       <td style="padding: 12px; border-bottom: 1px solid #eee;">
-        <strong>${item.productName}</strong>
-        ${item.color ? `<br><span style="color: #666; font-size: 14px;">Cor: ${item.color}</span>` : ''}
-        ${item.model ? `<br><span style="color: #666; font-size: 14px;">Modelo: ${item.model}</span>` : ''}
+        <strong>${escapeHtml(item.productName)}</strong>
+        ${item.color ? `<br><span style="color: #666; font-size: 14px;">Cor: ${escapeHtml(item.color)}</span>` : ''}
+        ${item.model ? `<br><span style="color: #666; font-size: 14px;">Modelo: ${escapeHtml(item.model)}</span>` : ''}
       </td>
       <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">
         <span style="background: ${item.currentStock <= 2 ? '#fee2e2' : '#fef3c7'}; color: ${item.currentStock <= 2 ? '#dc2626' : '#d97706'}; padding: 4px 12px; border-radius: 12px; font-weight: bold;">

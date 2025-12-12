@@ -30,12 +30,30 @@ const formatPrice = (price: number): string => {
   return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
 
+const escapeHtml = (str: string): string => {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
+const isValidImageUrl = (url: string): boolean => {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+};
+
 const generateItemsHtml = (items: CartItem[]): string => {
   return items.map(item => `
     <tr>
       <td style="padding: 12px; border-bottom: 1px solid #eee;">
-        ${item.image ? `<img src="${item.image}" alt="${item.name}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 10px; vertical-align: middle;">` : ''}
-        ${item.name}
+        ${item.image && isValidImageUrl(item.image) ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 10px; vertical-align: middle;">` : ''}
+        ${escapeHtml(item.name)}
       </td>
       <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
       <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;">${formatPrice(item.price)}</td>

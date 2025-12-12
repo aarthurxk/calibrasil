@@ -51,10 +51,19 @@ const formatPaymentMethod = (method: string): string => {
   return methods[method] || method;
 };
 
+const escapeHtml = (str: string): string => {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
 const generateItemsHtml = (items: OrderItem[]): string => {
   return items.map(item => `
     <tr>
-      <td style="padding: 12px; border-bottom: 1px solid #eee;">${item.product_name}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #eee;">${escapeHtml(item.product_name)}</td>
       <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
       <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;">${formatPrice(item.price)}</td>
       <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;">${formatPrice(item.price * item.quantity)}</td>

@@ -18,6 +18,15 @@ interface OrderStatusEmailRequest {
   trackingCode?: string;
 }
 
+const escapeHtml = (str: string): string => {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
 const getStatusInfo = (status: string): { label: string; emoji: string; color: string; message: string } => {
   const statusMap: Record<string, { label: string; emoji: string; color: string; message: string }> = {
     processing: {
@@ -77,7 +86,7 @@ const generateStatusEmail = (data: OrderStatusEmailRequest): string => {
       </div>
       
       <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-        <p style="margin: 0 0 10px 0;"><strong>Olá, ${data.customerName}!</strong></p>
+        <p style="margin: 0 0 10px 0;"><strong>Olá, ${escapeHtml(data.customerName)}!</strong></p>
         <p style="margin: 0;">${statusInfo.message}</p>
       </div>
 
