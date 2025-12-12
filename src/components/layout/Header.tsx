@@ -1,18 +1,27 @@
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Menu, X, User, Search, Heart } from 'lucide-react';
+import { ShoppingCart, Menu, X, User, Search, Heart, LayoutDashboard, LogOut, UserCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import caliLogo from '@/assets/cali-logo.jpeg';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { itemCount } = useCart();
   const { wishlistCount } = useWishlist();
-  const { user } = useAuth();
+  const { user, role, signOut } = useAuth();
+
+  const isAdminOrManager = role === 'admin' || role === 'manager';
 
   const navLinks = [
     { name: 'Início', path: '/' },
@@ -61,11 +70,51 @@ const Header = () => {
               </Button>
             </Link>
           )}
-          <Link to={user ? "/profile" : "/auth"} aria-label={user ? "Minha conta" : "Entrar na conta"}>
-            <Button variant="ghost" size="icon" aria-label={user ? "Minha conta" : "Entrar na conta"}>
-              <User className="h-5 w-5" />
-            </Button>
-          </Link>
+          
+          {/* User Menu */}
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Menu do usuário">
+                  <User className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-popover">
+                {isAdminOrManager && (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin" className="flex items-center gap-2 cursor-pointer">
+                        <LayoutDashboard className="h-4 w-4" />
+                        Painel Admin
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem asChild>
+                  <Link to="/profile" className="flex items-center gap-2 cursor-pointer">
+                    <UserCircle className="h-4 w-4" />
+                    Meu Perfil
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => signOut()} 
+                  className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link to="/auth" aria-label="Entrar na conta">
+              <Button variant="ghost" size="icon" aria-label="Entrar na conta">
+                <User className="h-5 w-5" />
+              </Button>
+            </Link>
+          )}
+
           <Link to="/cart" className="relative" aria-label="Carrinho de compras">
             <Button variant="ghost" size="icon" aria-label="Carrinho de compras">
               <ShoppingCart className="h-5 w-5" />
