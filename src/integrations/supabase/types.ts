@@ -407,18 +407,19 @@ export type Database = {
       }
     }
     Views: {
-      shipping_config: {
-        Row: {
-          currency: string | null
-          delivery_max_days: number | null
-          delivery_min_days: number | null
-          free_shipping_threshold: number | null
-          standard_shipping_rate: number | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
+      get_shipping_config: {
+        Args: never
+        Returns: {
+          currency: string
+          delivery_max_days: number
+          delivery_min_days: number
+          free_shipping_threshold: number
+          standard_shipping_rate: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
