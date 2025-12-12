@@ -8,7 +8,14 @@ const Footer = () => {
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <img src={caliLogo} alt="Cali" className="h-10 w-10 rounded-lg object-cover" />
+              <img 
+                src={caliLogo} 
+                alt="Cali" 
+                className="h-10 w-10 rounded-lg object-cover" 
+                loading="lazy"
+                width={40}
+                height={40}
+              />
               <span className="text-xl font-bold text-sidebar-primary">Cali</span>
             </div>
             <p className="text-sm text-sidebar-foreground/70">

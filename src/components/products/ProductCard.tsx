@@ -62,6 +62,9 @@ const ProductCard = ({ product }: ProductCardProps) => {
                     src={img}
                     alt={`${product.name} - Imagem ${index + 1}`}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    loading="lazy"
+                    width={400}
+                    height={400}
                   />
                 </div>
               ))}
