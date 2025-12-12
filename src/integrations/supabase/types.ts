@@ -358,6 +358,54 @@ export type Database = {
         }
         Relationships: []
       }
+      user_addresses: {
+        Row: {
+          city: string
+          complement: string | null
+          created_at: string
+          house_number: string
+          id: string
+          is_default: boolean | null
+          label: string
+          neighborhood: string
+          state: string
+          street: string
+          updated_at: string
+          user_id: string
+          zip: string
+        }
+        Insert: {
+          city: string
+          complement?: string | null
+          created_at?: string
+          house_number: string
+          id?: string
+          is_default?: boolean | null
+          label: string
+          neighborhood: string
+          state: string
+          street: string
+          updated_at?: string
+          user_id: string
+          zip: string
+        }
+        Update: {
+          city?: string
+          complement?: string | null
+          created_at?: string
+          house_number?: string
+          id?: string
+          is_default?: boolean | null
+          label?: string
+          neighborhood?: string
+          state?: string
+          street?: string
+          updated_at?: string
+          user_id?: string
+          zip?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string

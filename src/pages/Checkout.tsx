@@ -1,15 +1,22 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, CreditCard, Lock, QrCode, Barcode, Loader2 } from "lucide-react";
+import { ArrowLeft, CreditCard, Lock, QrCode, Barcode, Loader2, MapPin, ChevronDown } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useStoreSettings } from "@/hooks/useStoreSettings";
+import { useUserAddresses, UserAddress } from "@/hooks/useUserAddresses";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -38,7 +45,14 @@ const Checkout = () => {
   const isRedirecting = useRef(false);
   const { user } = useAuth();
   const { settings } = useStoreSettings();
+  const { addresses, isLoading: isLoadingAddresses, addAddress, canAddMore } = useUserAddresses();
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Address selection state
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [useNewAddress, setUseNewAddress] = useState(false);
+  const [saveNewAddress, setSaveNewAddress] = useState(false);
+  const [addressLabel, setAddressLabel] = useState("");
 
   // Form state
   const [email, setEmail] = useState("");
@@ -57,6 +71,44 @@ const Checkout = () => {
 
   const shipping = total >= settings.free_shipping_threshold ? 0 : settings.standard_shipping_rate;
   const finalTotal = total + shipping;
+
+  // Auto-select default address when addresses load
+  useEffect(() => {
+    if (addresses.length > 0 && !selectedAddressId && !useNewAddress) {
+      const defaultAddr = addresses.find((a) => a.is_default) || addresses[0];
+      setSelectedAddressId(defaultAddr.id);
+      fillFormFromAddress(defaultAddr);
+    }
+  }, [addresses]);
+
+  const fillFormFromAddress = (address: UserAddress) => {
+    setZip(address.zip);
+    setStreet(address.street);
+    setHouseNumber(address.house_number);
+    setComplement(address.complement || "");
+    setNeighborhood(address.neighborhood);
+    setCity(address.city);
+    setState(address.state);
+  };
+
+  const handleSelectAddress = (address: UserAddress) => {
+    setSelectedAddressId(address.id);
+    setUseNewAddress(false);
+    fillFormFromAddress(address);
+  };
+
+  const handleUseNewAddress = () => {
+    setSelectedAddressId(null);
+    setUseNewAddress(true);
+    // Clear address fields
+    setZip("");
+    setStreet("");
+    setHouseNumber("");
+    setComplement("");
+    setNeighborhood("");
+    setCity("");
+    setState("");
+  };
 
   const formatPrice = (price: number) => {
     return price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -129,6 +181,21 @@ const Checkout = () => {
         toast.error(firstError.message);
         setIsProcessing(false);
         return;
+      }
+
+      // Save new address if requested
+      if (user && useNewAddress && saveNewAddress && canAddMore && addressLabel) {
+        await addAddress({
+          label: addressLabel,
+          zip,
+          street,
+          house_number: houseNumber,
+          complement: complement || null,
+          neighborhood,
+          city,
+          state,
+          is_default: addresses.length === 0,
+        });
       }
 
       const baseUrl = window.location.origin;
@@ -222,6 +289,8 @@ const Checkout = () => {
     );
   }
 
+  const hasAddresses = user && addresses.length > 0;
+
   return (
     <MainLayout>
       <div className="container py-12">
@@ -276,96 +345,174 @@ const Checkout = () => {
               {/* Shipping Address */}
               <div className="space-y-4">
                 <h2 className="text-xl font-semibold">Endereço de Entrega</h2>
-                
-                {/* CEP - First field with auto-fill */}
-                <div>
-                  <Label htmlFor="zip">CEP *</Label>
-                  <div className="relative">
-                    <Input
-                      id="zip"
-                      required
-                      placeholder="00000-000"
-                      value={zip}
-                      onChange={handleCepChange}
-                      maxLength={9}
-                    />
-                    {isLoadingCep && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                    )}
-                  </div>
-                </div>
 
-                {/* Street - Auto-filled by API */}
-                <div>
-                  <Label htmlFor="street">Rua *</Label>
-                  <Input
-                    id="street"
-                    required
-                    placeholder="Preenchido automaticamente pelo CEP"
-                    value={street}
-                    onChange={(e) => setStreet(e.target.value)}
-                  />
-                </div>
+                {/* Saved Addresses */}
+                {hasAddresses && (
+                  <div className="space-y-3">
+                    <Label className="text-sm text-muted-foreground">Endereços salvos</Label>
+                    <div className="space-y-2">
+                      {addresses.map((addr) => (
+                        <div
+                          key={addr.id}
+                          onClick={() => handleSelectAddress(addr)}
+                          className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                            selectedAddressId === addr.id && !useNewAddress
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <MapPin className="h-4 w-4 mt-0.5 text-primary" />
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">{addr.label}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {addr.street}, {addr.house_number}
+                                {addr.complement && ` - ${addr.complement}`}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {addr.neighborhood}, {addr.city} - {addr.state}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
 
-                {/* Number & Complement */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="houseNumber">Número *</Label>
-                    <Input
-                      id="houseNumber"
-                      required
-                      placeholder="123"
-                      value={houseNumber}
-                      onChange={(e) => setHouseNumber(e.target.value)}
-                    />
+                    <Button
+                      type="button"
+                      variant={useNewAddress ? "default" : "outline"}
+                      size="sm"
+                      onClick={handleUseNewAddress}
+                      className="w-full"
+                    >
+                      Usar outro endereço
+                    </Button>
                   </div>
-                  <div>
-                    <Label htmlFor="complement">Complemento</Label>
-                    <Input
-                      id="complement"
-                      placeholder="Apto, bloco, etc. (opcional)"
-                      value={complement}
-                      onChange={(e) => setComplement(e.target.value)}
-                    />
-                  </div>
-                </div>
+                )}
 
-                {/* Neighborhood - Auto-filled by API */}
-                <div>
-                  <Label htmlFor="neighborhood">Bairro *</Label>
-                  <Input
-                    id="neighborhood"
-                    required
-                    placeholder="Preenchido automaticamente pelo CEP"
-                    value={neighborhood}
-                    onChange={(e) => setNeighborhood(e.target.value)}
-                  />
-                </div>
+                {/* New Address Form */}
+                {(!hasAddresses || useNewAddress) && (
+                  <Collapsible open={!hasAddresses || useNewAddress} className="space-y-4">
+                    <CollapsibleContent className="space-y-4">
+                      {/* CEP */}
+                      <div>
+                        <Label htmlFor="zip">CEP *</Label>
+                        <div className="relative">
+                          <Input
+                            id="zip"
+                            required
+                            placeholder="00000-000"
+                            value={zip}
+                            onChange={handleCepChange}
+                            maxLength={9}
+                          />
+                          {isLoadingCep && (
+                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                          )}
+                        </div>
+                      </div>
 
-                {/* City & State - Auto-filled by API */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="col-span-2">
-                    <Label htmlFor="city">Cidade *</Label>
-                    <Input
-                      id="city"
-                      required
-                      placeholder="Preenchido pelo CEP"
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="state">Estado *</Label>
-                    <Input
-                      id="state"
-                      required
-                      placeholder="UF"
-                      value={state}
-                      onChange={(e) => setState(e.target.value.toUpperCase())}
-                      maxLength={2}
-                    />
-                  </div>
-                </div>
+                      {/* Street */}
+                      <div>
+                        <Label htmlFor="street">Rua *</Label>
+                        <Input
+                          id="street"
+                          required
+                          placeholder="Preenchido automaticamente pelo CEP"
+                          value={street}
+                          onChange={(e) => setStreet(e.target.value)}
+                        />
+                      </div>
+
+                      {/* Number & Complement */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="houseNumber">Número *</Label>
+                          <Input
+                            id="houseNumber"
+                            required
+                            placeholder="123"
+                            value={houseNumber}
+                            onChange={(e) => setHouseNumber(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="complement">Complemento</Label>
+                          <Input
+                            id="complement"
+                            placeholder="Apto, bloco, etc. (opcional)"
+                            value={complement}
+                            onChange={(e) => setComplement(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Neighborhood */}
+                      <div>
+                        <Label htmlFor="neighborhood">Bairro *</Label>
+                        <Input
+                          id="neighborhood"
+                          required
+                          placeholder="Preenchido automaticamente pelo CEP"
+                          value={neighborhood}
+                          onChange={(e) => setNeighborhood(e.target.value)}
+                        />
+                      </div>
+
+                      {/* City & State */}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-2">
+                          <Label htmlFor="city">Cidade *</Label>
+                          <Input
+                            id="city"
+                            required
+                            placeholder="Preenchido pelo CEP"
+                            value={city}
+                            onChange={(e) => setCity(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="state">Estado *</Label>
+                          <Input
+                            id="state"
+                            required
+                            placeholder="UF"
+                            value={state}
+                            onChange={(e) => setState(e.target.value.toUpperCase())}
+                            maxLength={2}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Save address option (only for logged-in users) */}
+                      {user && canAddMore && useNewAddress && (
+                        <div className="space-y-3 pt-2 border-t border-border">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="saveAddress"
+                              checked={saveNewAddress}
+                              onCheckedChange={(checked) => setSaveNewAddress(checked === true)}
+                            />
+                            <Label htmlFor="saveAddress" className="text-sm font-normal cursor-pointer">
+                              Salvar este endereço no meu perfil
+                            </Label>
+                          </div>
+                          {saveNewAddress && (
+                            <div>
+                              <Label htmlFor="addressLabel">Nome do endereço</Label>
+                              <Input
+                                id="addressLabel"
+                                placeholder="Ex: Casa, Trabalho"
+                                value={addressLabel}
+                                onChange={(e) => setAddressLabel(e.target.value)}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
               </div>
 
               {/* Payment Method */}
@@ -457,32 +604,49 @@ const Checkout = () => {
                         <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium line-clamp-1">{item.name}</p>
-                        {(item.color || item.model || item.size) && (
+                        <p className="font-medium text-sm">{item.name}</p>
+                        {(item.color || item.model) && (
                           <p className="text-xs text-muted-foreground">
-                            {[item.color, item.model, item.size].filter(Boolean).join(" / ")}
+                            {item.color && `Cor: ${item.color}`}
+                            {item.color && item.model && " | "}
+                            {item.model && `Modelo: ${item.model}`}
                           </p>
                         )}
-                        <p className="text-sm text-muted-foreground">Qtd: {item.quantity}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Qtd: {item.quantity} × {formatPrice(item.price)}
+                        </p>
                       </div>
-                      <p className="font-medium">{formatPrice(item.price * item.quantity)}</p>
+                      <div className="text-right">
+                        <p className="font-semibold text-sm">{formatPrice(item.price * item.quantity)}</p>
+                      </div>
                     </div>
                   );
                 })}
               </div>
 
-              <div className="space-y-3 pt-4 border-t border-border">
-                <div className="flex justify-between text-muted-foreground">
+              <div className="border-t border-border pt-4 space-y-2">
+                <div className="flex justify-between text-sm">
                   <span>Subtotal</span>
                   <span>{formatPrice(total)}</span>
                 </div>
-                <div className="flex justify-between text-muted-foreground">
+                <div className="flex justify-between text-sm">
                   <span>Frete</span>
-                  <span>{shipping === 0 ? "Grátis 🎉" : formatPrice(shipping)}</span>
+                  <span>
+                    {shipping === 0 ? (
+                      <span className="text-primary font-medium">Grátis</span>
+                    ) : (
+                      formatPrice(shipping)
+                    )}
+                  </span>
                 </div>
-                <div className="flex justify-between text-lg font-bold pt-3 border-t border-border">
+                {shipping > 0 && total < settings.free_shipping_threshold && (
+                  <p className="text-xs text-muted-foreground">
+                    Faltam {formatPrice(settings.free_shipping_threshold - total)} para frete grátis!
+                  </p>
+                )}
+                <div className="flex justify-between font-semibold text-lg pt-2 border-t border-border">
                   <span>Total</span>
-                  <span className="text-primary">{formatPrice(finalTotal)}</span>
+                  <span>{formatPrice(finalTotal)}</span>
                 </div>
               </div>
             </div>
