@@ -4,13 +4,24 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { CustomerDetailsDialog } from '@/components/admin/CustomerDetailsDialog';
 
 const formatPrice = (price: number) => {
   return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
 
+interface Customer {
+  id: string;
+  user_id: string;
+  full_name: string | null;
+  phone: string | null;
+  created_at: string;
+}
+
 const Customers = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   // Fetch profiles
   const { data: profiles = [], isLoading } = useQuery({
@@ -97,7 +108,15 @@ const Customers = () => {
                           <div className="w-10 h-10 rounded-full bg-gradient-ocean flex items-center justify-center">
                             <User className="h-5 w-5 text-primary-foreground" />
                           </div>
-                          <p className="font-medium">{customer.full_name || 'Sem nome'}</p>
+                          <button
+                            className="font-medium text-primary hover:underline cursor-pointer text-left"
+                            onClick={() => {
+                              setSelectedCustomer(customer);
+                              setIsDetailsOpen(true);
+                            }}
+                          >
+                            {customer.full_name || 'Sem nome'}
+                          </button>
                         </div>
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">{customer.phone || '-'}</td>
@@ -118,6 +137,13 @@ const Customers = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Customer Details Dialog */}
+      <CustomerDetailsDialog
+        customer={selectedCustomer}
+        open={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+      />
     </div>
   );
 };
