@@ -21,6 +21,38 @@ interface ShippingOption {
 // CEP origin (store location - adjust as needed)
 const CEP_ORIGEM = "60160230"; // Fortaleza-CE
 
+// Simple in-memory rate limiting
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_MAX = 30; // requests per window
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute window
+
+const checkRateLimit = (clientIP: string): boolean => {
+  const now = Date.now();
+  const record = rateLimitMap.get(clientIP);
+  
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(clientIP, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  
+  if (record.count >= RATE_LIMIT_MAX) {
+    return false;
+  }
+  
+  record.count++;
+  return true;
+};
+
+// Cleanup old entries periodically (simple garbage collection)
+const cleanupRateLimitMap = () => {
+  const now = Date.now();
+  for (const [key, value] of rateLimitMap.entries()) {
+    if (now > value.resetTime) {
+      rateLimitMap.delete(key);
+    }
+  }
+};
+
 const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CALCULATE-SHIPPING] ${step}${detailsStr}`);
@@ -30,6 +62,22 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  // Rate limiting check
+  const clientIP = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || 
+                   req.headers.get("cf-connecting-ip") || 
+                   "unknown";
+  
+  if (!checkRateLimit(clientIP)) {
+    logStep("Rate limit exceeded", { clientIP });
+    return new Response(
+      JSON.stringify({ success: false, error: "Muitas requisições. Tente novamente em 1 minuto." }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }
+    );
+  }
+
+  // Periodic cleanup
+  if (Math.random() < 0.1) cleanupRateLimitMap();
 
   try {
     logStep("Function started");

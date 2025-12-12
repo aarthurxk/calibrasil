@@ -19,7 +19,6 @@ interface LowStockItem {
 
 interface LowStockEmailRequest {
   items: LowStockItem[];
-  internalCall?: boolean; // Flag for calls from other edge functions using service role
 }
 
 const generateLowStockEmail = (items: LowStockItem[]): string => {
@@ -93,54 +92,54 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { items, internalCall }: LowStockEmailRequest = body;
+    const { items }: LowStockEmailRequest = body;
 
-    // SECURITY: If not an internal call (from another edge function with service role), verify authentication
-    if (!internalCall) {
-      const authHeader = req.headers.get('Authorization');
-      if (!authHeader) {
-        console.error('[LOW-STOCK] No authorization header for external call');
+    // SECURITY: Always verify authentication - check service role key OR admin user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('[LOW-STOCK] No authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    // Check if this is a service role call (internal from other edge functions)
+    const isServiceRoleCall = token === serviceRoleKey;
+    
+    // If not using service role, verify user is admin
+    if (!isServiceRoleCall) {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('[LOW-STOCK] Auth error:', authError);
         return new Response(
           JSON.stringify({ error: 'Unauthorized' }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Check if this is a service role call (internal) or user call
-      const token = authHeader.replace('Bearer ', '');
-      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-      
-      // If not using service role, verify user is admin
-      if (token !== serviceRoleKey) {
-        const supabase = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-          { global: { headers: { Authorization: authHeader } } }
+      // Check if user has admin role
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+
+      if (roleError || !roleData || roleData.role !== 'admin') {
+        console.error('[LOW-STOCK] User does not have admin permission');
+        return new Response(
+          JSON.stringify({ error: 'Forbidden - Admin role required' }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
-
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-          console.error('[LOW-STOCK] Auth error:', authError);
-          return new Response(
-            JSON.stringify({ error: 'Unauthorized' }),
-            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // Check if user has admin role
-        const { data: roleData, error: roleError } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .single();
-
-        if (roleError || !roleData || roleData.role !== 'admin') {
-          console.error('[LOW-STOCK] User does not have admin permission');
-          return new Response(
-            JSON.stringify({ error: 'Forbidden - Admin role required' }),
-            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
       }
     }
     
