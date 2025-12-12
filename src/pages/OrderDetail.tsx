@@ -209,9 +209,9 @@ const OrderDetail = () => {
   return (
     <MainLayout>
       <div className="container py-12">
-        <Link to="/profile" className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-8">
+        <Link to="/orders" className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-8">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Voltar ao Perfil
+          Voltar aos Meus Pedidos
         </Link>
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">

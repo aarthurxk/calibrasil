@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Menu, X, User, Search, Heart, LayoutDashboard, LogOut, UserCircle } from 'lucide-react';
+import { ShoppingCart, Menu, X, User, Search, Heart, LayoutDashboard, LogOut, UserCircle, Package } from 'lucide-react';
 import { useState } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useWishlist } from '@/hooks/useWishlist';
@@ -95,6 +95,12 @@ const Header = () => {
                   <Link to="/profile" className="flex items-center gap-2 cursor-pointer">
                     <UserCircle className="h-4 w-4" />
                     Meu Perfil
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/orders" className="flex items-center gap-2 cursor-pointer">
+                    <Package className="h-4 w-4" />
+                    Meus Pedidos
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
