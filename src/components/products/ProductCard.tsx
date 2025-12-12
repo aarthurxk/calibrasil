@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
 import { Badge } from "@/components/ui/badge";
+import WishlistButton from "@/components/products/WishlistButton";
 import type { Product } from "@/types/product";
 
 interface ProductCardProps {
@@ -88,10 +89,14 @@ const ProductCard = ({ product }: ProductCardProps) => {
           {discount > 0 && (
             <Badge className="absolute top-3 left-3 bg-accent text-accent-foreground z-10">-{discount}%</Badge>
           )}
-          {product.featured && (
-            <Badge className="absolute top-3 right-3 bg-primary text-primary-foreground z-10">Destaque</Badge>
+          {product.featured && !discount && (
+            <Badge className="absolute top-3 left-3 bg-primary text-primary-foreground z-10">Destaque</Badge>
           )}
 
+          {/* Wishlist Button */}
+          <div className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+            <WishlistButton productId={product.id} />
+          </div>
         </div>
 
         {/* Content */}

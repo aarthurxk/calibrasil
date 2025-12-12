@@ -3,9 +3,8 @@
 ## 📦 Funcionalidades Planejadas
 
 ### Frete e Logística
-- [ ] **Integração API Correios** - Cálculo dinâmico de prazo de entrega baseado no CEP do cliente
-  - Opções PAC e SEDEX
-  - Cálculo de frete por peso/dimensão do produto
+- [x] **Cálculo de Frete Dinâmico** - Cálculo por região (PAC e SEDEX) com preços diferenciados
+- [ ] **Integração API Correios** - Integração direta com API oficial dos Correios
   - Rastreamento de encomendas
 
 ### Pagamentos
@@ -14,11 +13,11 @@
 
 ### Marketing e Engajamento
 - [ ] **Programa de Fidelidade** - Pontos por compra e recompensas
-- [ ] **Wishlist** - Lista de desejos para clientes logados
+- [x] **Wishlist** - Lista de desejos para clientes logados
 - [ ] **Notificações Push** - Alertas de promoções e status de pedido
 
 ### Admin Dashboard
-- [ ] **Relatórios Avançados** - Gráficos de vendas por período, produto e região
+- [x] **Relatórios Avançados** - Gráficos de vendas por período, produto e região (dados reais)
 - [ ] **Gestão de Promoções** - Criar e agendar promoções automáticas
 - [ ] **Dashboard de Métricas** - KPIs em tempo real (conversão, ticket médio, etc.)
 

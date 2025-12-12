@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Menu, X, User, Search } from 'lucide-react';
+import { ShoppingCart, Menu, X, User, Search, Heart } from 'lucide-react';
 import { useState } from 'react';
 import { useCart } from '@/contexts/CartContext';
+import { useWishlist } from '@/hooks/useWishlist';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import caliLogo from '@/assets/cali-logo.jpeg';
@@ -9,6 +11,8 @@ import caliLogo from '@/assets/cali-logo.jpeg';
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { itemCount } = useCart();
+  const { wishlistCount } = useWishlist();
+  const { user } = useAuth();
 
   const navLinks = [
     { name: 'Início', path: '/' },
@@ -44,6 +48,19 @@ const Header = () => {
           <Button variant="ghost" size="icon" className="hidden md:flex" aria-label="Pesquisar">
             <Search className="h-5 w-5" />
           </Button>
+          {/* Wishlist - only show if logged in */}
+          {user && (
+            <Link to="/wishlist" className="relative" aria-label="Lista de desejos">
+              <Button variant="ghost" size="icon" aria-label="Lista de desejos">
+                <Heart className="h-5 w-5" />
+                {wishlistCount > 0 && (
+                  <Badge className="absolute -right-1 -top-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-red-500 text-white">
+                    {wishlistCount}
+                  </Badge>
+                )}
+              </Button>
+            </Link>
+          )}
           <Link to="/auth" aria-label="Entrar na conta">
             <Button variant="ghost" size="icon" aria-label="Entrar na conta">
               <User className="h-5 w-5" />
