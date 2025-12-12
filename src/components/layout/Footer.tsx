@@ -23,13 +23,13 @@ const Footer = () => {
  
             </p>
             <div className="flex gap-4">
-              <a href="#" className="text-sidebar-foreground/70 hover:text-sidebar-primary transition-colors">
+              <a href="#" className="text-sidebar-foreground/70 hover:text-sidebar-primary transition-colors" aria-label="Instagram">
                 <Instagram className="h-5 w-5" />
               </a>
-              <a href="#" className="text-sidebar-foreground/70 hover:text-sidebar-primary transition-colors">
+              <a href="#" className="text-sidebar-foreground/70 hover:text-sidebar-primary transition-colors" aria-label="Twitter">
                 <Twitter className="h-5 w-5" />
               </a>
-              <a href="#" className="text-sidebar-foreground/70 hover:text-sidebar-primary transition-colors">
+              <a href="#" className="text-sidebar-foreground/70 hover:text-sidebar-primary transition-colors" aria-label="Facebook">
                 <Facebook className="h-5 w-5" />
               </a>
             </div>
@@ -64,8 +64,8 @@ const Footer = () => {
               Cadastra aí e recebe ofertas exclusivas e novidades quentinhas direto no seu e-mail!
             </p>
             <div className="flex gap-2">
-              <input type="email" placeholder="Seu melhor e-mail" className="flex-1 px-3 py-2 text-sm rounded-lg bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/50 border border-sidebar-border focus:outline-none focus:ring-2 focus:ring-sidebar-primary" />
-              <button className="px-4 py-2 bg-gradient-ocean text-primary-foreground rounded-lg hover:opacity-90 transition-opacity">
+              <input type="email" placeholder="Seu melhor e-mail" aria-label="Seu e-mail para newsletter" className="flex-1 px-3 py-2 text-sm rounded-lg bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/50 border border-sidebar-border focus:outline-none focus:ring-2 focus:ring-sidebar-primary" />
+              <button className="px-4 py-2 bg-gradient-ocean text-primary-foreground rounded-lg hover:opacity-90 transition-opacity" aria-label="Assinar newsletter">
                 <Mail className="h-4 w-4" />
               </button>
             </div>
