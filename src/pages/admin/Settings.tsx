@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { UserDetailsDialog } from '@/components/admin/UserDetailsDialog';
 
 interface UserWithRole {
   user_id: string;
@@ -47,6 +48,10 @@ const ROLE_CONFIG = {
 const Settings = () => {
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
+  
+  // User details dialog state
+  const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
+  const [isUserDetailsOpen, setIsUserDetailsOpen] = useState(false);
   
   // New user form state
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -338,9 +343,15 @@ const Settings = () => {
                     return (
                       <TableRow key={user.user_id}>
                         <TableCell>
-                          <div className="font-medium">
+                          <button
+                            className="font-medium text-primary hover:underline cursor-pointer text-left"
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setIsUserDetailsOpen(true);
+                            }}
+                          >
                             {user.profile?.full_name || 'Sem nome'}
-                          </div>
+                          </button>
                           <div className="text-xs text-muted-foreground">
                             {user.user_id.slice(0, 8)}...
                           </div>
@@ -559,6 +570,13 @@ const Settings = () => {
           )}
         </Button>
       </div>
+
+      {/* User Details Dialog */}
+      <UserDetailsDialog
+        user={selectedUser}
+        open={isUserDetailsOpen}
+        onOpenChange={setIsUserDetailsOpen}
+      />
     </div>
   );
 };
