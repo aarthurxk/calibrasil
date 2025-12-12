@@ -61,8 +61,8 @@ const Header = () => {
               </Button>
             </Link>
           )}
-          <Link to="/auth" aria-label="Entrar na conta">
-            <Button variant="ghost" size="icon" aria-label="Entrar na conta">
+          <Link to={user ? "/profile" : "/auth"} aria-label={user ? "Minha conta" : "Entrar na conta"}>
+            <Button variant="ghost" size="icon" aria-label={user ? "Minha conta" : "Entrar na conta"}>
               <User className="h-5 w-5" />
             </Button>
           </Link>
