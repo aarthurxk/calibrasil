@@ -41,16 +41,16 @@ const Header = () => {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="hidden md:flex">
+          <Button variant="ghost" size="icon" className="hidden md:flex" aria-label="Pesquisar">
             <Search className="h-5 w-5" />
           </Button>
-          <Link to="/auth">
-            <Button variant="ghost" size="icon">
+          <Link to="/auth" aria-label="Entrar na conta">
+            <Button variant="ghost" size="icon" aria-label="Entrar na conta">
               <User className="h-5 w-5" />
             </Button>
           </Link>
-          <Link to="/cart" className="relative">
-            <Button variant="ghost" size="icon">
+          <Link to="/cart" className="relative" aria-label="Carrinho de compras">
+            <Button variant="ghost" size="icon" aria-label="Carrinho de compras">
               <ShoppingCart className="h-5 w-5" />
               {itemCount > 0 && (
                 <Badge className="absolute -right-1 -top-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-accent text-accent-foreground">
@@ -66,6 +66,7 @@ const Header = () => {
             size="icon"
             className="md:hidden"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label={isMenuOpen ? "Fechar menu" : "Abrir menu"}
           >
             {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
