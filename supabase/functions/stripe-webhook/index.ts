@@ -52,7 +52,7 @@ serve(async (req) => {
     }
 
     try {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+      event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
       console.log("Webhook signature verified successfully");
     } catch (err: any) {
       console.error("Webhook signature verification failed:", err.message);
@@ -107,6 +107,13 @@ serve(async (req) => {
               if (itemsError) {
                 console.error("Error fetching order items:", itemsError);
               } else {
+                // Fetch store settings for delivery time
+                const { data: storeSettings } = await supabase
+                  .from("store_settings")
+                  .select("delivery_min_days, delivery_max_days")
+                  .limit(1)
+                  .single();
+
                 // Send notification emails
                 const shippingAddress = orderData.shipping_address as any;
                 const customerEmail = orderData.guest_email || session.customer_email || "";
@@ -134,6 +141,8 @@ serve(async (req) => {
                     zipCode: shippingAddress?.zipCode || "",
                   },
                   paymentMethod: orderData.payment_method || "card",
+                  deliveryMinDays: storeSettings?.delivery_min_days || 5,
+                  deliveryMaxDays: storeSettings?.delivery_max_days || 10,
                 };
 
                 console.log("Sending order emails for order:", orderId);

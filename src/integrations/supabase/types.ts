@@ -305,6 +305,8 @@ export type Database = {
         Row: {
           created_at: string
           currency: string | null
+          delivery_max_days: number | null
+          delivery_min_days: number | null
           free_shipping_threshold: number | null
           id: string
           notify_abandoned_cart: boolean | null
@@ -321,6 +323,8 @@ export type Database = {
         Insert: {
           created_at?: string
           currency?: string | null
+          delivery_max_days?: number | null
+          delivery_min_days?: number | null
           free_shipping_threshold?: number | null
           id?: string
           notify_abandoned_cart?: boolean | null
@@ -337,6 +341,8 @@ export type Database = {
         Update: {
           created_at?: string
           currency?: string | null
+          delivery_max_days?: number | null
+          delivery_min_days?: number | null
           free_shipping_threshold?: number | null
           id?: string
           notify_abandoned_cart?: boolean | null
