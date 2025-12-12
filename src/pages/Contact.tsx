@@ -9,8 +9,8 @@ const Contact = () => {
     {
       icon: Mail,
       title: "E-mail",
-      info: "contato@calibrasil.com.br",
-      link: "mailto:contato@calibrasil.com.br",
+      info: "contato@calibrasil.com",
+      link: "mailto:contato@calibrasil.com",
       description: "Resposta em até 24h",
     },
     {
@@ -30,8 +30,8 @@ const Contact = () => {
     {
       icon: Facebook,
       title: "Facebook",
-      info: "/calibrasil",
-      link: "https://facebook.com/calibrasil",
+      info: "/calinobrasil",
+      link: "https://facebook.com/calinobrasil",
       description: "Curte nossa página",
     },
   ];
