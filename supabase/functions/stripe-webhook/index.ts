@@ -147,7 +147,7 @@ serve(async (req) => {
 
                 console.log("Sending order emails for order:", orderId);
 
-                // Call send-order-emails function
+                // Call send-order-emails function with internal secret authentication
                 try {
                   const emailResponse = await fetch(
                     `${supabaseUrl}/functions/v1/send-order-emails`,
@@ -156,6 +156,7 @@ serve(async (req) => {
                       headers: {
                         "Content-Type": "application/json",
                         "Authorization": `Bearer ${supabaseServiceKey}`,
+                        "x-internal-secret": webhookSecret,
                       },
                       body: JSON.stringify(emailPayload),
                     }
