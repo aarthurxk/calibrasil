@@ -232,7 +232,7 @@ const Checkout = () => {
         cancel_url: `${baseUrl}/checkout`,
       };
 
-      console.log("Creating checkout session:", checkoutData);
+      console.log("Creating checkout session:", { itemCount: items.length, payment_method: paymentMethod });
 
       const { data, error } = await supabase.functions.invoke("create-checkout-session", {
         body: checkoutData,

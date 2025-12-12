@@ -57,7 +57,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body: CheckoutRequest = await req.json();
-    console.log("Creating checkout session:", body);
+    console.log("Creating checkout session:", { itemCount: body.items?.length, payment_method: body.payment_method });
 
     // Validate required fields
     if (!body.items || body.items.length === 0) {
