@@ -9,7 +9,16 @@ import {
   Settings,
   LogOut,
   Menu,
+  UserCircle,
+  Store,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -138,17 +147,43 @@ const AdminLayout = () => {
             >
               <Menu className="h-5 w-5" />
             </Button>
-            <div className="flex items-center gap-4 ml-auto">
-              <div className="text-right">
-                <p className="text-sm font-medium">{user?.email}</p>
-                <div className="flex items-center gap-2 justify-end">
-                  {getRoleBadge()}
-                </div>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-gradient-ocean flex items-center justify-center text-primary-foreground font-bold">
-                {user?.email?.charAt(0).toUpperCase()}
-              </div>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity">
+                  <div className="text-right">
+                    <p className="text-sm font-medium">{user?.email}</p>
+                    <div className="flex items-center gap-2 justify-end">
+                      {getRoleBadge()}
+                    </div>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-gradient-ocean flex items-center justify-center text-primary-foreground font-bold">
+                    {user?.email?.charAt(0).toUpperCase()}
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-popover">
+                <DropdownMenuItem asChild>
+                  <Link to="/profile" className="flex items-center gap-2 cursor-pointer">
+                    <UserCircle className="h-4 w-4" />
+                    Meu Perfil
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/" className="flex items-center gap-2 cursor-pointer">
+                    <Store className="h-4 w-4" />
+                    Ver Loja
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={handleLogout} 
+                  className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
