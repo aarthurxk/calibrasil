@@ -77,6 +77,28 @@ serve(async (req) => {
       }
     };
 
+    // SECURITY: Validate redirect URLs against allowed domains
+    const ALLOWED_DOMAINS = ['calibrasil.com', 'lovable.app', 'localhost'];
+    const validateRedirectUrl = (url: string): boolean => {
+      try {
+        const parsed = new URL(url);
+        return ALLOWED_DOMAINS.some(domain => 
+          parsed.hostname === domain || parsed.hostname.endsWith('.' + domain)
+        );
+      } catch {
+        return false;
+      }
+    };
+
+    if (!validateRedirectUrl(body.success_url)) {
+      console.error("SECURITY: Invalid success_url domain:", body.success_url);
+      throw new Error("Invalid redirect URL");
+    }
+    if (!validateRedirectUrl(body.cancel_url)) {
+      console.error("SECURITY: Invalid cancel_url domain:", body.cancel_url);
+      throw new Error("Invalid redirect URL");
+    }
+
     // SECURITY: Fetch real product prices from database to prevent price manipulation
     const productIds = body.items.map((item) => item.id);
     const { data: products, error: productsError } = await supabase
