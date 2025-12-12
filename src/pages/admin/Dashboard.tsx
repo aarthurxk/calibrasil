@@ -67,14 +67,15 @@ const Dashboard = () => {
 
   const isLoading = ordersLoading || customersLoading || productsLoading;
 
-  // Calculate stats
-  const totalRevenue = orders.reduce((sum, order) => sum + Number(order.total), 0);
-  const totalOrders = orders.length;
+  // Calculate stats - only paid orders for revenue
+  const paidOrders = orders.filter(order => order.payment_status === 'paid');
+  const totalRevenue = paidOrders.reduce((sum, order) => sum + Number(order.total), 0);
+  const totalOrders = paidOrders.length;
   const pendingOrders = orders.filter(o => o.status === 'pending').length;
   const completedOrders = orders.filter(o => o.status === 'delivered' || o.status === 'completed').length;
 
-  // Group orders by month for chart
-  const monthlyData = orders.reduce((acc, order) => {
+  // Group orders by month for chart - only paid orders
+  const monthlyData = paidOrders.reduce((acc, order) => {
     const date = new Date(order.created_at);
     const month = date.toLocaleString('pt-BR', { month: 'short' });
     const existing = acc.find(item => item.name === month);
