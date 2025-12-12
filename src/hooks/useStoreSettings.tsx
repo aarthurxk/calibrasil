@@ -19,22 +19,20 @@ export const useStoreSettings = () => {
   const { data: settings, isLoading } = useQuery({
     queryKey: ['store-settings-public'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('store_settings')
-        .select('free_shipping_threshold, standard_shipping_rate, delivery_min_days, delivery_max_days')
-        .limit(1)
-        .maybeSingle();
+      // Use RPC function that only exposes shipping-related fields (security best practice)
+      const { data, error } = await supabase.rpc('get_shipping_config');
 
       if (error) {
         console.error('Error fetching store settings:', error);
         return DEFAULT_SETTINGS;
       }
 
+      const config = data?.[0];
       return {
-        free_shipping_threshold: data?.free_shipping_threshold ?? DEFAULT_SETTINGS.free_shipping_threshold,
-        standard_shipping_rate: data?.standard_shipping_rate ?? DEFAULT_SETTINGS.standard_shipping_rate,
-        delivery_min_days: data?.delivery_min_days ?? DEFAULT_SETTINGS.delivery_min_days,
-        delivery_max_days: data?.delivery_max_days ?? DEFAULT_SETTINGS.delivery_max_days,
+        free_shipping_threshold: config?.free_shipping_threshold ?? DEFAULT_SETTINGS.free_shipping_threshold,
+        standard_shipping_rate: config?.standard_shipping_rate ?? DEFAULT_SETTINGS.standard_shipping_rate,
+        delivery_min_days: config?.delivery_min_days ?? DEFAULT_SETTINGS.delivery_min_days,
+        delivery_max_days: config?.delivery_max_days ?? DEFAULT_SETTINGS.delivery_max_days,
       };
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
