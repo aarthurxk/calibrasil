@@ -18,8 +18,8 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 180 50% 10%;
 
-    /* Primary - Cali Teal */
-    --primary: 174 42% 45%;
+    /* Primary - Cali Teal (darkened for 4.5:1 contrast) */
+    --primary: 174 50% 32%;
     --primary-foreground: 0 0% 100%;
 
     /* Secondary - Soft Sand */
@@ -30,8 +30,8 @@ All colors MUST be HSL.
     --muted: 180 15% 94%;
     --muted-foreground: 180 20% 40%;
 
-    /* Accent - Coral Sunset */
-    --accent: 16 80% 60%;
+    /* Accent - Coral Sunset (darkened for 4.5:1 contrast) */
+    --accent: 16 80% 42%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -54,17 +54,17 @@ All colors MUST be HSL.
     --sidebar-ring: 174 50% 55%;
 
     /* Custom Cali tokens */
-    --cali-teal: 174 42% 45%;
+    --cali-teal: 174 50% 32%;
     --cali-teal-light: 174 40% 92%;
-    --cali-coral: 16 80% 60%;
+    --cali-coral: 16 80% 42%;
     --cali-coral-light: 16 80% 95%;
     --cali-sand: 40 30% 95%;
     --cali-ocean-dark: 180 40% 12%;
     --cali-wave: 180 50% 65%;
 
     /* Gradients */
-    --gradient-ocean: linear-gradient(135deg, hsl(174 42% 45%) 0%, hsl(180 50% 65%) 100%);
-    --gradient-sunset: linear-gradient(135deg, hsl(16 80% 60%) 0%, hsl(40 80% 70%) 100%);
+    --gradient-ocean: linear-gradient(135deg, hsl(174 50% 32%) 0%, hsl(180 50% 50%) 100%);
+    --gradient-sunset: linear-gradient(135deg, hsl(16 80% 42%) 0%, hsl(40 80% 55%) 100%);
     --gradient-hero: linear-gradient(180deg, hsl(180 20% 99% / 0) 0%, hsl(180 20% 99%) 100%);
 
     /* Shadows */
