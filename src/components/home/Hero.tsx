@@ -7,7 +7,14 @@ const Hero = () => {
     <section className="relative min-h-[90vh] flex items-center overflow-hidden">
       {/* Background Image */}
       <div className="absolute inset-0">
-        <img src={heroImage} alt="Pôr do sol na praia com ondas" className="h-full w-full object-cover" />
+        <img 
+          src={heroImage} 
+          alt="Pôr do sol na praia com ondas" 
+          className="h-full w-full object-cover"
+          fetchPriority="high"
+          width={1920}
+          height={1080}
+        />
         <div className="absolute inset-0 bg-gradient-to-r from-cali-ocean-dark/90 via-cali-ocean-dark/60 to-transparent" />
       </div>
 
