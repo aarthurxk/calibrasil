@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, Package, LogOut, Loader2, Save, Mail, Phone, Calendar } from "lucide-react";
+import { User, Package, LogOut, Loader2, Save, Mail, Phone, Calendar, ChevronRight } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { AddressSection } from "@/components/profile/AddressSection";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -154,8 +155,8 @@ const Profile = () => {
         <h1 className="text-3xl font-bold mb-8">Minha Conta</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Profile Info */}
-          <div className="lg:col-span-1">
+          {/* Profile Info & Addresses */}
+          <div className="lg:col-span-1 space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -225,6 +226,9 @@ const Profile = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Address Section */}
+            <AddressSection />
           </div>
 
           {/* Orders */}
@@ -251,7 +255,8 @@ const Profile = () => {
                     {orders.map((order) => (
                       <div
                         key={order.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                        onClick={() => navigate(`/order/${order.id}`)}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-border rounded-lg hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
                       >
                         <div className="space-y-1">
                           <p className="font-medium text-sm">
@@ -269,6 +274,7 @@ const Profile = () => {
                             {getStatusLabel(order.status)}
                           </Badge>
                           <span className="font-semibold">{formatPrice(order.total)}</span>
+                          <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
                         </div>
                       </div>
                     ))}
