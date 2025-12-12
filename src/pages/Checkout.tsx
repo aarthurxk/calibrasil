@@ -53,7 +53,7 @@ const Checkout = () => {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [isLoadingCep, setIsLoadingCep] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pix");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
 
   const shipping = total >= settings.free_shipping_threshold ? 0 : settings.standard_shipping_rate;
   const finalTotal = total + shipping;
@@ -194,7 +194,18 @@ const Checkout = () => {
       }
     } catch (error: any) {
       console.error("Error creating checkout session:", error);
-      toast.error(error.message || "Erro ao processar pagamento. Tente novamente.");
+      
+      // Specific error messages based on payment method
+      if (error.message?.toLowerCase().includes('pix')) {
+        toast.error('Pagamento via Pix temporariamente indisponível.');
+      } else if (error.message?.toLowerCase().includes('boleto')) {
+        toast.error('Pagamento via Boleto temporariamente indisponível.');
+      } else if (error.message?.includes('network') || error.message?.includes('fetch') || error.message?.includes('Failed to fetch')) {
+        toast.error('Erro de conexão. Verifique sua internet.');
+      } else {
+        toast.error(error.message || 'Erro ao processar pagamento. Tente novamente.');
+      }
+      
       setIsProcessing(false);
     }
   };
@@ -375,12 +386,18 @@ const Checkout = () => {
                   onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
                   className="space-y-3"
                 >
-                  <div className="flex items-center space-x-3 border border-border rounded-lg p-4 cursor-pointer hover:border-primary/50 transition-colors">
-                    <RadioGroupItem value="pix" id="pix" />
-                    <Label htmlFor="pix" className="flex items-center gap-3 cursor-pointer flex-1">
-                      <QrCode className="h-5 w-5 text-primary" />
-                      <div>
-                        <p className="font-medium">Pix</p>
+                  {/* Pix - Temporariamente desativado */}
+                  <div className="flex items-center space-x-3 border border-border rounded-lg p-4 opacity-60 cursor-not-allowed bg-muted/30">
+                    <RadioGroupItem value="pix" id="pix" disabled />
+                    <Label htmlFor="pix" className="flex items-center gap-3 cursor-not-allowed flex-1">
+                      <QrCode className="h-5 w-5 text-muted-foreground" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-muted-foreground">Pix</p>
+                          <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-medium">
+                            Em Breve
+                          </span>
+                        </div>
                         <p className="text-sm text-muted-foreground">Aprovação instantânea</p>
                       </div>
                     </Label>

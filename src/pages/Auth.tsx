@@ -98,10 +98,20 @@ const Auth = () => {
     setIsLoading(false);
 
     if (error) {
+      console.error('Signup error details:', error.message, error);
+      
       if (error.message.includes('User already registered')) {
-        toast.error('Este e-mail já está cadastrado');
+        toast.error('Este e-mail já está cadastrado. Tente fazer login.');
+      } else if (error.message.toLowerCase().includes('rate limit') || error.message.toLowerCase().includes('too many')) {
+        toast.error('Muitas tentativas. Aguarde alguns minutos e tente novamente.');
+      } else if (error.message.toLowerCase().includes('invalid') && error.message.toLowerCase().includes('email')) {
+        toast.error('Formato de e-mail inválido.');
+      } else if (error.message.toLowerCase().includes('password')) {
+        toast.error('A senha deve ter no mínimo 6 caracteres.');
+      } else if (error.message.toLowerCase().includes('network') || error.message.toLowerCase().includes('fetch')) {
+        toast.error('Erro de conexão. Verifique sua internet.');
       } else {
-        toast.error('Erro ao criar conta. Tente novamente.');
+        toast.error('Erro ao criar conta. Tente novamente mais tarde.');
       }
       return;
     }
