@@ -49,6 +49,7 @@ const Checkout = () => {
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [zip, setZip] = useState("");
+  const [houseNumber, setHouseNumber] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pix");
 
   const shipping = total >= settings.free_shipping_threshold ? 0 : settings.standard_shipping_rate;
