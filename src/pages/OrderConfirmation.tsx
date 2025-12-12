@@ -52,7 +52,11 @@ const OrderConfirmation = () => {
           clearCart();
         } else if (data.payment_status === 'failed') {
           setStatus('failed');
+        } else if (data.payment_status === 'awaiting_payment' || data.status === 'awaiting_payment') {
+          setStatus('pending');
+          clearCart();
         } else {
+          // For newly created orders that haven't been processed by webhook yet
           setStatus('pending');
           clearCart();
         }

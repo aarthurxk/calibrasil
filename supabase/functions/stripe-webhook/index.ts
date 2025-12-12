@@ -64,16 +64,154 @@ serve(async (req) => {
 
     console.log("Received webhook event:", event.type);
 
+    // Helper function to send order emails
+    const sendOrderEmails = async (orderId: string) => {
+      // Fetch order details for email
+      const { data: orderData, error: orderError } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("id", orderId)
+        .single();
+
+      if (orderError) {
+        console.error("Error fetching order for email:", orderError);
+        return;
+      }
+
+      // Fetch order items
+      const { data: itemsData, error: itemsError } = await supabase
+        .from("order_items")
+        .select("*")
+        .eq("order_id", orderId);
+
+      if (itemsError) {
+        console.error("Error fetching order items:", itemsError);
+        return;
+      }
+
+      // Fetch store settings for delivery time
+      const { data: storeSettings } = await supabase
+        .from("store_settings")
+        .select("delivery_min_days, delivery_max_days")
+        .limit(1)
+        .single();
+
+      // Send notification emails
+      const shippingAddress = orderData.shipping_address as any;
+      const customerEmail = orderData.guest_email || "";
+      const customerName = shippingAddress?.name || "Cliente";
+      
+      const emailPayload = {
+        orderId: orderId,
+        customerEmail: customerEmail,
+        customerName: customerName,
+        customerPhone: orderData.phone || "",
+        items: itemsData.map((item: any) => ({
+          product_name: item.product_name,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        total: orderData.total,
+        shippingAddress: {
+          name: shippingAddress?.name || "",
+          street: shippingAddress?.street || "",
+          number: shippingAddress?.number || "",
+          complement: shippingAddress?.complement || "",
+          neighborhood: shippingAddress?.neighborhood || "",
+          city: shippingAddress?.city || "",
+          state: shippingAddress?.state || "",
+          zipCode: shippingAddress?.zipCode || "",
+        },
+        paymentMethod: orderData.payment_method || "card",
+        deliveryMinDays: storeSettings?.delivery_min_days || 5,
+        deliveryMaxDays: storeSettings?.delivery_max_days || 10,
+      };
+
+      console.log("Sending order emails for order:", orderId);
+
+      try {
+        const emailResponse = await fetch(
+          `${supabaseUrl}/functions/v1/send-order-emails`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${supabaseServiceKey}`,
+              "x-internal-secret": webhookSecret,
+            },
+            body: JSON.stringify(emailPayload),
+          }
+        );
+
+        const emailResult = await emailResponse.json();
+        console.log("Email send result:", emailResult);
+      } catch (emailError) {
+        console.error("Error sending emails:", emailError);
+      }
+    };
+
     // Handle different event types
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         const orderId = session.metadata?.order_id;
+        const paymentStatus = session.payment_status;
 
         if (orderId) {
-          console.log("Payment completed for order:", orderId);
+          console.log("Checkout completed for order:", orderId, "Payment status:", paymentStatus);
 
-          // Update order status
+          // For async payment methods (boleto, pix), payment_status will be "unpaid"
+          // For card payments, payment_status will be "paid"
+          if (paymentStatus === "paid") {
+            // Instant payment (card) - mark as paid
+            console.log("Instant payment confirmed for order:", orderId);
+            
+            const { error } = await supabase
+              .from("orders")
+              .update({
+                payment_status: "paid",
+                status: "confirmed",
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", orderId);
+
+            if (error) {
+              console.error("Error updating order:", error);
+            } else {
+              console.log("Order updated to paid/confirmed:", orderId);
+              await sendOrderEmails(orderId);
+            }
+          } else {
+            // Async payment (boleto, pix) - waiting for payment
+            console.log("Async payment method - awaiting payment for order:", orderId);
+            
+            const { error } = await supabase
+              .from("orders")
+              .update({
+                payment_status: "awaiting_payment",
+                status: "awaiting_payment",
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", orderId);
+
+            if (error) {
+              console.error("Error updating order to awaiting_payment:", error);
+            } else {
+              console.log("Order updated to awaiting_payment:", orderId);
+            }
+          }
+        }
+        break;
+      }
+
+      case "checkout.session.async_payment_succeeded": {
+        // This event fires when boleto/pix is actually paid
+        const session = event.data.object as Stripe.Checkout.Session;
+        const orderId = session.metadata?.order_id;
+
+        if (orderId) {
+          console.log("Async payment succeeded for order:", orderId);
+
           const { error } = await supabase
             .from("orders")
             .update({
@@ -84,91 +222,36 @@ serve(async (req) => {
             .eq("id", orderId);
 
           if (error) {
-            console.error("Error updating order:", error);
+            console.error("Error updating order after async payment:", error);
           } else {
-            console.log("Order updated successfully:", orderId);
+            console.log("Order updated to paid/confirmed after async payment:", orderId);
+            await sendOrderEmails(orderId);
+          }
+        }
+        break;
+      }
 
-            // Fetch order details for email
-            const { data: orderData, error: orderError } = await supabase
-              .from("orders")
-              .select("*")
-              .eq("id", orderId)
-              .single();
+      case "checkout.session.async_payment_failed": {
+        // This event fires when boleto expires without payment
+        const session = event.data.object as Stripe.Checkout.Session;
+        const orderId = session.metadata?.order_id;
 
-            if (orderError) {
-              console.error("Error fetching order for email:", orderError);
-            } else {
-              // Fetch order items
-              const { data: itemsData, error: itemsError } = await supabase
-                .from("order_items")
-                .select("*")
-                .eq("order_id", orderId);
+        if (orderId) {
+          console.log("Async payment failed/expired for order:", orderId);
 
-              if (itemsError) {
-                console.error("Error fetching order items:", itemsError);
-              } else {
-                // Fetch store settings for delivery time
-                const { data: storeSettings } = await supabase
-                  .from("store_settings")
-                  .select("delivery_min_days, delivery_max_days")
-                  .limit(1)
-                  .single();
+          const { error } = await supabase
+            .from("orders")
+            .update({
+              payment_status: "expired",
+              status: "cancelled",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", orderId);
 
-                // Send notification emails
-                const shippingAddress = orderData.shipping_address as any;
-                const customerEmail = orderData.guest_email || session.customer_email || "";
-                const customerName = shippingAddress?.name || "Cliente";
-                
-                const emailPayload = {
-                  orderId: orderId,
-                  customerEmail: customerEmail,
-                  customerName: customerName,
-                  customerPhone: orderData.phone || "",
-                  items: itemsData.map((item: any) => ({
-                    product_name: item.product_name,
-                    quantity: item.quantity,
-                    price: item.price,
-                  })),
-                  total: orderData.total,
-                  shippingAddress: {
-                    name: shippingAddress?.name || "",
-                    street: shippingAddress?.street || "",
-                    number: shippingAddress?.number || "",
-                    complement: shippingAddress?.complement || "",
-                    neighborhood: shippingAddress?.neighborhood || "",
-                    city: shippingAddress?.city || "",
-                    state: shippingAddress?.state || "",
-                    zipCode: shippingAddress?.zipCode || "",
-                  },
-                  paymentMethod: orderData.payment_method || "card",
-                  deliveryMinDays: storeSettings?.delivery_min_days || 5,
-                  deliveryMaxDays: storeSettings?.delivery_max_days || 10,
-                };
-
-                console.log("Sending order emails for order:", orderId);
-
-                // Call send-order-emails function with internal secret authentication
-                try {
-                  const emailResponse = await fetch(
-                    `${supabaseUrl}/functions/v1/send-order-emails`,
-                    {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${supabaseServiceKey}`,
-                        "x-internal-secret": webhookSecret,
-                      },
-                      body: JSON.stringify(emailPayload),
-                    }
-                  );
-
-                  const emailResult = await emailResponse.json();
-                  console.log("Email send result:", emailResult);
-                } catch (emailError) {
-                  console.error("Error sending emails:", emailError);
-                }
-              }
-            }
+          if (error) {
+            console.error("Error updating order after async payment failure:", error);
+          } else {
+            console.log("Order updated to expired/cancelled:", orderId);
           }
         }
         break;
@@ -179,7 +262,7 @@ serve(async (req) => {
         const orderId = session.metadata?.order_id;
 
         if (orderId) {
-          console.log("Payment expired for order:", orderId);
+          console.log("Checkout session expired for order:", orderId);
 
           await supabase
             .from("orders")
@@ -213,7 +296,6 @@ serve(async (req) => {
 
       case "charge.refunded": {
         const charge = event.data.object as Stripe.Charge;
-        // Handle refunds if needed
         console.log("Charge refunded:", charge.id);
         break;
       }
