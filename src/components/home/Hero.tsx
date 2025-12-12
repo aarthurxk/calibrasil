@@ -1,14 +1,13 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Waves } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import heroImage from "@/assets/hero-beach.jpg";
 const Hero = () => {
   return (
     <section className="relative min-h-[90vh] flex items-center overflow-hidden">
       {/* Background Image */}
       <div className="absolute inset-0">
         <img 
-          src={heroImage} 
+          src="/images/hero-beach.jpg" 
           alt="Pôr do sol na praia com ondas" 
           className="h-full w-full object-cover"
           fetchPriority="high"
