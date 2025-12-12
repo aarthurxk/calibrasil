@@ -104,6 +104,18 @@ serve(async (req) => {
   }
 
   try {
+    // Verify internal secret to prevent unauthorized access
+    const internalSecret = req.headers.get("x-internal-secret");
+    const expectedSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+    
+    if (!internalSecret || internalSecret !== expectedSecret) {
+      console.error("[ABANDONED-CART] Unauthorized: Invalid or missing internal secret");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
