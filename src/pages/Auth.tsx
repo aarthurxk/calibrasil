@@ -100,18 +100,31 @@ const Auth = () => {
     if (error) {
       console.error('Signup error details:', error.message, error);
       
+      // Mensagens específicas do Supabase traduzidas
+      const errorMessage = error.message.toLowerCase();
+      
       if (error.message.includes('User already registered')) {
         toast.error('Este e-mail já está cadastrado. Tente fazer login.');
-      } else if (error.message.toLowerCase().includes('rate limit') || error.message.toLowerCase().includes('too many')) {
+      } else if (errorMessage.includes('rate limit') || errorMessage.includes('too many')) {
         toast.error('Muitas tentativas. Aguarde alguns minutos e tente novamente.');
-      } else if (error.message.toLowerCase().includes('invalid') && error.message.toLowerCase().includes('email')) {
+      } else if (errorMessage.includes('invalid') && errorMessage.includes('email')) {
         toast.error('Formato de e-mail inválido.');
-      } else if (error.message.toLowerCase().includes('password')) {
+      } else if (errorMessage.includes('password should be at least')) {
         toast.error('A senha deve ter no mínimo 6 caracteres.');
-      } else if (error.message.toLowerCase().includes('network') || error.message.toLowerCase().includes('fetch')) {
+      } else if (errorMessage.includes('password should contain')) {
+        // Captura requisitos de complexidade de senha
+        toast.error('A senha deve conter letras e números.');
+      } else if (errorMessage.includes('password')) {
+        // Exibe a mensagem original traduzida
+        toast.error(`Erro na senha: ${error.message}`);
+      } else if (errorMessage.includes('signup is disabled')) {
+        toast.error('Cadastro temporariamente desabilitado.');
+      } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
         toast.error('Erro de conexão. Verifique sua internet.');
       } else {
-        toast.error('Erro ao criar conta. Tente novamente mais tarde.');
+        // Fallback: exibe o erro real do Supabase para debugging
+        console.error('Erro não mapeado:', error.message);
+        toast.error(`Erro ao criar conta: ${error.message}`);
       }
       return;
     }
@@ -257,8 +270,12 @@ const Auth = () => {
                         value={signupPassword}
                         onChange={(e) => setSignupPassword(e.target.value)}
                         required
+                        minLength={6}
                       />
                     </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Mínimo de 6 caracteres
+                    </p>
                   </div>
                   <Button
                     type="submit"

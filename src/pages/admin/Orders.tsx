@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { OrderDetailsDialog } from '@/components/admin/OrderDetailsDialog';
 
 // Helper to send order status email
 const sendOrderStatusEmail = async (
@@ -75,6 +76,8 @@ const formatPrice = (price: number) => {
 
 const Orders = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const { canEditOrders } = useAuth();
   const queryClient = useQueryClient();
 
@@ -285,7 +288,15 @@ const Orders = () => {
                       </td>
                       {canEditOrders && (
                         <td className="py-3 px-4">
-                          <Button variant="ghost" size="icon">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            aria-label="Ver detalhes do pedido"
+                            onClick={() => {
+                              setSelectedOrder(order);
+                              setIsDetailsOpen(true);
+                            }}
+                          >
                             <Eye className="h-4 w-4" />
                           </Button>
                         </td>
@@ -304,6 +315,12 @@ const Orders = () => {
           </div>
         </CardContent>
       </Card>
+
+      <OrderDetailsDialog 
+        order={selectedOrder}
+        open={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+      />
     </div>
   );
 };
