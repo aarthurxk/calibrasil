@@ -34,6 +34,8 @@ interface OrderEmailRequest {
   total: number;
   shippingAddress: ShippingAddress;
   paymentMethod: string;
+  deliveryMinDays?: number;
+  deliveryMaxDays?: number;
 }
 
 const formatPrice = (price: number): string => {
@@ -99,6 +101,12 @@ const generateBuyerEmail = (data: OrderEmailRequest): string => {
           </tr>
         </tfoot>
       </table>
+
+      <h2 style="color: #333; border-bottom: 2px solid #16a34a; padding-bottom: 10px;">📦 Prazo de Entrega</h2>
+      <div style="background: #ecfdf5; border: 1px solid #16a34a; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+        <p style="margin: 0 0 10px 0; font-size: 18px;"><strong>Estimativa: ${data.deliveryMinDays || 5} a ${data.deliveryMaxDays || 10} dias úteis</strong></p>
+        <p style="margin: 0; color: #666;">Após a confirmação do pagamento, seu pedido será enviado e você receberá o código de rastreamento por e-mail.</p>
+      </div>
 
       <h2 style="color: #333; border-bottom: 2px solid #16a34a; padding-bottom: 10px;">Endereço de Entrega</h2>
       <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">

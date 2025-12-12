@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CheckCircle, XCircle, Clock, Loader2, Package, ArrowRight } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Loader2, Package, ArrowRight, Truck } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/contexts/CartContext';
+import { useStoreSettings } from '@/hooks/useStoreSettings';
 
 type OrderStatus = 'loading' | 'success' | 'pending' | 'failed' | 'not_found';
 
@@ -23,6 +24,7 @@ const OrderConfirmation = () => {
   const [status, setStatus] = useState<OrderStatus>('loading');
   const [order, setOrder] = useState<OrderData | null>(null);
   const { clearCart } = useCart();
+  const { settings } = useStoreSettings();
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -47,13 +49,11 @@ const OrderConfirmation = () => {
 
         if (data.payment_status === 'paid' || data.status === 'confirmed') {
           setStatus('success');
-          // Clear cart after successful payment confirmation
           clearCart();
         } else if (data.payment_status === 'failed') {
           setStatus('failed');
         } else {
           setStatus('pending');
-          // Also clear cart for pending orders (order was created)
           clearCart();
         }
       } catch (err) {
@@ -86,6 +86,25 @@ const OrderConfirmation = () => {
       case 'card': return 'Cartão de Crédito';
       default: return method;
     }
+  };
+
+  const calculateDeliveryDate = (orderDate: string, daysToAdd: number) => {
+    const date = new Date(orderDate);
+    let businessDays = 0;
+    
+    while (businessDays < daysToAdd) {
+      date.setDate(date.getDate() + 1);
+      const dayOfWeek = date.getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        businessDays++;
+      }
+    }
+    
+    return date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
   };
 
   return (
@@ -127,6 +146,24 @@ const OrderConfirmation = () => {
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Data</span>
                   <span>{formatDate(order.created_at)}</span>
+                </div>
+              </div>
+
+              {/* Prazo de Entrega */}
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-6 text-left space-y-3">
+                <div className="flex items-center gap-2 text-primary font-semibold">
+                  <Truck className="h-5 w-5" />
+                  <span>Prazo de Entrega</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Estimativa</span>
+                    <span className="font-medium">{settings.delivery_min_days} a {settings.delivery_max_days} dias úteis</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Entrega prevista até</span>
+                    <span className="font-medium">{calculateDeliveryDate(order.created_at, settings.delivery_max_days)}</span>
+                  </div>
                 </div>
               </div>
 
@@ -174,6 +211,14 @@ const OrderConfirmation = () => {
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Pagamento</span>
                   <span>{getPaymentMethodLabel(order.payment_method)}</span>
+                </div>
+              </div>
+
+              {/* Prazo de Entrega após confirmação */}
+              <div className="bg-muted/50 border border-border rounded-xl p-4 text-left">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <Truck className="h-4 w-4" />
+                  <span>Após confirmação do pagamento, a entrega será em {settings.delivery_min_days} a {settings.delivery_max_days} dias úteis</span>
                 </div>
               </div>
 
