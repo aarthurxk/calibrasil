@@ -25,7 +25,9 @@ const Payments = () => {
     },
   });
 
-  const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total), 0);
+  const totalRevenue = orders
+    .filter(o => o.payment_status === 'paid')
+    .reduce((sum, o) => sum + Number(o.total), 0);
   const approvedPayments = orders.filter(o => o.payment_status === 'approved' || o.payment_status === 'paid').length;
   const pendingPayments = orders.filter(o => o.payment_status === 'pending' || !o.payment_status).length;
 
