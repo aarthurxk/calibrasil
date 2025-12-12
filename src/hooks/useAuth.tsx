@@ -13,6 +13,8 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error: Error | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
   isAdmin: boolean;
   isManager: boolean;
   canManageProducts: boolean;
@@ -139,6 +141,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     toast.success('Você saiu da sua conta');
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      const redirectUrl = `${window.location.origin}/auth?mode=reset`;
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      });
+
+      if (error) {
+        return { error };
+      }
+
+      return { error: null };
+    } catch (err) {
+      return { error: err as Error };
+    }
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) {
+        return { error };
+      }
+
+      return { error: null };
+    } catch (err) {
+      return { error: err as Error };
+    }
+  };
+
   // Permission helpers
   const isAdmin = role === 'admin';
   const isManager = role === 'manager';
@@ -157,6 +193,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signUp,
         signOut,
+        resetPassword,
+        updatePassword,
         isAdmin,
         isManager,
         canManageProducts,

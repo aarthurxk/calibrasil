@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, Lock, User, ArrowLeft, Eye, EyeOff, Check, X } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,19 @@ const signupSchema = z.object({
     .regex(/[a-z]/, 'Senha deve ter pelo menos uma letra minúscula')
     .regex(/[0-9]/, 'Senha deve ter pelo menos um número')
     .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/, 'Senha deve ter pelo menos um caractere especial'),
+});
+
+const resetPasswordSchema = z.object({
+  password: z.string()
+    .min(8, 'Senha deve ter pelo menos 8 caracteres')
+    .regex(/[A-Z]/, 'Senha deve ter pelo menos uma letra maiúscula')
+    .regex(/[a-z]/, 'Senha deve ter pelo menos uma letra minúscula')
+    .regex(/[0-9]/, 'Senha deve ter pelo menos um número')
+    .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/, 'Senha deve ter pelo menos um caractere especial'),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'As senhas não coincidem',
+  path: ['confirmPassword'],
 });
 
 const passwordRequirements = [
@@ -56,7 +69,10 @@ const passwordRequirements = [
   },
 ];
 
+type AuthView = 'login' | 'forgot-password' | 'reset-password' | 'email-sent';
+
 const Auth = () => {
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -67,19 +83,35 @@ const Auth = () => {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   
-  const { signIn, signUp, user, role, isLoading: authLoading } = useAuth();
+  // Password recovery states
+  const [authView, setAuthView] = useState<AuthView>('login');
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  const { signIn, signUp, resetPassword, updatePassword, user, role, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already logged in
+  // Check if user came from password reset email
   useEffect(() => {
-    if (!authLoading && user) {
+    const mode = searchParams.get('mode');
+    if (mode === 'reset') {
+      setAuthView('reset-password');
+    }
+  }, [searchParams]);
+
+  // Redirect if already logged in (but not during password reset)
+  useEffect(() => {
+    if (!authLoading && user && authView !== 'reset-password') {
       if (role === 'admin' || role === 'manager') {
         navigate('/admin');
       } else {
         navigate('/');
       }
     }
-  }, [user, role, authLoading, navigate]);
+  }, [user, role, authLoading, navigate, authView]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,7 +167,6 @@ const Auth = () => {
     if (error) {
       console.error('Signup error details:', error.message, error);
       
-      // Mensagens específicas do Supabase traduzidas
       const errorMessage = error.message.toLowerCase();
       
       if (error.message.includes('User already registered')) {
@@ -166,6 +197,79 @@ const Auth = () => {
     toast.success('Conta criada com sucesso! Bem-vindo à Cali! 🤙');
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const emailValidation = z.string().trim().email('E-mail inválido').safeParse(recoveryEmail);
+    
+    if (!emailValidation.success) {
+      toast.error(emailValidation.error.errors[0].message);
+      return;
+    }
+
+    setIsLoading(true);
+    const { error } = await resetPassword(recoveryEmail);
+    setIsLoading(false);
+
+    if (error) {
+      const errorMessage = error.message.toLowerCase();
+      
+      if (errorMessage.includes('rate limit') || errorMessage.includes('too many')) {
+        toast.error('Muitas tentativas. Aguarde alguns minutos e tente novamente.');
+      } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+        toast.error('Erro de conexão. Verifique sua internet.');
+      } else {
+        // Don't reveal if email exists or not for security
+        toast.error('Erro ao enviar e-mail. Tente novamente.');
+      }
+      return;
+    }
+
+    setAuthView('email-sent');
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const validation = resetPasswordSchema.safeParse({
+      password: newPassword,
+      confirmPassword,
+    });
+
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+
+    setIsLoading(true);
+    const { error } = await updatePassword(newPassword);
+    setIsLoading(false);
+
+    if (error) {
+      const errorMessage = error.message.toLowerCase();
+      
+      if (errorMessage.includes('same as') || errorMessage.includes('different')) {
+        toast.error('A nova senha deve ser diferente da anterior.');
+      } else if (errorMessage.includes('weak') || errorMessage.includes('pwned')) {
+        toast.error('Esta senha é muito comum ou já foi vazada. Escolha outra.');
+      } else if (errorMessage.includes('session') || errorMessage.includes('expired')) {
+        toast.error('Sessão expirada. Solicite um novo link de recuperação.');
+        setAuthView('forgot-password');
+      } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+        toast.error('Erro de conexão. Verifique sua internet.');
+      } else {
+        toast.error('Erro ao atualizar senha. Tente novamente.');
+      }
+      return;
+    }
+
+    toast.success('Senha atualizada com sucesso! 🤙');
+    setAuthView('login');
+    setNewPassword('');
+    setConfirmPassword('');
+    navigate('/auth', { replace: true });
+  };
+
   if (authLoading) {
     return (
       <MainLayout>
@@ -176,6 +280,228 @@ const Auth = () => {
     );
   }
 
+  // Forgot Password View
+  if (authView === 'forgot-password') {
+    return (
+      <MainLayout>
+        <div className="container py-12">
+          <button
+            onClick={() => setAuthView('login')}
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-8"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar pro login
+          </button>
+
+          <div className="max-w-md mx-auto">
+            <div className="text-center mb-8">
+              <img
+                src={caliLogo}
+                alt="Cali"
+                className="h-16 w-16 rounded-xl mx-auto mb-4"
+              />
+              <h1 className="text-2xl font-bold">Esqueceu a senha?</h1>
+              <p className="text-muted-foreground">
+                Tranquilo! Digita seu e-mail que a gente te manda um link pra criar uma nova
+              </p>
+            </div>
+
+            <div className="bg-card rounded-xl border border-border p-6">
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div>
+                  <Label htmlFor="recovery-email">E-mail</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="recovery-email"
+                      type="email"
+                      placeholder="seu@email.com"
+                      className="pl-10"
+                      value={recoveryEmail}
+                      onChange={(e) => setRecoveryEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-ocean text-primary-foreground"
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Enviando...' : 'Enviar link de recuperação'}
+                </Button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // Email Sent Confirmation View
+  if (authView === 'email-sent') {
+    return (
+      <MainLayout>
+        <div className="container py-12">
+          <div className="max-w-md mx-auto">
+            <div className="text-center mb-8">
+              <img
+                src={caliLogo}
+                alt="Cali"
+                className="h-16 w-16 rounded-xl mx-auto mb-4"
+              />
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Check className="h-8 w-8 text-primary" />
+              </div>
+              <h1 className="text-2xl font-bold">E-mail enviado!</h1>
+              <p className="text-muted-foreground mt-2">
+                Confere sua caixa de entrada. Mandamos um link pra você criar uma nova senha.
+              </p>
+              <p className="text-sm text-muted-foreground mt-4">
+                Não recebeu? Olha na pasta de spam ou tenta de novo.
+              </p>
+            </div>
+
+            <div className="bg-card rounded-xl border border-border p-6 space-y-4">
+              <Button
+                onClick={() => setAuthView('login')}
+                className="w-full bg-gradient-ocean text-primary-foreground"
+              >
+                Voltar pro login
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setAuthView('forgot-password')}
+                className="w-full"
+              >
+                Tentar novamente
+              </Button>
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // Reset Password View (after clicking email link)
+  if (authView === 'reset-password') {
+    return (
+      <MainLayout>
+        <div className="container py-12">
+          <div className="max-w-md mx-auto">
+            <div className="text-center mb-8">
+              <img
+                src={caliLogo}
+                alt="Cali"
+                className="h-16 w-16 rounded-xl mx-auto mb-4"
+              />
+              <h1 className="text-2xl font-bold">Criar nova senha</h1>
+              <p className="text-muted-foreground">
+                Escolhe uma senha forte pra proteger sua conta
+              </p>
+            </div>
+
+            <div className="bg-card rounded-xl border border-border p-6">
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">Nova senha</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="new-password"
+                      type={showNewPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      className="pl-10 pr-10"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={showNewPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    >
+                      {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  
+                  {newPassword.length > 0 && (
+                    <div className="mt-3 space-y-1.5 p-3 bg-muted/50 rounded-lg border border-border">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">
+                        Requisitos da senha:
+                      </p>
+                      {passwordRequirements.map(req => {
+                        const isValid = req.test(newPassword);
+                        return (
+                          <div key={req.id} className="flex items-center gap-2 text-xs">
+                            {isValid ? (
+                              <Check className="h-3.5 w-3.5 text-green-500" />
+                            ) : (
+                              <X className="h-3.5 w-3.5 text-red-500" />
+                            )}
+                            <span className={isValid ? 'text-green-600' : 'text-red-500'}>
+                              {req.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="confirm-password">Confirmar senha</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="confirm-password"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      className="pl-10 pr-10"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {confirmPassword.length > 0 && newPassword !== confirmPassword && (
+                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                      <X className="h-3 w-3" />
+                      As senhas não coincidem
+                    </p>
+                  )}
+                  {confirmPassword.length > 0 && newPassword === confirmPassword && (
+                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                      <Check className="h-3 w-3" />
+                      Senhas coincidem
+                    </p>
+                  )}
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-ocean text-primary-foreground"
+                  disabled={isLoading || newPassword !== confirmPassword}
+                >
+                  {isLoading ? 'Salvando...' : 'Salvar nova senha'}
+                </Button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // Default Login/Signup View
   return (
     <MainLayout>
       <div className="container py-12">
@@ -247,6 +573,15 @@ const Auth = () => {
                       </button>
                     </div>
                   </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setAuthView('forgot-password')}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Esqueci minha senha
+                  </button>
+                  
                   <Button
                     type="submit"
                     className="w-full bg-gradient-ocean text-primary-foreground"
@@ -323,7 +658,6 @@ const Auth = () => {
                       </button>
                     </div>
                     
-                    {/* Requisitos da senha com validação visual em tempo real */}
                     {signupPassword.length > 0 && (
                       <div className="mt-3 space-y-1.5 p-3 bg-muted/50 rounded-lg border border-border">
                         <p className="text-xs font-medium text-muted-foreground mb-2">
