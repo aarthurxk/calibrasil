@@ -407,7 +407,16 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      shipping_config: {
+        Row: {
+          currency: string | null
+          delivery_max_days: number | null
+          delivery_min_days: number | null
+          free_shipping_threshold: number | null
+          standard_shipping_rate: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {
