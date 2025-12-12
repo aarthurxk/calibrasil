@@ -24,6 +24,7 @@ const Contact = lazy(() => import("./pages/Contact"));
 const Wishlist = lazy(() => import("./pages/Wishlist"));
 const Profile = lazy(() => import("./pages/Profile"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail"));
+const MyOrders = lazy(() => import("./pages/MyOrders"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Lazy load Admin Pages
@@ -73,6 +74,14 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <OrderDetail />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/orders"
+                    element={
+                      <ProtectedRoute>
+                        <MyOrders />
                       </ProtectedRoute>
                     }
                   />
