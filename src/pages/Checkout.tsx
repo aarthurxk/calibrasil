@@ -182,12 +182,10 @@ const Checkout = () => {
 
       console.log("Checkout session created:", data);
 
-      // Open Stripe Checkout in new tab (works in preview and production)
+      // Redirect to Stripe Checkout in same tab
       if (data.sessionUrl) {
         isRedirecting.current = true;
-        window.open(data.sessionUrl, "_blank");
-        toast.success("Abrindo página de pagamento...");
-        setIsProcessing(false);
+        window.location.href = data.sessionUrl;
         return;
       } else {
         throw new Error("URL de pagamento não recebida");
