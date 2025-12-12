@@ -170,7 +170,7 @@ const Contact = () => {
               <MessageCircle className="w-6 h-6 text-primary" />
             </a>
             <a
-              href="https://facebook.com/calibrasil"
+              href="https://facebook.com/calinobrasil"
               target="_blank"
               rel="noopener noreferrer"
               className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
