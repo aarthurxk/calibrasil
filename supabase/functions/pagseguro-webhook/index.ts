@@ -39,13 +39,40 @@ serve(async (req) => {
     } else {
       // New webhook format (JSON)
       const body = await req.json();
-      logStep('Received webhook payload', { body });
+      logStep('Received webhook payload', { chargeId: body.id, reference: body.reference_id });
       
       // Handle charge webhook
       if (body.charges && body.charges.length > 0) {
         chargeData = body.charges[0];
       } else if (body.id) {
         chargeData = body;
+      }
+      
+      // SECURITY: Verify the charge with PagSeguro API before trusting the webhook
+      if (chargeData && chargeData.id) {
+        logStep('Verifying charge with PagSeguro API', { chargeId: chargeData.id });
+        
+        const verifyUrl = `https://api.pagseguro.com/charges/${chargeData.id}`;
+        const verifyResponse = await fetch(verifyUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${pagseguroToken}`,
+            'Content-Type': 'application/json',
+            'x-api-version': '4.0'
+          }
+        });
+        
+        if (!verifyResponse.ok) {
+          const errorText = await verifyResponse.text();
+          logStep('Failed to verify charge with PagSeguro', { status: verifyResponse.status, error: errorText });
+          throw new Error(`Failed to verify charge with PagSeguro: ${verifyResponse.status}`);
+        }
+        
+        const verifiedCharge = await verifyResponse.json();
+        logStep('Charge verified with PagSeguro', { status: verifiedCharge.status, reference: verifiedCharge.reference_id });
+        
+        // Use the verified data instead of the webhook payload
+        chargeData = verifiedCharge;
       }
     }
 
