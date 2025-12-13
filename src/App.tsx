@@ -39,6 +39,7 @@ const Settings = lazy(() => import("./pages/admin/Settings"));
 const Roadmap = lazy(() => import("./pages/admin/Roadmap"));
 const Coupons = lazy(() => import("./pages/admin/Coupons"));
 const Categories = lazy(() => import("./pages/admin/Categories"));
+const EmailTemplates = lazy(() => import("./pages/admin/EmailTemplates"));
 
 const queryClient = new QueryClient();
 
@@ -105,6 +106,7 @@ const App = () => (
                   <Route path="reports" element={<Reports />} />
                   <Route path="coupons" element={<Coupons />} />
                   <Route path="categories" element={<Categories />} />
+                  <Route path="email-templates" element={<EmailTemplates />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="roadmap" element={<Roadmap />} />
                 </Route>
