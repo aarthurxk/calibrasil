@@ -25,6 +25,7 @@ const Wishlist = lazy(() => import("./pages/Wishlist"));
 const Profile = lazy(() => import("./pages/Profile"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail"));
 const MyOrders = lazy(() => import("./pages/MyOrders"));
+const OrderReceived = lazy(() => import("./pages/OrderReceived"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Lazy load Admin Pages
@@ -64,6 +65,7 @@ const App = () => (
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/contact" element={<Contact />} />
+                  <Route path="/order-received" element={<OrderReceived />} />
                   <Route path="/wishlist" element={<Wishlist />} />
                   <Route
                     path="/profile"
