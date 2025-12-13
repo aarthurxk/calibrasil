@@ -261,6 +261,7 @@ const Orders = () => {
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">ID</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Itens</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Total</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Gateway</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Pagamento</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Data</th>
@@ -276,6 +277,17 @@ const Orders = () => {
                       <td className="py-3 px-4 font-medium">#{order.id.slice(0, 8)}</td>
                       <td className="py-3 px-4">{order.order_items?.length || 0} itens</td>
                       <td className="py-3 px-4 font-medium">{formatPrice(Number(order.total))}</td>
+                      <td className="py-3 px-4">
+                        <Badge className={
+                          order.payment_gateway === 'stripe' 
+                            ? 'bg-purple-100 text-purple-800' 
+                            : order.payment_gateway === 'pagseguro'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-muted text-muted-foreground'
+                        }>
+                          {order.payment_gateway === 'stripe' ? 'Stripe' : order.payment_gateway === 'pagseguro' ? 'PagSeguro' : 'N/A'}
+                        </Badge>
+                      </td>
                       <td className="py-3 px-4">
                         <Badge className={getPaymentStatusBadge(order.payment_status)}>
                           {getPaymentStatusLabel(order.payment_status)}
@@ -341,7 +353,7 @@ const Orders = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={canEditOrders ? 7 : 6} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={canEditOrders ? 8 : 7} className="py-8 text-center text-muted-foreground">
                       {searchTerm ? 'Nenhum pedido encontrado' : 'Nenhum pedido ainda'}
                     </td>
                   </tr>
