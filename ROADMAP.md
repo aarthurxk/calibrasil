@@ -66,4 +66,20 @@
 
 ---
 
+## 🚀 Roadmap v2.0 - Funcionalidades Planejadas
+
+### Rastreamento e Entrega
+- [ ] **Página de Código de Rastreio (Admin)** - Interface para admin adicionar código de rastreamento do produto enviado
+  - Ao inserir/atualizar código, enviar email automático ao cliente com link de rastreio
+- [ ] **Confirmação de Recebimento via Email** - Botão no email de "Enviado" para cliente confirmar recebimento do pedido
+
+### Avaliações
+- [ ] **Botão de Avaliação no Email de Entrega** - Corrigir email de status "Entregue" para incluir link direto para avaliar o produto comprado
+
+### UX/UI (Loja)
+- [ ] **Filtros Avançados por Preço** - Filtrar produtos por faixa de preço (menor/maior valor)
+  - Testar ordenação com produtos de preços variados
+
+---
+
 *Última atualização: Dezembro 2024*
