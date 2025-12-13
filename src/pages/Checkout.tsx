@@ -297,15 +297,20 @@ const Checkout = () => {
     } catch (error: any) {
       console.error("Error creating checkout session:", error);
       
-      // Specific error messages based on payment method
-      if (error.message?.toLowerCase().includes('pix')) {
+      // Check if it's a validation error with a specific message (like minimum amount)
+      const errorMessage = error.message || '';
+      
+      if (errorMessage.includes('valor mínimo')) {
+        // Show the actual minimum value error message
+        toast.error(errorMessage);
+      } else if (errorMessage.toLowerCase().includes('pix') && !errorMessage.includes('mínimo')) {
         toast.error('Pagamento via Pix temporariamente indisponível.');
-      } else if (error.message?.toLowerCase().includes('boleto')) {
+      } else if (errorMessage.toLowerCase().includes('boleto') && !errorMessage.includes('mínimo')) {
         toast.error('Pagamento via Boleto temporariamente indisponível.');
-      } else if (error.message?.includes('network') || error.message?.includes('fetch') || error.message?.includes('Failed to fetch')) {
+      } else if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch')) {
         toast.error('Erro de conexão. Verifique sua internet.');
       } else {
-        toast.error(error.message || 'Erro ao processar pagamento. Tente novamente.');
+        toast.error(errorMessage || 'Erro ao processar pagamento. Tente novamente.');
       }
       
       setIsProcessing(false);
