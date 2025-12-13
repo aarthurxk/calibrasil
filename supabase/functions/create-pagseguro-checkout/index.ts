@@ -342,8 +342,16 @@ serve(async (req) => {
       body: JSON.stringify(checkoutPayload)
     });
 
-    const pagseguroData = await pagseguroResponse.json();
-    logStep('PagSeguro response', { status: pagseguroResponse.status, data: pagseguroData });
+    const responseText = await pagseguroResponse.text();
+    logStep('PagSeguro raw response', { status: pagseguroResponse.status, body: responseText });
+    
+    let pagseguroData;
+    try {
+      pagseguroData = responseText ? JSON.parse(responseText) : {};
+    } catch (parseError) {
+      logStep('Failed to parse PagSeguro response', { responseText });
+      throw new Error(`Erro na resposta do PagSeguro: ${responseText || 'Resposta vazia - verifique as credenciais'}`);
+    }
 
     if (!pagseguroResponse.ok) {
       logStep('PagSeguro error', { error: pagseguroData });
