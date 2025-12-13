@@ -18,6 +18,13 @@ interface OrderStatusEmailRequest {
   trackingCode?: string;
 }
 
+interface EmailTemplate {
+  template_key: string;
+  subject: string;
+  html_content: string;
+  variables: string[];
+}
+
 const escapeHtml = (str: string): string => {
   return str
     .replace(/&/g, '&amp;')
@@ -80,19 +87,67 @@ const getStatusInfo = (status: string): { label: string; emoji: string; color: s
   };
 };
 
-const generateStatusEmail = async (data: OrderStatusEmailRequest): Promise<string> => {
+// Replaces template variables like {{variable_name}} with actual values
+const replaceTemplateVariables = (template: string, variables: Record<string, string>): string => {
+  let result = template;
+  for (const [key, value] of Object.entries(variables)) {
+    const regex = new RegExp(`{{${key}}}`, 'g');
+    result = result.replace(regex, escapeHtml(value));
+  }
+  return result;
+};
+
+// Fetch template from database
+async function fetchTemplate(supabase: any, templateKey: string): Promise<EmailTemplate | null> {
+  const { data, error } = await supabase
+    .from('email_templates')
+    .select('template_key, subject, html_content, variables')
+    .eq('template_key', templateKey)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (error) {
+    console.error(`[ORDER-STATUS] Error fetching template ${templateKey}:`, error);
+    return null;
+  }
+
+  return data;
+}
+
+// Generate email using database template or fallback to hardcoded
+async function generateEmailFromTemplate(
+  supabase: any,
+  data: OrderStatusEmailRequest,
+  templateKey: string,
+  variables: Record<string, string>
+): Promise<{ subject: string; html: string }> {
+  const template = await fetchTemplate(supabase, templateKey);
+  
+  if (template) {
+    console.log(`[ORDER-STATUS] Using database template: ${templateKey}`);
+    return {
+      subject: replaceTemplateVariables(template.subject, variables),
+      html: replaceTemplateVariables(template.html_content, variables)
+    };
+  }
+  
+  console.log(`[ORDER-STATUS] Template ${templateKey} not found, using fallback`);
+  return generateFallbackEmail(data);
+}
+
+// Fallback hardcoded email for when template is not found
+async function generateFallbackEmail(data: OrderStatusEmailRequest): Promise<{ subject: string; html: string }> {
   const statusInfo = getStatusInfo(data.newStatus);
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const storeUrl = 'https://calibrasil.com';
   
-  // Generate confirmation token for shipped orders
   const confirmationToken = await generateConfirmationToken(data.orderId);
   const confirmationUrl = `${supabaseUrl}/functions/v1/confirm-order-received?orderId=${data.orderId}&token=${confirmationToken}`;
-  
-  // Get first product ID for review link (simplified - links to orders page)
   const reviewUrl = `${storeUrl}/orders`;
   
-  return `
+  const subject = `${statusInfo.emoji} Seu pedido foi ${statusInfo.label.toLowerCase()}! #${data.orderId.substring(0, 8).toUpperCase()}`;
+  
+  const html = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -156,7 +211,9 @@ const generateStatusEmail = async (data: OrderStatusEmailRequest): Promise<strin
     </body>
     </html>
   `;
-};
+  
+  return { subject, html };
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -174,13 +231,20 @@ serve(async (req) => {
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    
+    // Client for auth check (user context)
+    const supabaseAuth = createClient(
+      supabaseUrl,
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Client for template fetch (service role to bypass RLS)
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
     if (authError || !user) {
       console.error('[ORDER-STATUS] Auth error:', authError);
       return new Response(
@@ -190,7 +254,7 @@ serve(async (req) => {
     }
 
     // Check if user has admin or manager role
-    const { data: roleData, error: roleError } = await supabase
+    const { data: roleData, error: roleError } = await supabaseAuth
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
@@ -209,14 +273,55 @@ serve(async (req) => {
     console.log(`[ORDER-STATUS] Sending status update email for order ${data.orderId}`);
     console.log(`[ORDER-STATUS] Status change: ${data.oldStatus} -> ${data.newStatus}`);
 
-    const statusInfo = getStatusInfo(data.newStatus);
-    const emailHtml = await generateStatusEmail(data);
+    let emailContent: { subject: string; html: string };
+    
+    // For shipped status with tracking code, use tracking_code_notification template
+    if (data.newStatus === 'shipped' && data.trackingCode) {
+      const confirmationToken = await generateConfirmationToken(data.orderId);
+      const confirmationUrl = `${supabaseUrl}/functions/v1/confirm-order-received?orderId=${data.orderId}&token=${confirmationToken}`;
+      const trackingUrl = 'https://www.linkcorreios.com.br/';
+      
+      const variables: Record<string, string> = {
+        customer_name: data.customerName,
+        order_id: data.orderId.substring(0, 8).toUpperCase(),
+        tracking_code: data.trackingCode,
+        tracking_url: trackingUrl,
+        confirmation_url: confirmationUrl
+      };
+      
+      emailContent = await generateEmailFromTemplate(
+        supabaseAdmin,
+        data,
+        'tracking_code_notification',
+        variables
+      );
+    } else {
+      // For other status updates, use order_status_update template
+      const statusInfo = getStatusInfo(data.newStatus);
+      
+      const variables: Record<string, string> = {
+        customer_name: data.customerName,
+        order_id: data.orderId.substring(0, 8).toUpperCase(),
+        status_label: statusInfo.label,
+        status_emoji: statusInfo.emoji,
+        status_color: statusInfo.color,
+        status_message: statusInfo.message,
+        tracking_code: data.trackingCode || ''
+      };
+      
+      emailContent = await generateEmailFromTemplate(
+        supabaseAdmin,
+        data,
+        'order_status_update',
+        variables
+      );
+    }
 
     const emailResult = await resend.emails.send({
       from: "Cali Brasil <pedidos@calibrasil.com>",
       to: [data.customerEmail],
-      subject: `${statusInfo.emoji} Seu pedido foi ${statusInfo.label.toLowerCase()}! #${data.orderId.substring(0, 8).toUpperCase()}`,
-      html: emailHtml,
+      subject: emailContent.subject,
+      html: emailContent.html,
     });
 
     console.log("[ORDER-STATUS] Email sent successfully");
