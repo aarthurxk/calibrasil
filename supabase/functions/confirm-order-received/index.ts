@@ -12,91 +12,106 @@ serve(async (req) => {
   }
 
   try {
+    // Handle POST request from frontend
+    if (req.method === "POST") {
+      const { orderId, token } = await req.json();
+      
+      console.log(`[CONFIRM-RECEIVED] Processing order: ${orderId}`);
+
+      if (!orderId || !token) {
+        return new Response(
+          JSON.stringify({ error: 'Link inválido. Parâmetros faltando.' }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Validate token format (simple hash of orderId)
+      const expectedToken = await generateToken(orderId);
+      if (token !== expectedToken) {
+        console.error('[CONFIRM-RECEIVED] Invalid token');
+        return new Response(
+          JSON.stringify({ error: 'Link inválido ou expirado.' }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+
+      // Check if order exists and is in shipped status
+      const { data: order, error: fetchError } = await supabase
+        .from('orders')
+        .select('id, status, received_at')
+        .eq('id', orderId)
+        .single();
+
+      if (fetchError || !order) {
+        console.error('[CONFIRM-RECEIVED] Order not found:', fetchError);
+        return new Response(
+          JSON.stringify({ error: 'Pedido não encontrado.' }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Check if already confirmed
+      if (order.received_at) {
+        return new Response(
+          JSON.stringify({ alreadyConfirmed: true }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Update order status to delivered and set received_at
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ 
+          status: 'delivered',
+          received_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (updateError) {
+        console.error('[CONFIRM-RECEIVED] Error updating order:', updateError);
+        return new Response(
+          JSON.stringify({ error: 'Erro ao confirmar recebimento. Tente novamente.' }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log(`[CONFIRM-RECEIVED] Order ${orderId} marked as delivered`);
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Handle GET request from email link - redirect to frontend
     const url = new URL(req.url);
     const orderId = url.searchParams.get('orderId');
     const token = url.searchParams.get('token');
-
-    console.log(`[CONFIRM-RECEIVED] Processing order: ${orderId}`);
-
-    if (!orderId || !token) {
-      return new Response(
-        generateHtmlPage('Erro', 'Link inválido. Parâmetros faltando.', 'error'),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" } }
-      );
-    }
-
-    // Validate token format (simple hash of orderId)
-    const expectedToken = await generateToken(orderId);
-    if (token !== expectedToken) {
-      console.error('[CONFIRM-RECEIVED] Invalid token');
-      return new Response(
-        generateHtmlPage('Erro', 'Link inválido ou expirado.', 'error'),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" } }
-      );
-    }
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    // Check if order exists and is in shipped status
-    const { data: order, error: fetchError } = await supabase
-      .from('orders')
-      .select('id, status, received_at')
-      .eq('id', orderId)
-      .single();
-
-    if (fetchError || !order) {
-      console.error('[CONFIRM-RECEIVED] Order not found:', fetchError);
-      return new Response(
-        generateHtmlPage('Erro', 'Pedido não encontrado.', 'error'),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" } }
-      );
-    }
-
-    // Check if already confirmed
-    if (order.received_at) {
-      return new Response(
-        generateHtmlPage('Já Confirmado', 'Você já confirmou o recebimento deste pedido anteriormente. Obrigado!', 'info'),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" } }
-      );
-    }
-
-    // Update order status to delivered and set received_at
-    const { error: updateError } = await supabase
-      .from('orders')
-      .update({ 
-        status: 'delivered',
-        received_at: new Date().toISOString()
-      })
-      .eq('id', orderId);
-
-    if (updateError) {
-      console.error('[CONFIRM-RECEIVED] Error updating order:', updateError);
-      return new Response(
-        generateHtmlPage('Erro', 'Erro ao confirmar recebimento. Tente novamente.', 'error'),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" } }
-      );
-    }
-
-    console.log(`[CONFIRM-RECEIVED] Order ${orderId} marked as delivered`);
-
-    return new Response(
-      generateHtmlPage(
-        'Recebimento Confirmado! ✅', 
-        'Obrigado por confirmar o recebimento do seu pedido! Esperamos que você ame seus produtos Cali. Que tal deixar uma avaliação?',
-        'success',
-        orderId
-      ),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" } }
-    );
+    
+    // Get the frontend URL from environment or use default
+    const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://calibrasil.com';
+    
+    // Redirect to frontend page with parameters
+    const redirectUrl = `${frontendUrl}/order-received?orderId=${orderId}&token=${token}`;
+    
+    return new Response(null, {
+      status: 302,
+      headers: {
+        ...corsHeaders,
+        'Location': redirectUrl
+      }
+    });
 
   } catch (error: any) {
     console.error("[CONFIRM-RECEIVED] Error:", error);
     return new Response(
-      generateHtmlPage('Erro', 'Ocorreu um erro inesperado. Tente novamente.', 'error'),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" } }
+      JSON.stringify({ error: 'Ocorreu um erro inesperado. Tente novamente.' }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
@@ -110,90 +125,4 @@ async function generateToken(orderId: string): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-function generateHtmlPage(title: string, message: string, type: 'success' | 'error' | 'info', orderId?: string): string {
-  const colors = {
-    success: { bg: '#dcfce7', border: '#16a34a', text: '#166534', icon: '✅' },
-    error: { bg: '#fee2e2', border: '#dc2626', text: '#991b1b', icon: '❌' },
-    info: { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af', icon: 'ℹ️' },
-  };
-  
-  const color = colors[type];
-  const siteUrl = Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '') || 'https://calibrasil.com';
-  const storeUrl = 'https://calibrasil.com';
-
-  return `
-    <!DOCTYPE html>
-    <html lang="pt-BR">
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${title} - Cali Brasil</title>
-      <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 20px;
-        }
-        .container {
-          background: white;
-          border-radius: 16px;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-          padding: 40px;
-          max-width: 480px;
-          text-align: center;
-        }
-        .icon { font-size: 48px; margin-bottom: 20px; }
-        h1 { color: ${color.text}; margin-bottom: 16px; font-size: 24px; }
-        p { color: #666; line-height: 1.6; margin-bottom: 24px; }
-        .status-box {
-          background: ${color.bg};
-          border: 2px solid ${color.border};
-          border-radius: 12px;
-          padding: 20px;
-          margin-bottom: 24px;
-        }
-        .btn {
-          display: inline-block;
-          background: #16a34a;
-          color: white;
-          padding: 14px 28px;
-          border-radius: 8px;
-          text-decoration: none;
-          font-weight: 600;
-          transition: background 0.2s;
-          margin: 8px;
-        }
-        .btn:hover { background: #15803d; }
-        .btn-secondary {
-          background: #3b82f6;
-        }
-        .btn-secondary:hover { background: #2563eb; }
-        .logo { font-size: 28px; font-weight: bold; color: #16a34a; margin-bottom: 24px; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="logo">🌴 Cali Brasil</div>
-        <div class="status-box">
-          <div class="icon">${color.icon}</div>
-          <h1>${title}</h1>
-          <p>${message}</p>
-        </div>
-        ${type === 'success' && orderId ? `
-          <a href="${storeUrl}/orders" class="btn">Ver Meus Pedidos</a>
-          <a href="${storeUrl}/shop" class="btn btn-secondary">Continuar Comprando</a>
-        ` : `
-          <a href="${storeUrl}" class="btn">Ir para a Loja</a>
-        `}
-      </div>
-    </body>
-    </html>
-  `;
 }
