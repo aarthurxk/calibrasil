@@ -243,6 +243,18 @@ serve(async (req) => {
     // Determine payment method types for Stripe
     let paymentMethodTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [];
     
+    // Minimum amounts for payment methods (in BRL)
+    const MINIMUM_AMOUNTS: Record<string, number> = {
+      boleto: 5.00,
+      pix: 0.50,
+      card: 0.50,
+    };
+
+    const minAmount = MINIMUM_AMOUNTS[body.payment_method] || 0.50;
+    if (realTotal < minAmount) {
+      throw new Error(`O valor mínimo para ${body.payment_method === 'boleto' ? 'Boleto' : body.payment_method === 'pix' ? 'Pix' : 'Cartão'} é R$ ${minAmount.toFixed(2).replace('.', ',')}`);
+    }
+    
     switch (body.payment_method) {
       case "pix":
         paymentMethodTypes = ["pix"];
