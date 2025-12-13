@@ -6,10 +6,11 @@
 - [x] **Cálculo de Frete Dinâmico** - Cálculo por região (PAC e SEDEX) com preços diferenciados
 - [ ] **Integração API Correios** - Integração direta com API oficial dos Correios
   - Rastreamento de encomendas
+  - ⏳ *Aguardando contrato comercial ativo com Correios*
 
 ### Pagamentos
-- [ ] **Parcelamento no Cartão** - Opção de parcelamento em até 12x
-- [ ] **Cupons de Desconto** - Sistema de cupons promocionais
+- [x] **Parcelamento no Cartão** - Opção de parcelamento em até 6x (configurável por faixa de valor)
+- [x] **Cupons de Desconto** - Sistema completo de cupons promocionais com admin
 
 ### Marketing e Engajamento
 - [ ] **Programa de Fidelidade** - Pontos por compra e recompensas
@@ -19,11 +20,12 @@
 ### Admin Dashboard
 - [x] **Relatórios Avançados** - Gráficos de vendas por período, produto e região (dados reais)
 - [ ] **Gestão de Promoções** - Criar e agendar promoções automáticas
-- [ ] **Dashboard de Métricas** - KPIs em tempo real (conversão, ticket médio, etc.)
+- [x] **Dashboard de Métricas** - KPIs em tempo real (conversão, ticket médio, abandono de carrinho)
+- [x] **Gestão de Categorias** - CRUD completo de categorias (admin-only)
 
 ### UX/UI
-- [ ] **Filtros Avançados na Loja** - Por preço, cor, modelo, avaliação
-- [ ] **Busca com Autocomplete** - Sugestões de produtos ao digitar
+- [x] **Filtros Avançados na Loja** - Filtro por faixa de preço com slider duplo
+- [x] **Busca com Autocomplete** - Modal de busca com sugestões de produtos em tempo real
 - [ ] **Comparador de Produtos** - Comparar até 3 produtos lado a lado
 
 ---
@@ -80,10 +82,6 @@
 - [ ] **Vinculação de Pedidos Guest a Conta Nova** - Quando cliente criar conta com email usado em compras como visitante, vincular automaticamente todos os pedidos anteriores à nova conta
   - Trigger no signup que verifica `orders.guest_email` e atualiza `orders.user_id`
 
-### UX/UI (Loja)
-- [ ] **Filtros Avançados por Preço** - Filtrar produtos por faixa de preço (menor/maior valor)
-  - Testar ordenação com produtos de preços variados
-
 ---
 
-*Última atualização: Dezembro 2024*
+*Última atualização: 13 de Dezembro de 2024*
