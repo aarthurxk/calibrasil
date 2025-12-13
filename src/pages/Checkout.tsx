@@ -271,17 +271,23 @@ const Checkout = () => {
 
       console.log("Creating checkout session:", { itemCount: items.length, payment_method: paymentMethod });
 
-      const { data, error } = await supabase.functions.invoke("create-checkout-session", {
+      const response = await supabase.functions.invoke("create-checkout-session", {
         body: checkoutData,
       });
 
-      if (error) {
-        console.error("Edge function error:", error);
-        throw new Error(error.message || "Erro ao criar sessão de pagamento");
-      }
+      const { data, error } = response;
 
-      if (!data.success) {
-        throw new Error(data.error || "Erro ao criar sessão de pagamento");
+      // Handle edge function errors
+      // When edge function returns 400, error is set but data also contains the error message
+      if (error || !data?.success) {
+        console.error("Edge function error:", { error, data });
+        
+        // Priority: data.error > error.message > generic
+        const errorMessage = data?.error || 
+          (error?.message && error.message !== 'FunctionsHttpError' ? error.message : null) ||
+          "Erro ao criar sessão de pagamento";
+        
+        throw new Error(errorMessage);
       }
 
       console.log("Checkout session created:", data);
