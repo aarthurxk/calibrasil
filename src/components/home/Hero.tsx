@@ -2,18 +2,10 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Waves } from "lucide-react";
 import { Button } from "@/components/ui/button";
 const Hero = () => {
-  return (
-    <section className="relative min-h-[90vh] flex items-center overflow-hidden">
+  return <section className="relative min-h-[90vh] flex items-center overflow-hidden">
       {/* Background Image */}
       <div className="absolute inset-0">
-        <img 
-          src="/images/hero-beach.jpg" 
-          alt="Pôr do sol na praia com ondas" 
-          className="h-full w-full object-cover"
-          fetchPriority="high"
-          width={1920}
-          height={1080}
-        />
+        <img src="/images/hero-beach.jpg" alt="Pôr do sol na praia com ondas" className="h-full w-full object-cover" fetchPriority="high" width={1920} height={1080} />
         <div className="absolute inset-0 bg-gradient-to-r from-cali-ocean-dark/90 via-cali-ocean-dark/60 to-transparent" />
       </div>
 
@@ -37,20 +29,13 @@ const Hero = () => {
 
           <div className="flex flex-wrap gap-4">
             <Link to="/shop">
-              <Button
-                size="lg"
-                className="bg-gradient-ocean text-primary-foreground hover:opacity-90 transition-opacity shadow-glow"
-              >
+              <Button size="lg" className="bg-gradient-ocean text-primary-foreground hover:opacity-90 transition-opacity shadow-glow">
                 Bora Conferir
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
             <Link to="/about">
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-sidebar-border hover:bg-sidebar-accent text-primary"
-              >
+              <Button size="lg" variant="outline" className="border-sidebar-border hover:bg-sidebar-accent text-primary">
                 Nossa História
               </Button>
             </Link>
@@ -67,13 +52,12 @@ const Hero = () => {
               <p className="text-xs sm:text-sm text-sidebar-foreground/60">Sustentável</p>
             </div>
             <div>
-              <p className="text-2xl sm:text-3xl font-bold text-cali-wave">Eco</p>
+              <p className="text-2xl sm:text-3xl font-bold text-cali-wave text-center">Eco</p>
               <p className="text-xs sm:text-sm text-sidebar-foreground/60">Produção consciente</p>
             </div>
           </div>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
 export default Hero;
