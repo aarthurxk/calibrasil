@@ -13,10 +13,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import SearchModal from '@/components/search/SearchModal';
 import caliLogo from '@/assets/cali-logo.jpeg';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const { itemCount } = useCart();
   const { wishlistCount } = useWishlist();
   const { user, role, signOut } = useAuth();
@@ -54,7 +56,13 @@ const Header = () => {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="hidden md:flex" aria-label="Pesquisar">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="hidden md:flex" 
+            aria-label="Pesquisar"
+            onClick={() => setIsSearchOpen(true)}
+          >
             <Search className="h-5 w-5" />
           </Button>
           {/* Wishlist - only show if logged in */}
@@ -162,6 +170,9 @@ const Header = () => {
           </nav>
         </div>
       )}
+
+      {/* Search Modal */}
+      <SearchModal open={isSearchOpen} onOpenChange={setIsSearchOpen} />
     </header>
   );
 };

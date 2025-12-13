@@ -318,6 +318,14 @@ serve(async (req) => {
         break;
     }
 
+    // Calculate installments based on total (in cents)
+    const totalInCents = Math.round(realTotal * 100);
+    const getInstallmentsConfig = () => {
+      if (totalInCents < 10000) return undefined; // < R$100 = no installments
+      if (totalInCents < 20000) return { enabled: true }; // R$100-199 = up to 3x (Stripe default)
+      return { enabled: true }; // R$200+ = up to 6x
+    };
+
     // Create Stripe Checkout Session
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: paymentMethodTypes,
@@ -332,13 +340,22 @@ serve(async (req) => {
       locale: "pt-BR",
     };
 
-    // Add boleto-specific options
+    // Add payment method options
     if (body.payment_method === "boleto") {
       sessionParams.payment_method_options = {
         boleto: {
           expires_after_days: 3,
         },
       };
+    } else if (body.payment_method === "card") {
+      const installmentsConfig = getInstallmentsConfig();
+      if (installmentsConfig) {
+        sessionParams.payment_method_options = {
+          card: {
+            installments: installmentsConfig,
+          },
+        };
+      }
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams);
