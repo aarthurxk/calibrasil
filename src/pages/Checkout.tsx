@@ -694,26 +694,17 @@ const Checkout = () => {
                     )}
                   </Button>
 
-                  {/* PagSeguro Button */}
+                  {/* PagSeguro Button - Temporariamente desabilitado */}
                   <Button
                     type="button"
                     size="lg"
-                    onClick={handlePagseguroCheckout}
-                    disabled={isProcessing}
-                    className="h-auto py-4 flex flex-col items-center gap-2 bg-[#00A859] hover:bg-[#008c4a] text-white"
+                    disabled={true}
+                    className="h-auto py-4 flex flex-col items-center gap-2 bg-muted text-muted-foreground cursor-not-allowed opacity-60"
                   >
-                    {isProcessingPagseguro ? (
-                      <>
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                        <span className="text-sm">Redirecionando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <QrCode className="h-6 w-6" />
-                        <span className="font-semibold">Pagar com PagSeguro</span>
-                        <span className="text-xs opacity-80">Cartão • Pix</span>
-                      </>
-                    )}
+                    <QrCode className="h-6 w-6" />
+                    <span className="font-semibold">PagSeguro</span>
+                    <span className="text-xs">Em breve</span>
+                    <span className="text-[10px] opacity-70">Em fase de implementação</span>
                   </Button>
                 </div>
 
