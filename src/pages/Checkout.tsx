@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, CreditCard, Lock, QrCode, Barcode, Loader2, MapPin, ChevronDown } from "lucide-react";
+import { ArrowLeft, CreditCard, Lock, QrCode, Barcode, Loader2, MapPin, Ticket, X } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useStoreSettings } from "@/hooks/useStoreSettings";
 import { useUserAddresses, UserAddress } from "@/hooks/useUserAddresses";
+import { useCoupon } from "@/hooks/useCoupon";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +47,9 @@ const Checkout = () => {
   const { user } = useAuth();
   const { settings } = useStoreSettings();
   const { addresses, isLoading: isLoadingAddresses, addAddress, canAddMore } = useUserAddresses();
+  const { appliedCoupon, isValidating, validateCoupon, removeCoupon, discountAmount } = useCoupon(total);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
 
   // Address selection state
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -70,7 +73,8 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
 
   const shipping = total >= settings.free_shipping_threshold ? 0 : settings.standard_shipping_rate;
-  const finalTotal = total + shipping;
+  const totalAfterDiscount = total - discountAmount;
+  const finalTotal = totalAfterDiscount + shipping;
 
   // Auto-fill contact info from user profile
   useEffect(() => {
@@ -686,11 +690,57 @@ const Checkout = () => {
                 })}
               </div>
 
+              {/* Coupon Field */}
+              <div className="border-t border-border pt-4 mb-4">
+                <Label className="text-sm font-medium mb-2 block">Cupom de Desconto</Label>
+                {appliedCoupon ? (
+                  <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg border border-primary/20">
+                    <div className="flex items-center gap-2">
+                      <Ticket className="h-4 w-4 text-primary" />
+                      <span className="font-mono font-medium text-sm">{appliedCoupon.code}</span>
+                      <span className="text-xs text-primary">-{appliedCoupon.discount_percent}%</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={removeCoupon}
+                      className="h-8 w-8 p-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Digite o código"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                      className="font-mono"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => validateCoupon(couponCode)}
+                      disabled={isValidating || !couponCode}
+                    >
+                      {isValidating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aplicar"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               <div className="border-t border-border pt-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Subtotal</span>
                   <span>{formatPrice(total)}</span>
                 </div>
+                {appliedCoupon && (
+                  <div className="flex justify-between text-sm text-primary">
+                    <span>Desconto ({appliedCoupon.discount_percent}%)</span>
+                    <span>-{formatPrice(discountAmount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span>Frete</span>
                   <span>
