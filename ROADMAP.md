@@ -68,19 +68,23 @@
 
 ---
 
-## 🚀 Roadmap v2.0 - Funcionalidades Planejadas
+## ✅ Roadmap v2.0 - Implementado
 
 ### Rastreamento e Entrega
-- [ ] **Página de Código de Rastreio (Admin)** - Interface para admin adicionar código de rastreamento do produto enviado
-  - Ao inserir/atualizar código, enviar email automático ao cliente com link de rastreio
-- [ ] **Confirmação de Recebimento via Email** - Botão no email de "Enviado" para cliente confirmar recebimento do pedido
+- [x] **Página de Código de Rastreio (Admin)** - Interface no modal de detalhes do pedido para admin adicionar código de rastreamento
+  - Ao inserir/atualizar código, envia email automático ao cliente com link de rastreio
+  - Status do pedido atualizado automaticamente para "Enviado"
+- [x] **Confirmação de Recebimento via Email** - Botão "Recebi meu Pedido" no email de "Enviado" para cliente confirmar recebimento
+  - Edge Function `confirm-order-received` processa confirmação via link seguro com token
+  - Atualiza status para "Entregue" e registra `received_at`
 
 ### Avaliações
-- [ ] **Botão de Avaliação no Email de Entrega** - Corrigir email de status "Entregue" para incluir link direto para avaliar o produto comprado
+- [x] **Botão de Avaliação no Email de Entrega** - Email de status "Entregue" inclui botão "Avaliar minha Compra" com link para página de pedidos
 
 ### Contas e Pedidos
-- [ ] **Vinculação de Pedidos Guest a Conta Nova** - Quando cliente criar conta com email usado em compras como visitante, vincular automaticamente todos os pedidos anteriores à nova conta
-  - Trigger no signup que verifica `orders.guest_email` e atualiza `orders.user_id`
+- [x] **Vinculação de Pedidos Guest a Conta Nova** - Trigger automático no signup vincula todos os pedidos anteriores feitos com o mesmo email
+  - Função `handle_new_user` atualizada para vincular `orders.guest_email` ao novo `user_id`
+  - Vinculação retroativa executada para usuários já existentes
 
 ---
 

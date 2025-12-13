@@ -356,6 +356,10 @@ const Orders = () => {
         order={selectedOrder}
         open={isDetailsOpen}
         onOpenChange={setIsDetailsOpen}
+        onTrackingCodeSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+          setIsDetailsOpen(false);
+        }}
       />
     </div>
   );

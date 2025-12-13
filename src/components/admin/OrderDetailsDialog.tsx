@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -6,7 +7,12 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { MapPin, Phone, Mail, Package, CreditCard, Calendar } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { MapPin, Phone, Mail, Package, CreditCard, Calendar, Truck, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface OrderItem {
   id: string;
@@ -41,12 +47,14 @@ interface Order {
   shipping_address?: ShippingAddress;
   created_at: string;
   order_items?: OrderItem[];
+  tracking_code?: string;
 }
 
 interface OrderDetailsDialogProps {
   order: Order | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onTrackingCodeSaved?: () => void;
 }
 
 const getStatusBadge = (status: string) => {
@@ -99,7 +107,10 @@ const formatDate = (dateString: string) => {
   });
 };
 
-export function OrderDetailsDialog({ order, open, onOpenChange }: OrderDetailsDialogProps) {
+export function OrderDetailsDialog({ order, open, onOpenChange, onTrackingCodeSaved }: OrderDetailsDialogProps) {
+  const [trackingCode, setTrackingCode] = useState(order?.tracking_code || '');
+  const [isSaving, setIsSaving] = useState(false);
+
   if (!order) return null;
 
   const address = order.shipping_address;
@@ -107,11 +118,82 @@ export function OrderDetailsDialog({ order, open, onOpenChange }: OrderDetailsDi
     `${address?.firstName || ''} ${address?.lastName || ''}`.trim() || 
     'Cliente';
 
+  const customerEmail = order.guest_email || '';
+
   const subtotal = order.order_items?.reduce(
     (acc, item) => acc + item.price * item.quantity, 
     0
   ) || 0;
   const shipping = Number(order.total) - subtotal;
+
+  const handleSaveTrackingCode = async () => {
+    if (!trackingCode.trim()) {
+      toast({
+        title: 'Código obrigatório',
+        description: 'Digite o código de rastreamento.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Update order with tracking code
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ 
+          tracking_code: trackingCode.trim(),
+          status: 'shipped'
+        })
+        .eq('id', order.id);
+
+      if (updateError) throw updateError;
+
+      // Send email notification with tracking code
+      if (customerEmail) {
+        const { error: emailError } = await supabase.functions.invoke('send-order-status-email', {
+          body: {
+            orderId: order.id,
+            customerEmail: customerEmail,
+            customerName: customerName,
+            oldStatus: order.status,
+            newStatus: 'shipped',
+            trackingCode: trackingCode.trim(),
+          },
+        });
+
+        if (emailError) {
+          console.error('Error sending email:', emailError);
+          toast({
+            title: 'Rastreio salvo',
+            description: 'Código salvo, mas houve erro ao enviar email.',
+            variant: 'default',
+          });
+        } else {
+          toast({
+            title: 'Sucesso!',
+            description: 'Código de rastreamento salvo e email enviado ao cliente.',
+          });
+        }
+      } else {
+        toast({
+          title: 'Rastreio salvo',
+          description: 'Código de rastreamento salvo (cliente sem email).',
+        });
+      }
+
+      onTrackingCodeSaved?.();
+    } catch (error) {
+      console.error('Error saving tracking code:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível salvar o código de rastreamento.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -133,6 +215,45 @@ export function OrderDetailsDialog({ order, open, onOpenChange }: OrderDetailsDi
               <Calendar className="h-4 w-4" />
               {formatDate(order.created_at)}
             </div>
+          </div>
+
+          <Separator />
+
+          {/* Código de Rastreamento */}
+          <div className="bg-muted/50 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Truck className="h-4 w-4 text-primary" />
+              <Label className="font-semibold">Código de Rastreamento</Label>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Ex: AA123456789BR"
+                value={trackingCode}
+                onChange={(e) => setTrackingCode(e.target.value.toUpperCase())}
+                className="flex-1 font-mono"
+              />
+              <Button 
+                onClick={handleSaveTrackingCode} 
+                disabled={isSaving}
+                size="default"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Salvando...
+                  </>
+                ) : order.tracking_code ? (
+                  'Atualizar'
+                ) : (
+                  'Salvar e Enviar'
+                )}
+              </Button>
+            </div>
+            {order.tracking_code && (
+              <p className="text-xs text-muted-foreground mt-2">
+                ✅ Código atual: {order.tracking_code}
+              </p>
+            )}
           </div>
 
           <Separator />
