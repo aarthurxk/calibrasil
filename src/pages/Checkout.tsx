@@ -72,6 +72,36 @@ const Checkout = () => {
   const shipping = total >= settings.free_shipping_threshold ? 0 : settings.standard_shipping_rate;
   const finalTotal = total + shipping;
 
+  // Auto-fill contact info from user profile
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user) return;
+
+      // Email from auth
+      setEmail(user.email || "");
+
+      // Fetch profile data
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name, phone")
+        .eq("user_id", user.id)
+        .single();
+
+      if (data) {
+        if (data.full_name) {
+          const nameParts = data.full_name.trim().split(" ");
+          setFirstName(nameParts[0] || "");
+          setLastName(nameParts.slice(1).join(" ") || "");
+        }
+        if (data.phone) {
+          setPhone(data.phone);
+        }
+      }
+    };
+
+    fetchProfile();
+  }, [user]);
+
   // Auto-select default address when addresses load
   useEffect(() => {
     if (addresses.length > 0 && !selectedAddressId && !useNewAddress) {
@@ -80,6 +110,13 @@ const Checkout = () => {
       fillFormFromAddress(defaultAddr);
     }
   }, [addresses]);
+
+  // For logged-in users with no addresses, default to save new address
+  useEffect(() => {
+    if (user && addresses.length === 0 && !isLoadingAddresses) {
+      setSaveNewAddress(true);
+    }
+  }, [user, addresses, isLoadingAddresses]);
 
   const fillFormFromAddress = (address: UserAddress) => {
     setZip(address.zip);
@@ -183,8 +220,8 @@ const Checkout = () => {
         return;
       }
 
-      // Save new address if requested
-      if (user && useNewAddress && saveNewAddress && canAddMore && addressLabel) {
+      // Save new address if requested (for new address or when user has no addresses)
+      if (user && (useNewAddress || addresses.length === 0) && saveNewAddress && canAddMore && addressLabel) {
         await addAddress({
           label: addressLabel,
           zip,
@@ -346,6 +383,15 @@ const Checkout = () => {
               <div className="space-y-4">
                 <h2 className="text-xl font-semibold">Endereço de Entrega</h2>
 
+                {/* Prompt for users without addresses */}
+                {user && addresses.length === 0 && !isLoadingAddresses && (
+                  <div className="p-4 border border-dashed border-primary/50 bg-primary/5 rounded-lg">
+                    <p className="text-sm text-foreground">
+                      Você ainda não tem endereços salvos. Preencha o endereço abaixo e salve para usar em compras futuras!
+                    </p>
+                  </div>
+                )}
+
                 {/* Saved Addresses */}
                 {hasAddresses && (
                   <div className="space-y-3">
@@ -485,7 +531,7 @@ const Checkout = () => {
                       </div>
 
                       {/* Save address option (only for logged-in users) */}
-                      {user && canAddMore && useNewAddress && (
+                      {user && canAddMore && (useNewAddress || addresses.length === 0) && (
                         <div className="space-y-3 pt-2 border-t border-border">
                           <div className="flex items-center space-x-2">
                             <Checkbox
@@ -499,9 +545,10 @@ const Checkout = () => {
                           </div>
                           {saveNewAddress && (
                             <div>
-                              <Label htmlFor="addressLabel">Nome do endereço</Label>
+                              <Label htmlFor="addressLabel">Nome do endereço *</Label>
                               <Input
                                 id="addressLabel"
+                                required={saveNewAddress}
                                 placeholder="Ex: Casa, Trabalho"
                                 value={addressLabel}
                                 onChange={(e) => setAddressLabel(e.target.value)}
