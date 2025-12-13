@@ -38,3 +38,9 @@ verify_jwt = true
 
 [functions.send-review-request-email]
 verify_jwt = false
+
+[functions.create-pagseguro-checkout]
+verify_jwt = false
+
+[functions.pagseguro-webhook]
+verify_jwt = false
