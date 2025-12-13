@@ -117,12 +117,24 @@ const ProductDetail = () => {
     });
   };
 
-  // Get stock for selected variant
+  // Parse arrays from database
+  const colors: string[] = Array.isArray(product?.color) ? product.color : [];
+  const colorCodes: Record<string, string> = product?.color_codes as Record<string, string> || {};
+  const models: string[] = Array.isArray(product?.model) ? product.model : [];
+  const sizes: string[] = product?.sizes || [];
+
+  // Get stock for selected variant - only show after required selections are made
   const getSelectedVariantStock = (): number | null => {
     if (variants.length === 0) return null;
+    
+    // Don't show stock until required options are selected
+    if (colors.length > 0 && !selectedColor) return null;
+    if (models.length > 0 && !selectedModel) return null;
+    
     const variant = variants.find(v => (v.color === selectedColor || !v.color && !selectedColor) && (v.model === selectedModel || !v.model && !selectedModel));
     return variant?.stock_quantity ?? 0;
   };
+  
   const variantStock = getSelectedVariantStock();
   const isOutOfStock = variantStock !== null && variantStock <= 0;
 
@@ -181,12 +193,6 @@ const ProductDetail = () => {
       </MainLayout>;
   }
   const discount = product.original_price ? Math.round((product.original_price - product.price) / product.original_price * 100) : 0;
-
-  // Parse arrays from database
-  const colors: string[] = Array.isArray(product.color) ? product.color : [];
-  const colorCodes: Record<string, string> = product.color_codes as Record<string, string> || {};
-  const models: string[] = Array.isArray(product.model) ? product.model : [];
-  const sizes: string[] = product.sizes || [];
   const handleAddToCart = () => {
     // Validate required selections
     if (colors.length > 0 && !selectedColor) {
