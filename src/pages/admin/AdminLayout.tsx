@@ -11,6 +11,7 @@ import {
   Menu,
   UserCircle,
   Store,
+  Map,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -39,7 +40,8 @@ const AdminLayout = () => {
     { name: 'Clientes', icon: Users, path: '/admin/customers', showFor: ['admin', 'manager'] },
     { name: 'Pagamentos', icon: CreditCard, path: '/admin/payments', showFor: ['admin', 'manager'] },
     { name: 'Relatórios', icon: BarChart3, path: '/admin/reports', showFor: ['admin', 'manager'] },
-    { name: 'Configurações', icon: Settings, path: '/admin/settings', showFor: ['admin'] }, // Admin only
+    { name: 'Roadmap', icon: Map, path: '/admin/roadmap', showFor: ['admin'] },
+    { name: 'Configurações', icon: Settings, path: '/admin/settings', showFor: ['admin'] },
   ];
 
   const visibleItems = sidebarItems.filter(item => 

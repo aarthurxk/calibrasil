@@ -36,6 +36,7 @@ const Customers = lazy(() => import("./pages/admin/Customers"));
 const Payments = lazy(() => import("./pages/admin/Payments"));
 const Reports = lazy(() => import("./pages/admin/Reports"));
 const Settings = lazy(() => import("./pages/admin/Settings"));
+const Roadmap = lazy(() => import("./pages/admin/Roadmap"));
 
 const queryClient = new QueryClient();
 
@@ -101,6 +102,7 @@ const App = () => (
                   <Route path="payments" element={<Payments />} />
                   <Route path="reports" element={<Reports />} />
                   <Route path="settings" element={<Settings />} />
+                  <Route path="roadmap" element={<Roadmap />} />
                 </Route>
                 
                   {/* Catch-all */}

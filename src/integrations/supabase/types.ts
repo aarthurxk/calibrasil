@@ -301,6 +301,42 @@ export type Database = {
         }
         Relationships: []
       }
+      roadmap_items: {
+        Row: {
+          category: string
+          created_at: string | null
+          description: string | null
+          id: string
+          priority: number | null
+          status: string | null
+          title: string
+          updated_at: string | null
+          version: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          priority?: number | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          version?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          priority?: number | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          version?: string | null
+        }
+        Relationships: []
+      }
       store_settings: {
         Row: {
           created_at: string
