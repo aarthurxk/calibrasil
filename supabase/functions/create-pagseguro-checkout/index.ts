@@ -313,8 +313,7 @@ serve(async (req) => {
       payment_methods: [
         { type: 'CREDIT_CARD' },
         { type: 'DEBIT_CARD' },
-        { type: 'PIX' },
-        { type: 'BOLETO' }
+        { type: 'PIX' }
       ],
       payment_methods_configs: [
         {
