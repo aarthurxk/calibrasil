@@ -38,6 +38,7 @@ const Reports = lazy(() => import("./pages/admin/Reports"));
 const Settings = lazy(() => import("./pages/admin/Settings"));
 const Roadmap = lazy(() => import("./pages/admin/Roadmap"));
 const Coupons = lazy(() => import("./pages/admin/Coupons"));
+const Categories = lazy(() => import("./pages/admin/Categories"));
 
 const queryClient = new QueryClient();
 
@@ -103,6 +104,7 @@ const App = () => (
                   <Route path="payments" element={<Payments />} />
                   <Route path="reports" element={<Reports />} />
                   <Route path="coupons" element={<Coupons />} />
+                  <Route path="categories" element={<Categories />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="roadmap" element={<Roadmap />} />
                 </Route>

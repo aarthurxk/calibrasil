@@ -12,7 +12,11 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Product } from '@/types/product';
 
-const CATEGORIES = ['Todos', 'Tech', 'Acessórios', 'Vestuário', 'Esporte'];
+type Category = {
+  id: string;
+  name: string;
+  slug: string;
+};
 
 const Shop = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -24,7 +28,21 @@ const Shop = () => {
   
   const { isAdmin, isManager } = useAuth();
   const canManageProducts = isAdmin || isManager;
-  const selectedCategory = searchParams.get('category') || 'Todos';
+  const selectedCategory = searchParams.get('category') || 'todos';
+
+  // Fetch categories from database
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('id, name, slug')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+      if (error) throw error;
+      return data as Category[];
+    },
+  });
 
   // Fetch products from database
   const { data: products = [], isLoading } = useQuery({
@@ -60,7 +78,7 @@ const Shop = () => {
     let result = [...products];
 
     // Filter by category
-    if (selectedCategory && selectedCategory !== 'Todos') {
+    if (selectedCategory && selectedCategory !== 'todos') {
       result = result.filter((p) => p.category.toLowerCase() === selectedCategory.toLowerCase());
     }
 
@@ -86,11 +104,11 @@ const Shop = () => {
     }
     return result;
   }, [products, selectedCategory, sortBy, priceRange, isPriceFilterActive]);
-  const handleCategoryChange = (category: string) => {
-    if (category === 'Todos') {
+  const handleCategoryChange = (slug: string) => {
+    if (slug === 'todos') {
       searchParams.delete('category');
     } else {
-      searchParams.set('category', category.toLowerCase());
+      searchParams.set('category', slug);
     }
     setSearchParams(searchParams);
   };
@@ -106,7 +124,7 @@ const Shop = () => {
     setSortBy('featured');
   };
 
-  const hasActiveFilters = selectedCategory !== 'Todos' || isPriceFilterActive;
+  const hasActiveFilters = selectedCategory !== 'todos' || isPriceFilterActive;
 
   return (
     <MainLayout>
@@ -127,14 +145,21 @@ const Shop = () => {
               <Filter className="h-5 w-5 text-muted-foreground" />
               <span className="text-sm font-medium">Filtrar:</span>
               <div className="flex gap-2 flex-wrap">
-                {CATEGORIES.map((category) => (
+                <Button
+                  variant={selectedCategory === 'todos' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleCategoryChange('todos')}
+                >
+                  Todos
+                </Button>
+                {categories.map((category) => (
                   <Button
-                    key={category}
-                    variant={selectedCategory.toLowerCase() === category.toLowerCase() ? 'default' : 'outline'}
+                    key={category.id}
+                    variant={selectedCategory === category.slug ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => handleCategoryChange(category)}
+                    onClick={() => handleCategoryChange(category.slug)}
                   >
-                    {category}
+                    {category.name}
                   </Button>
                 ))}
               </div>
