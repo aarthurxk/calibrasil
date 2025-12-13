@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CheckCircle, XCircle, Clock, Loader2, Package, ArrowRight, Truck } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Loader2, Package, ArrowRight, Truck, Mail } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ interface OrderData {
   total: number;
   created_at: string;
   payment_method: string;
+  masked_email?: string | null;
 }
 
 const OrderConfirmation = () => {
@@ -34,25 +35,26 @@ const OrderConfirmation = () => {
       }
 
       try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('id, status, payment_status, total, created_at, payment_method')
-          .eq('id', orderId)
-          .single();
+        // Use Edge Function to bypass RLS and fetch order securely
+        const { data, error } = await supabase.functions.invoke('get-order-confirmation', {
+          body: { order_id: orderId }
+        });
 
-        if (error || !data) {
+        if (error || !data?.order) {
+          console.error('Error fetching order:', error);
           setStatus('not_found');
           return;
         }
 
-        setOrder(data);
+        const orderData = data.order as OrderData;
+        setOrder(orderData);
 
-        if (data.payment_status === 'paid' || data.status === 'confirmed') {
+        if (orderData.payment_status === 'paid' || orderData.status === 'confirmed') {
           setStatus('success');
           clearCart();
-        } else if (data.payment_status === 'failed') {
+        } else if (orderData.payment_status === 'failed') {
           setStatus('failed');
-        } else if (data.payment_status === 'awaiting_payment' || data.status === 'awaiting_payment') {
+        } else if (orderData.payment_status === 'awaiting_payment' || orderData.status === 'awaiting_payment') {
           setStatus('pending');
           clearCart();
         } else {
@@ -133,6 +135,15 @@ const OrderConfirmation = () => {
                   Seu pedido foi recebido e está sendo preparado.
                 </p>
               </div>
+
+              {/* Email notification message */}
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-center gap-3">
+                <Mail className="h-5 w-5 text-primary flex-shrink-0" />
+                <p className="text-sm text-left">
+                  Enviamos um email com todos os detalhes do seu pedido
+                  {order.masked_email && <span className="font-medium"> para {order.masked_email}</span>}
+                </p>
+              </div>
               
               <div className="bg-card border border-border rounded-xl p-6 text-left space-y-4">
                 <div className="flex justify-between items-center">
@@ -200,6 +211,15 @@ const OrderConfirmation = () => {
                     : order.payment_method === 'pix'
                     ? 'Complete o pagamento via Pix para confirmar seu pedido.'
                     : 'Complete o pagamento para confirmar seu pedido.'}
+                </p>
+              </div>
+
+              {/* Email notification message */}
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex items-center gap-3">
+                <Mail className="h-5 w-5 text-yellow-600 flex-shrink-0" />
+                <p className="text-sm text-left">
+                  Após a confirmação do pagamento, você receberá um email com todos os detalhes
+                  {order.masked_email && <span className="font-medium"> em {order.masked_email}</span>}
                 </p>
               </div>
 
