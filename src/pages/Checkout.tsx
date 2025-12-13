@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, CreditCard, Lock, QrCode, Barcode, Loader2, MapPin, Ticket, X } from "lucide-react";
+import { ArrowLeft, CreditCard, Lock, QrCode, Loader2, MapPin, Ticket, X } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,7 +11,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Collapsible,
@@ -39,7 +38,7 @@ const checkoutSchema = z.object({
   state: z.string().trim().length(2, "Estado inválido"),
 });
 
-type PaymentMethod = "pix" | "boleto" | "card";
+type PaymentGateway = "stripe" | "pagseguro";
 
 const Checkout = () => {
   const { items, total } = useCart();
@@ -48,7 +47,8 @@ const Checkout = () => {
   const { settings } = useStoreSettings();
   const { addresses, isLoading: isLoadingAddresses, addAddress, canAddMore } = useUserAddresses();
   const { appliedCoupon, isValidating, validateCoupon, removeCoupon, discountAmount } = useCoupon(total);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isProcessingStripe, setIsProcessingStripe] = useState(false);
+  const [isProcessingPagseguro, setIsProcessingPagseguro] = useState(false);
   const [couponCode, setCouponCode] = useState("");
 
   // Address selection state
@@ -70,7 +70,8 @@ const Checkout = () => {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [isLoadingCep, setIsLoadingCep] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
+
+  const isProcessing = isProcessingStripe || isProcessingPagseguro;
 
   const shipping = total >= settings.free_shipping_threshold ? 0 : settings.standard_shipping_rate;
   const totalAfterDiscount = total - discountAmount;
@@ -197,85 +198,110 @@ const Checkout = () => {
     setPhone(formatado);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsProcessing(true);
+  const validateForm = () => {
+    const validationResult = checkoutSchema.safeParse({
+      email,
+      phone,
+      firstName,
+      lastName,
+      zip,
+      street,
+      houseNumber,
+      complement: complement || undefined,
+      neighborhood,
+      city,
+      state,
+    });
 
-    try {
-      // Validate form data with zod schema
-      const validationResult = checkoutSchema.safeParse({
-        email,
-        phone,
-        firstName,
-        lastName,
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      toast.error(firstError.message);
+      return false;
+    }
+    return true;
+  };
+
+  const saveAddressIfNeeded = async () => {
+    if (user && (useNewAddress || addresses.length === 0) && saveNewAddress && canAddMore && addressLabel) {
+      await addAddress({
+        label: addressLabel,
         zip,
         street,
-        houseNumber,
-        complement: complement || undefined,
+        house_number: houseNumber,
+        complement: complement || null,
         neighborhood,
         city,
         state,
+        is_default: addresses.length === 0,
       });
+    }
+  };
 
-      if (!validationResult.success) {
-        const firstError = validationResult.error.errors[0];
-        toast.error(firstError.message);
-        setIsProcessing(false);
-        return;
-      }
+  const getCheckoutPayload = () => ({
+    items: items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity,
+      image: item.image,
+      size: item.size,
+      color: item.color,
+      model: item.model,
+    })),
+    customerEmail: email,
+    customerName: `${firstName} ${lastName}`,
+    customerPhone: phone,
+    shippingAddress: {
+      street,
+      houseNumber,
+      complement: complement || null,
+      neighborhood,
+      city,
+      state,
+      zip,
+    },
+    shippingCost: shipping,
+    couponCode: appliedCoupon?.code || null,
+    user_id: user?.id || null,
+  });
 
-      // Save new address if requested (for new address or when user has no addresses)
-      if (user && (useNewAddress || addresses.length === 0) && saveNewAddress && canAddMore && addressLabel) {
-        await addAddress({
-          label: addressLabel,
-          zip,
-          street,
-          house_number: houseNumber,
-          complement: complement || null,
-          neighborhood,
-          city,
-          state,
-          is_default: addresses.length === 0,
-        });
-      }
+  const handleStripeCheckout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+    
+    setIsProcessingStripe(true);
+
+    try {
+      await saveAddressIfNeeded();
 
       const baseUrl = window.location.origin;
+      const payload = getCheckoutPayload();
 
       const checkoutData = {
-        items: items.map((item) => ({
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          image: item.image,
-          size: item.size,
-          color: item.color,
-          model: item.model,
-        })),
-        email,
-        phone,
+        items: payload.items,
+        email: payload.customerEmail,
+        phone: payload.customerPhone,
         shipping_address: {
           firstName,
           lastName,
-          street,
-          number: houseNumber,
-          complement: complement || null,
-          neighborhood,
-          city,
-          state,
-          zip,
+          street: payload.shippingAddress.street,
+          number: payload.shippingAddress.houseNumber,
+          complement: payload.shippingAddress.complement,
+          neighborhood: payload.shippingAddress.neighborhood,
+          city: payload.shippingAddress.city,
+          state: payload.shippingAddress.state,
+          zip: payload.shippingAddress.zip,
         },
-        user_id: user?.id || null,
+        user_id: payload.user_id,
         total: finalTotal,
         shipping,
-        payment_method: paymentMethod,
+        payment_method: "card",
         success_url: `${baseUrl}/order-confirmation`,
         cancel_url: `${baseUrl}/checkout`,
       };
 
-      console.log("Creating checkout session:", { itemCount: items.length, payment_method: paymentMethod });
+      console.log("Creating Stripe checkout session:", { itemCount: items.length });
 
-      // Use fetch directly to properly handle error responses with JSON bodies
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const session = await supabase.auth.getSession();
@@ -294,13 +320,10 @@ const Checkout = () => {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        console.error("Checkout error:", data);
-        throw new Error(data.error || "Erro ao criar sessão de pagamento");
+        console.error("Stripe checkout error:", data);
+        throw new Error(data.error || "Erro ao criar sessão de pagamento Stripe");
       }
 
-      console.log("Checkout session created:", data);
-
-      // Redirect to Stripe Checkout in same tab
       if (data.sessionUrl) {
         isRedirecting.current = true;
         window.location.href = data.sessionUrl;
@@ -309,25 +332,81 @@ const Checkout = () => {
         throw new Error("URL de pagamento não recebida");
       }
     } catch (error: any) {
-      console.error("Error creating checkout session:", error);
-      
-      // Check if it's a validation error with a specific message (like minimum amount)
+      console.error("Error creating Stripe checkout:", error);
       const errorMessage = error.message || '';
       
       if (errorMessage.includes('valor mínimo')) {
-        // Show the actual minimum value error message
         toast.error(errorMessage);
-      } else if (errorMessage.toLowerCase().includes('pix') && !errorMessage.includes('mínimo')) {
-        toast.error('Pagamento via Pix temporariamente indisponível.');
-      } else if (errorMessage.toLowerCase().includes('boleto') && !errorMessage.includes('mínimo')) {
-        toast.error('Pagamento via Boleto temporariamente indisponível.');
       } else if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch')) {
         toast.error('Erro de conexão. Verifique sua internet.');
       } else {
         toast.error(errorMessage || 'Erro ao processar pagamento. Tente novamente.');
       }
       
-      setIsProcessing(false);
+      setIsProcessingStripe(false);
+    }
+  };
+
+  const handlePagseguroCheckout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+    
+    setIsProcessingPagseguro(true);
+
+    try {
+      await saveAddressIfNeeded();
+
+      const baseUrl = window.location.origin;
+      const payload = getCheckoutPayload();
+
+      const checkoutData = {
+        ...payload,
+        success_url: `${baseUrl}/order-confirmation`,
+        cancel_url: `${baseUrl}/checkout`,
+      };
+
+      console.log("Creating PagSeguro checkout session:", { itemCount: items.length });
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const session = await supabase.auth.getSession();
+      const accessToken = session.data.session?.access_token;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/create-pagseguro-checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${accessToken || supabaseAnonKey}`,
+        },
+        body: JSON.stringify(checkoutData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        console.error("PagSeguro checkout error:", data);
+        throw new Error(data.error || "Erro ao criar sessão de pagamento PagSeguro");
+      }
+
+      if (data.url) {
+        isRedirecting.current = true;
+        window.location.href = data.url;
+        return;
+      } else {
+        throw new Error("URL de pagamento não recebida");
+      }
+    } catch (error: any) {
+      console.error("Error creating PagSeguro checkout:", error);
+      const errorMessage = error.message || '';
+      
+      if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch')) {
+        toast.error('Erro de conexão. Verifique sua internet.');
+      } else {
+        toast.error(errorMessage || 'Erro ao processar pagamento PagSeguro. Tente novamente.');
+      }
+      
+      setIsProcessingPagseguro(false);
     }
   };
 
@@ -360,7 +439,7 @@ const Checkout = () => {
           <div>
             <h1 className="text-3xl font-bold mb-8">Finalizar Compra</h1>
 
-            <form onSubmit={handleSubmit} className="space-y-8">
+            <form className="space-y-8">
               {/* Contact Info */}
               <div className="space-y-4">
                 <h2 className="text-xl font-semibold">Informações de Contato</h2>
@@ -581,78 +660,67 @@ const Checkout = () => {
                 )}
               </div>
 
-              {/* Payment Method */}
+              {/* Payment Gateway Selection */}
               <div className="space-y-4">
                 <h2 className="text-xl font-semibold flex items-center gap-2">
                   <CreditCard className="h-5 w-5" />
-                  Forma de Pagamento
+                  Escolha como pagar
                 </h2>
                 <p className="text-sm text-muted-foreground flex items-center gap-2">
                   <Lock className="h-4 w-4" />
-                  Pagamento 100% seguro via Stripe
+                  Pagamento 100% seguro
                 </p>
 
-                <RadioGroup
-                  value={paymentMethod}
-                  onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
-                  className="space-y-3"
-                >
-                  {/* Pix - Temporariamente desativado */}
-                  <div className="flex items-center space-x-3 border border-border rounded-lg p-4 opacity-60 cursor-not-allowed bg-muted/30">
-                    <RadioGroupItem value="pix" id="pix" disabled />
-                    <Label htmlFor="pix" className="flex items-center gap-3 cursor-not-allowed flex-1">
-                      <QrCode className="h-5 w-5 text-muted-foreground" />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-muted-foreground">Pix</p>
-                          <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-medium">
-                            Em Breve
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">Aprovação instantânea</p>
-                      </div>
-                    </Label>
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Stripe Button */}
+                  <Button
+                    type="button"
+                    size="lg"
+                    onClick={handleStripeCheckout}
+                    disabled={isProcessing}
+                    className="h-auto py-4 flex flex-col items-center gap-2 bg-[#635BFF] hover:bg-[#5046e5] text-white"
+                  >
+                    {isProcessingStripe ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span className="text-sm">Redirecionando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="h-6 w-6" />
+                        <span className="font-semibold">Pagar com Stripe</span>
+                        <span className="text-xs opacity-80">Cartão • Boleto</span>
+                      </>
+                    )}
+                  </Button>
 
-                  <div className="flex items-center space-x-3 border border-border rounded-lg p-4 cursor-pointer hover:border-primary/50 transition-colors">
-                    <RadioGroupItem value="boleto" id="boleto" />
-                    <Label htmlFor="boleto" className="flex items-center gap-3 cursor-pointer flex-1">
-                      <Barcode className="h-5 w-5 text-primary" />
-                      <div>
-                        <p className="font-medium">Boleto Bancário</p>
-                        <p className="text-sm text-muted-foreground">Aprovação em até 3 dias úteis</p>
-                      </div>
-                    </Label>
-                  </div>
+                  {/* PagSeguro Button */}
+                  <Button
+                    type="button"
+                    size="lg"
+                    onClick={handlePagseguroCheckout}
+                    disabled={isProcessing}
+                    className="h-auto py-4 flex flex-col items-center gap-2 bg-[#00A859] hover:bg-[#008c4a] text-white"
+                  >
+                    {isProcessingPagseguro ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span className="text-sm">Redirecionando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <QrCode className="h-6 w-6" />
+                        <span className="font-semibold">Pagar com PagSeguro</span>
+                        <span className="text-xs opacity-80">Cartão • Pix • Boleto</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
 
-                  <div className="flex items-center space-x-3 border border-border rounded-lg p-4 cursor-pointer hover:border-primary/50 transition-colors">
-                    <RadioGroupItem value="card" id="card" />
-                    <Label htmlFor="card" className="flex items-center gap-3 cursor-pointer flex-1">
-                      <CreditCard className="h-5 w-5 text-primary" />
-                      <div>
-                        <p className="font-medium">Cartão de Crédito</p>
-                        <p className="text-sm text-muted-foreground">Aprovação instantânea</p>
-                      </div>
-                    </Label>
-                  </div>
-                </RadioGroup>
+                <p className="text-xs text-center text-muted-foreground">
+                  Você será redirecionado para o gateway de pagamento escolhido
+                </p>
               </div>
-
-              <Button
-                type="submit"
-                size="lg"
-                className="w-full bg-gradient-ocean text-primary-foreground hover:opacity-90"
-                disabled={isProcessing}
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Redirecionando para pagamento...
-                  </>
-                ) : (
-                  `Pagar ${formatPrice(finalTotal)}`
-                )}
-              </Button>
             </form>
           </div>
 

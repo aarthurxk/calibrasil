@@ -213,6 +213,8 @@ export type Database = {
           discount_amount: number | null
           guest_email: string | null
           id: string
+          pagseguro_transaction_id: string | null
+          payment_gateway: string | null
           payment_method: string | null
           payment_status: string | null
           phone: string | null
@@ -231,6 +233,8 @@ export type Database = {
           discount_amount?: number | null
           guest_email?: string | null
           id?: string
+          pagseguro_transaction_id?: string | null
+          payment_gateway?: string | null
           payment_method?: string | null
           payment_status?: string | null
           phone?: string | null
@@ -249,6 +253,8 @@ export type Database = {
           discount_amount?: number | null
           guest_email?: string | null
           id?: string
+          pagseguro_transaction_id?: string | null
+          payment_gateway?: string | null
           payment_method?: string | null
           payment_status?: string | null
           phone?: string | null
