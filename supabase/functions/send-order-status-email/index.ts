@@ -28,7 +28,10 @@ const escapeHtml = (str: string): string => {
 };
 
 async function generateConfirmationToken(orderId: string): Promise<string> {
-  const secret = Deno.env.get('INTERNAL_API_SECRET') || 'default-secret';
+  const secret = Deno.env.get('INTERNAL_API_SECRET');
+  if (!secret) {
+    throw new Error('INTERNAL_API_SECRET not configured');
+  }
   const data = new TextEncoder().encode(orderId + secret);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
