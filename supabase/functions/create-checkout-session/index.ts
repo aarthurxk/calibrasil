@@ -66,6 +66,65 @@ interface CheckoutRequest {
   payment_method: "pix" | "boleto" | "card";
   success_url: string;
   cancel_url: string;
+  coupon_code?: string;
+}
+
+interface ValidatedCoupon {
+  code: string;
+  discount_percent: number;
+}
+
+// Validate coupon code against database
+async function validateCoupon(
+  supabase: any,
+  couponCode: string,
+  orderTotal: number
+): Promise<ValidatedCoupon | null> {
+  console.log(`[COUPON] Validating coupon: ${couponCode} for total: ${orderTotal}`);
+
+  const { data: coupon, error } = await supabase
+    .from("coupons")
+    .select("*")
+    .eq("code", couponCode.toUpperCase())
+    .eq("is_active", true)
+    .single();
+
+  if (error || !coupon) {
+    console.log("[COUPON] Coupon not found or inactive");
+    return null;
+  }
+
+  const now = new Date();
+
+  // Check valid_from
+  if (coupon.valid_from && new Date(coupon.valid_from) > now) {
+    console.log("[COUPON] Coupon not yet valid");
+    return null;
+  }
+
+  // Check valid_until
+  if (coupon.valid_until && new Date(coupon.valid_until) < now) {
+    console.log("[COUPON] Coupon expired");
+    return null;
+  }
+
+  // Check max_uses
+  if (coupon.max_uses !== null && coupon.used_count >= coupon.max_uses) {
+    console.log("[COUPON] Coupon usage limit reached");
+    return null;
+  }
+
+  // Check min_purchase
+  if (coupon.min_purchase && orderTotal < coupon.min_purchase) {
+    console.log(`[COUPON] Order total ${orderTotal} below minimum ${coupon.min_purchase}`);
+    return null;
+  }
+
+  console.log(`[COUPON] Valid coupon: ${coupon.code} with ${coupon.discount_percent}% discount`);
+  return {
+    code: coupon.code,
+    discount_percent: coupon.discount_percent,
+  };
 }
 
 serve(async (req) => {
@@ -241,8 +300,39 @@ serve(async (req) => {
       });
     }
 
-    // Calculate real total (items + shipping) for order record
-    const realTotal = realItemsTotal + realShipping;
+    // Calculate subtotal (items + shipping) before discount
+    const subtotalBeforeDiscount = realItemsTotal + realShipping;
+
+    // SECURITY: Validate coupon server-side
+    let validatedCoupon: ValidatedCoupon | null = null;
+    let discountAmount = 0;
+
+    if (body.coupon_code) {
+      validatedCoupon = await validateCoupon(supabase, body.coupon_code, realItemsTotal);
+      
+      if (validatedCoupon) {
+        discountAmount = (realItemsTotal * validatedCoupon.discount_percent) / 100;
+        discountAmount = Math.round(discountAmount * 100) / 100; // Round to 2 decimal places
+        console.log(`[COUPON] Applied discount: R$ ${discountAmount.toFixed(2)}`);
+
+        // Add discount as a negative line item
+        lineItems.push({
+          price_data: {
+            currency: "brl",
+            product_data: {
+              name: `Desconto (${validatedCoupon.code})`,
+            },
+            unit_amount: -Math.round(discountAmount * 100), // Negative amount for discount
+          },
+          quantity: 1,
+        });
+      } else {
+        console.log(`[COUPON] Invalid coupon code: ${body.coupon_code}`);
+      }
+    }
+
+    // Calculate real total (items + shipping - discount) for order record
+    const realTotal = subtotalBeforeDiscount - discountAmount;
 
     // Create pending order in database first (using server-calculated values)
     const { data: order, error: orderError } = await supabase
@@ -251,11 +341,13 @@ serve(async (req) => {
         user_id: body.user_id || null,
         guest_email: body.user_id ? null : body.email,
         phone: body.phone || null,
-        total: realTotal, // Use server-calculated total
+        total: realTotal, // Use server-calculated total with discount
         shipping_address: body.shipping_address,
         payment_method: body.payment_method,
         payment_status: "pending",
         status: "pending",
+        coupon_code: validatedCoupon?.code || null,
+        discount_amount: discountAmount > 0 ? discountAmount : null,
       })
       .select()
       .single();
@@ -265,7 +357,7 @@ serve(async (req) => {
       throw new Error("Failed to create order");
     }
 
-    console.log("Order created:", order.id);
+    console.log("Order created:", order.id, validatedCoupon ? `with coupon ${validatedCoupon.code}` : "");
 
     // Insert order items with server-validated prices
     const orderItems = body.items.map((item) => {
@@ -336,6 +428,8 @@ serve(async (req) => {
       customer_email: body.email,
       metadata: {
         order_id: order.id,
+        coupon_code: validatedCoupon?.code || "",
+        discount_amount: discountAmount.toString(),
       },
       locale: "pt-BR",
     };
