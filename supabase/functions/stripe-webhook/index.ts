@@ -64,6 +64,42 @@ serve(async (req) => {
 
     console.log("Received webhook event:", event.type);
 
+    // Helper function to increment coupon usage
+    const incrementCouponUsage = async (couponCode: string) => {
+      if (!couponCode) return;
+
+      console.log(`[COUPON] Incrementing usage for coupon: ${couponCode}`);
+      
+      try {
+        // Fetch current count and increment
+        const { data: coupon, error: fetchError } = await supabase
+          .from("coupons")
+          .select("used_count")
+          .eq("code", couponCode)
+          .single();
+
+        if (fetchError) {
+          console.error("[COUPON] Error fetching coupon:", fetchError);
+          return;
+        }
+
+        if (coupon) {
+          const { error: updateError } = await supabase
+            .from("coupons")
+            .update({ used_count: (coupon.used_count || 0) + 1 })
+            .eq("code", couponCode);
+
+          if (updateError) {
+            console.error("[COUPON] Error updating coupon usage:", updateError);
+          } else {
+            console.log(`[COUPON] Successfully incremented usage for: ${couponCode}`);
+          }
+        }
+      } catch (err) {
+        console.error("[COUPON] Error incrementing usage:", err);
+      }
+    };
+
     // Helper function to send order emails
     const sendOrderEmails = async (orderId: string) => {
       // Fetch order details for email
@@ -125,6 +161,8 @@ serve(async (req) => {
         paymentMethod: orderData.payment_method || "card",
         deliveryMinDays: storeSettings?.delivery_min_days || 5,
         deliveryMaxDays: storeSettings?.delivery_max_days || 10,
+        couponCode: orderData.coupon_code || null,
+        discountAmount: orderData.discount_amount || 0,
       };
 
       console.log("Sending order emails for order:", orderId);
@@ -156,9 +194,15 @@ serve(async (req) => {
         const session = event.data.object as Stripe.Checkout.Session;
         const orderId = session.metadata?.order_id;
         const paymentStatus = session.payment_status;
+        const couponCode = session.metadata?.coupon_code || null;
+        const discountAmount = parseFloat(session.metadata?.discount_amount || "0");
 
         if (orderId) {
           console.log("Checkout completed for order:", orderId, "Payment status:", paymentStatus);
+          
+          if (couponCode) {
+            console.log(`[COUPON] Order ${orderId} used coupon: ${couponCode} with discount: R$ ${discountAmount.toFixed(2)}`);
+          }
 
           // For async payment methods (boleto, pix), payment_status will be "unpaid"
           // For card payments, payment_status will be "paid"
@@ -172,6 +216,8 @@ serve(async (req) => {
                 payment_status: "paid",
                 status: "confirmed",
                 updated_at: new Date().toISOString(),
+                coupon_code: couponCode || null,
+                discount_amount: discountAmount > 0 ? discountAmount : null,
               })
               .eq("id", orderId);
 
@@ -179,6 +225,12 @@ serve(async (req) => {
               console.error("Error updating order:", error);
             } else {
               console.log("Order updated to paid/confirmed:", orderId);
+              
+              // Increment coupon usage on successful payment
+              if (couponCode) {
+                await incrementCouponUsage(couponCode);
+              }
+              
               await sendOrderEmails(orderId);
             }
           } else {
@@ -191,6 +243,8 @@ serve(async (req) => {
                 payment_status: "awaiting_payment",
                 status: "awaiting_payment",
                 updated_at: new Date().toISOString(),
+                coupon_code: couponCode || null,
+                discount_amount: discountAmount > 0 ? discountAmount : null,
               })
               .eq("id", orderId);
 
@@ -208,6 +262,7 @@ serve(async (req) => {
         // This event fires when boleto/pix is actually paid
         const session = event.data.object as Stripe.Checkout.Session;
         const orderId = session.metadata?.order_id;
+        const couponCode = session.metadata?.coupon_code || null;
 
         if (orderId) {
           console.log("Async payment succeeded for order:", orderId);
@@ -225,6 +280,12 @@ serve(async (req) => {
             console.error("Error updating order after async payment:", error);
           } else {
             console.log("Order updated to paid/confirmed after async payment:", orderId);
+            
+            // Increment coupon usage on successful async payment
+            if (couponCode) {
+              await incrementCouponUsage(couponCode);
+            }
+            
             await sendOrderEmails(orderId);
           }
         }
