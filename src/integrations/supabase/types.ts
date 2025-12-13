@@ -128,6 +128,42 @@ export type Database = {
         }
         Relationships: []
       }
+      email_templates: {
+        Row: {
+          created_at: string | null
+          html_content: string
+          id: string
+          is_active: boolean | null
+          name: string
+          subject: string
+          template_key: string
+          updated_at: string | null
+          variables: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          html_content: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          subject: string
+          template_key: string
+          updated_at?: string | null
+          variables?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          html_content?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          subject?: string
+          template_key?: string
+          updated_at?: string | null
+          variables?: Json | null
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           id: string
@@ -181,6 +217,7 @@ export type Database = {
           payment_status: string | null
           phone: string | null
           received_at: string | null
+          review_email_sent: boolean | null
           shipping_address: Json | null
           status: string
           total: number
@@ -198,6 +235,7 @@ export type Database = {
           payment_status?: string | null
           phone?: string | null
           received_at?: string | null
+          review_email_sent?: boolean | null
           shipping_address?: Json | null
           status?: string
           total: number
@@ -215,6 +253,7 @@ export type Database = {
           payment_status?: string | null
           phone?: string | null
           received_at?: string | null
+          review_email_sent?: boolean | null
           shipping_address?: Json | null
           status?: string
           total?: number
