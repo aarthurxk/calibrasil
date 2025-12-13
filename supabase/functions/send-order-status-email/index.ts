@@ -27,6 +27,14 @@ const escapeHtml = (str: string): string => {
     .replace(/'/g, '&#039;');
 };
 
+async function generateConfirmationToken(orderId: string): Promise<string> {
+  const secret = Deno.env.get('INTERNAL_API_SECRET') || 'default-secret';
+  const data = new TextEncoder().encode(orderId + secret);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 const getStatusInfo = (status: string): { label: string; emoji: string; color: string; message: string } => {
   const statusMap: Record<string, { label: string; emoji: string; color: string; message: string }> = {
     processing: {
@@ -69,8 +77,17 @@ const getStatusInfo = (status: string): { label: string; emoji: string; color: s
   };
 };
 
-const generateStatusEmail = (data: OrderStatusEmailRequest): string => {
+const generateStatusEmail = async (data: OrderStatusEmailRequest): Promise<string> => {
   const statusInfo = getStatusInfo(data.newStatus);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const storeUrl = 'https://calibrasil.com';
+  
+  // Generate confirmation token for shipped orders
+  const confirmationToken = await generateConfirmationToken(data.orderId);
+  const confirmationUrl = `${supabaseUrl}/functions/v1/confirm-order-received?orderId=${data.orderId}&token=${confirmationToken}`;
+  
+  // Get first product ID for review link (simplified - links to orders page)
+  const reviewUrl = `${storeUrl}/orders`;
   
   return `
     <!DOCTYPE html>
@@ -101,15 +118,29 @@ const generateStatusEmail = (data: OrderStatusEmailRequest): string => {
         ${data.trackingCode ? `
           <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
             <p style="margin: 0;"><strong>🚚 Código de Rastreamento:</strong></p>
-            <p style="margin: 5px 0 0 0; font-family: monospace; background: #e5e7eb; padding: 8px; border-radius: 4px;">${data.trackingCode}</p>
+            <p style="margin: 5px 0 0 0; font-family: monospace; background: #e5e7eb; padding: 8px; border-radius: 4px; font-size: 16px; letter-spacing: 1px;">${escapeHtml(data.trackingCode)}</p>
           </div>
         ` : ''}
       </div>
 
       ${data.newStatus === 'shipped' ? `
         <div style="text-align: center; margin: 30px 0;">
-          <a href="https://www.linkcorreios.com.br/" style="background: #8b5cf6; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+          <a href="https://www.linkcorreios.com.br/" style="background: #8b5cf6; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; margin-bottom: 10px;">
             Rastrear Pedido 📍
+          </a>
+          <br><br>
+          <p style="color: #666; margin-bottom: 15px;">Já recebeu seu pedido? Confirme para nós:</p>
+          <a href="${confirmationUrl}" style="background: #16a34a; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+            ✅ Recebi meu Pedido
+          </a>
+        </div>
+      ` : ''}
+
+      ${data.newStatus === 'delivered' ? `
+        <div style="text-align: center; margin: 30px 0;">
+          <p style="color: #666; margin-bottom: 15px;">Conte pra gente o que achou dos produtos!</p>
+          <a href="${reviewUrl}" style="background: #f59e0b; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+            ⭐ Avaliar minha Compra
           </a>
         </div>
       ` : ''}
@@ -176,12 +207,13 @@ serve(async (req) => {
     console.log(`[ORDER-STATUS] Status change: ${data.oldStatus} -> ${data.newStatus}`);
 
     const statusInfo = getStatusInfo(data.newStatus);
+    const emailHtml = await generateStatusEmail(data);
 
     const emailResult = await resend.emails.send({
       from: "Cali Brasil <pedidos@calibrasil.com>",
       to: [data.customerEmail],
       subject: `${statusInfo.emoji} Seu pedido foi ${statusInfo.label.toLowerCase()}! #${data.orderId.substring(0, 8).toUpperCase()}`,
-      html: generateStatusEmail(data),
+      html: emailHtml,
     });
 
     console.log("[ORDER-STATUS] Email sent successfully");

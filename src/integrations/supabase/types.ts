@@ -180,9 +180,11 @@ export type Database = {
           payment_method: string | null
           payment_status: string | null
           phone: string | null
+          received_at: string | null
           shipping_address: Json | null
           status: string
           total: number
+          tracking_code: string | null
           updated_at: string
           user_id: string | null
         }
@@ -195,9 +197,11 @@ export type Database = {
           payment_method?: string | null
           payment_status?: string | null
           phone?: string | null
+          received_at?: string | null
           shipping_address?: Json | null
           status?: string
           total: number
+          tracking_code?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -210,9 +214,11 @@ export type Database = {
           payment_method?: string | null
           payment_status?: string | null
           phone?: string | null
+          received_at?: string | null
           shipping_address?: Json | null
           status?: string
           total?: number
+          tracking_code?: string | null
           updated_at?: string
           user_id?: string | null
         }
