@@ -57,18 +57,18 @@ const Hero = () => {
           </div>
 
           {/* Stats */}
-          <div className="flex gap-8 pt-8 border-t border-sidebar-border/30">
+          <div className="flex flex-wrap gap-4 sm:gap-8 pt-8 border-t border-sidebar-border/30">
             <div>
-              <p className="text-3xl font-bold text-cali-wave">5mil+</p>
-              <p className="text-sm text-sidebar-foreground/60">Clientes Felizes</p>
+              <p className="text-2xl sm:text-3xl font-bold text-cali-wave">5mil+</p>
+              <p className="text-xs sm:text-sm text-sidebar-foreground/60">Clientes Felizes</p>
             </div>
             <div>
-              <p className="text-3xl font-bold text-cali-wave">100%</p>
-              <p className="text-sm text-sidebar-foreground/60">Sustentável</p>
+              <p className="text-2xl sm:text-3xl font-bold text-cali-wave">100%</p>
+              <p className="text-xs sm:text-sm text-sidebar-foreground/60">Sustentável</p>
             </div>
             <div>
-              <p className="text-3xl font-bold text-cali-wave">Produção consciente</p>
-              <p className="text-sm text-sidebar-foreground/60">Materiais premium com impacto positivo</p>
+              <p className="text-2xl sm:text-3xl font-bold text-cali-wave">Eco</p>
+              <p className="text-xs sm:text-sm text-sidebar-foreground/60">Produção consciente</p>
             </div>
           </div>
         </div>
