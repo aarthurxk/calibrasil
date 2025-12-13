@@ -271,23 +271,27 @@ const Checkout = () => {
 
       console.log("Creating checkout session:", { itemCount: items.length, payment_method: paymentMethod });
 
-      const response = await supabase.functions.invoke("create-checkout-session", {
-        body: checkoutData,
+      // Use fetch directly to properly handle error responses with JSON bodies
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const session = await supabase.auth.getSession();
+      const accessToken = session.data.session?.access_token;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${accessToken || supabaseAnonKey}`,
+        },
+        body: JSON.stringify(checkoutData),
       });
 
-      const { data, error } = response;
+      const data = await response.json();
 
-      // Handle edge function errors
-      // When edge function returns 400, error is set but data also contains the error message
-      if (error || !data?.success) {
-        console.error("Edge function error:", { error, data });
-        
-        // Priority: data.error > error.message > generic
-        const errorMessage = data?.error || 
-          (error?.message && error.message !== 'FunctionsHttpError' ? error.message : null) ||
-          "Erro ao criar sessão de pagamento";
-        
-        throw new Error(errorMessage);
+      if (!response.ok || !data.success) {
+        console.error("Checkout error:", data);
+        throw new Error(data.error || "Erro ao criar sessão de pagamento");
       }
 
       console.log("Checkout session created:", data);
