@@ -50,9 +50,11 @@ const getStatusBadge = (status: string) => {
   const styles: Record<string, string> = {
     delivered: 'bg-green-100 text-green-800',
     completed: 'bg-green-100 text-green-800',
+    confirmed: 'bg-green-100 text-green-800',
     processing: 'bg-blue-100 text-blue-800',
     shipped: 'bg-purple-100 text-purple-800',
     pending: 'bg-yellow-100 text-yellow-800',
+    awaiting_payment: 'bg-orange-100 text-orange-800',
     cancelled: 'bg-red-100 text-red-800',
   };
   return styles[status] || 'bg-muted text-muted-foreground';
@@ -62,12 +64,40 @@ const getStatusLabel = (status: string) => {
   const labels: Record<string, string> = {
     delivered: 'Entregue',
     completed: 'Concluído',
+    confirmed: 'Confirmado',
     processing: 'Processando',
     shipped: 'Enviado',
     pending: 'Pendente',
+    awaiting_payment: 'Aguardando Pagamento',
     cancelled: 'Cancelado',
   };
   return labels[status] || status;
+};
+
+const getPaymentStatusBadge = (paymentStatus: string | null) => {
+  const styles: Record<string, string> = {
+    paid: 'bg-green-100 text-green-800',
+    approved: 'bg-green-100 text-green-800',
+    awaiting_payment: 'bg-orange-100 text-orange-800',
+    pending: 'bg-yellow-100 text-yellow-800',
+    failed: 'bg-red-100 text-red-800',
+    expired: 'bg-gray-100 text-gray-800',
+    refunded: 'bg-purple-100 text-purple-800',
+  };
+  return styles[paymentStatus || 'pending'] || 'bg-muted text-muted-foreground';
+};
+
+const getPaymentStatusLabel = (paymentStatus: string | null) => {
+  const labels: Record<string, string> = {
+    paid: 'Pago',
+    approved: 'Aprovado',
+    awaiting_payment: 'Aguardando Pagamento',
+    pending: 'Pendente',
+    failed: 'Falhou',
+    expired: 'Expirado',
+    refunded: 'Reembolsado',
+  };
+  return labels[paymentStatus || 'pending'] || paymentStatus || 'Pendente';
 };
 
 const formatPrice = (price: number) => {
@@ -231,6 +261,7 @@ const Orders = () => {
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">ID</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Itens</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Total</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Pagamento</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Data</th>
                   {canEditOrders && (
@@ -245,6 +276,11 @@ const Orders = () => {
                       <td className="py-3 px-4 font-medium">#{order.id.slice(0, 8)}</td>
                       <td className="py-3 px-4">{order.order_items?.length || 0} itens</td>
                       <td className="py-3 px-4 font-medium">{formatPrice(Number(order.total))}</td>
+                      <td className="py-3 px-4">
+                        <Badge className={getPaymentStatusBadge(order.payment_status)}>
+                          {getPaymentStatusLabel(order.payment_status)}
+                        </Badge>
+                      </td>
                       <td className="py-3 px-4">
                         {canEditOrders ? (
                           <Select
@@ -305,7 +341,7 @@ const Orders = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={canEditOrders ? 6 : 5} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={canEditOrders ? 7 : 6} className="py-8 text-center text-muted-foreground">
                       {searchTerm ? 'Nenhum pedido encontrado' : 'Nenhum pedido ainda'}
                     </td>
                   </tr>
