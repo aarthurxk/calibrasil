@@ -76,6 +76,10 @@
 ### Avaliações
 - [ ] **Botão de Avaliação no Email de Entrega** - Corrigir email de status "Entregue" para incluir link direto para avaliar o produto comprado
 
+### Contas e Pedidos
+- [ ] **Vinculação de Pedidos Guest a Conta Nova** - Quando cliente criar conta com email usado em compras como visitante, vincular automaticamente todos os pedidos anteriores à nova conta
+  - Trigger no signup que verifica `orders.guest_email` e atualiza `orders.user_id`
+
 ### UX/UI (Loja)
 - [ ] **Filtros Avançados por Preço** - Filtrar produtos por faixa de preço (menor/maior valor)
   - Testar ordenação com produtos de preços variados
