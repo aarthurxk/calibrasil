@@ -78,7 +78,7 @@ serve(async (req) => {
     };
 
     // SECURITY: Validate redirect URLs against allowed domains
-    const ALLOWED_DOMAINS = ['calibrasil.com', 'lovable.app', 'localhost'];
+    const ALLOWED_DOMAINS = ['calibrasil.com', 'lovable.app', 'lovableproject.com', 'localhost'];
     const validateRedirectUrl = (url: string): boolean => {
       try {
         const parsed = new URL(url);
