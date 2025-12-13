@@ -6,6 +6,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Loader2,
+  Percent,
+  ShoppingBag,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -22,6 +24,8 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 const formatPrice = (price: number) => {
   return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -65,14 +69,32 @@ const Dashboard = () => {
     },
   });
 
-  const isLoading = ordersLoading || customersLoading || productsLoading;
+  // Fetch abandoned carts for conversion metrics
+  const { data: abandonedCarts = [], isLoading: cartsLoading } = useQuery({
+    queryKey: ['admin-abandoned-carts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('abandoned_carts')
+        .select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const isLoading = ordersLoading || customersLoading || productsLoading || cartsLoading;
 
   // Calculate stats - only paid orders for revenue
   const paidOrders = orders.filter(order => order.payment_status === 'paid');
   const totalRevenue = paidOrders.reduce((sum, order) => sum + Number(order.total), 0);
   const totalOrders = paidOrders.length;
-  const pendingOrders = orders.filter(o => o.status === 'pending').length;
+  const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'awaiting_payment').length;
   const completedOrders = orders.filter(o => o.status === 'delivered' || o.status === 'completed').length;
+
+  // Calculate conversion rate and average ticket
+  const avgTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  const totalCarts = abandonedCarts.length + totalOrders;
+  const conversionRate = totalCarts > 0 ? (totalOrders / totalCarts) * 100 : 0;
+  const abandonmentRate = totalCarts > 0 ? (abandonedCarts.filter(c => !c.recovered).length / totalCarts) * 100 : 0;
 
   // Group orders by month for chart - only paid orders
   const monthlyData = paidOrders.reduce((acc, order) => {
@@ -81,11 +103,12 @@ const Dashboard = () => {
     const existing = acc.find(item => item.name === month);
     if (existing) {
       existing.sales += Number(order.total);
+      existing.orders += 1;
     } else {
-      acc.push({ name: month, sales: Number(order.total) });
+      acc.push({ name: month, sales: Number(order.total), orders: 1 });
     }
     return acc;
-  }, [] as { name: string; sales: number }[]).slice(-7);
+  }, [] as { name: string; sales: number; orders: number }[]).slice(-7);
 
   // Group by category
   const categoryData = products.reduce((acc, product) => {
@@ -105,30 +128,30 @@ const Dashboard = () => {
     {
       title: 'Receita Total',
       value: formatPrice(totalRevenue),
-      change: '+12.5%',
+      change: `${completedOrders} entregues`,
       trend: 'up' as const,
       icon: DollarSign,
     },
     {
-      title: 'Pedidos',
-      value: totalOrders.toString(),
-      change: '+8.2%',
+      title: 'Ticket Médio',
+      value: formatPrice(avgTicket),
+      change: `${totalOrders} pedidos`,
       trend: 'up' as const,
-      icon: ShoppingCart,
+      icon: ShoppingBag,
+    },
+    {
+      title: 'Taxa de Conversão',
+      value: `${conversionRate.toFixed(1)}%`,
+      change: `${abandonmentRate.toFixed(1)}% abandono`,
+      trend: conversionRate > 5 ? 'up' as const : 'down' as const,
+      icon: Percent,
     },
     {
       title: 'Clientes',
       value: customersCount.toString(),
-      change: '+15.3%',
-      trend: 'up' as const,
+      change: `${pendingOrders} pedidos pendentes`,
+      trend: pendingOrders > 5 ? 'down' as const : 'up' as const,
       icon: Users,
-    },
-    {
-      title: 'Pedidos Pendentes',
-      value: pendingOrders.toString(),
-      change: pendingOrders > 0 ? 'Atenção' : 'OK',
-      trend: pendingOrders > 0 ? 'down' as const : 'up' as const,
-      icon: TrendingUp,
     },
   ];
 
@@ -279,8 +302,11 @@ const Dashboard = () => {
 
       {/* Recent Orders */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Pedidos Recentes</CardTitle>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/admin/orders">Ver todos</Link>
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
