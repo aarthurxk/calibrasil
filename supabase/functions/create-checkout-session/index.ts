@@ -7,6 +7,38 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Rate limiting configuration
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_MAX = 10; // Max 10 checkout sessions per window
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
+
+function checkRateLimit(clientIP: string): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(clientIP);
+  
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(clientIP, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  
+  if (record.count >= RATE_LIMIT_MAX) {
+    return false;
+  }
+  
+  record.count++;
+  return true;
+}
+
+// Cleanup old rate limit entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, record] of rateLimitMap.entries()) {
+    if (now > record.resetTime) {
+      rateLimitMap.delete(ip);
+    }
+  }
+}, 60000);
+
 interface CartItem {
   id: string;
   name: string;
@@ -43,6 +75,24 @@ serve(async (req) => {
   }
 
   try {
+    // Rate limiting check
+    const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                     req.headers.get('cf-connecting-ip') || 
+                     'unknown';
+    
+    if (!checkRateLimit(clientIP)) {
+      console.log(`[CHECKOUT-SESSION] Rate limit exceeded for IP: ${clientIP}`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Muitas tentativas. Por favor, aguarde um minuto antes de tentar novamente.' 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 429 
+        }
+      );
+    }
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) {
       throw new Error("Stripe secret key not configured");
