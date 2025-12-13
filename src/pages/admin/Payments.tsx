@@ -92,6 +92,7 @@ const Payments = () => {
                 <tr className="border-b border-border">
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">ID</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Valor</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Gateway</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Método</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Data</th>
@@ -103,6 +104,17 @@ const Payments = () => {
                     <tr key={order.id} className="border-b border-border last:border-0">
                       <td className="py-3 px-4 font-medium">#{order.id.slice(0, 8)}</td>
                       <td className="py-3 px-4 font-medium">{formatPrice(Number(order.total))}</td>
+                      <td className="py-3 px-4">
+                        <Badge className={
+                          order.payment_gateway === 'stripe' 
+                            ? 'bg-purple-100 text-purple-800' 
+                            : order.payment_gateway === 'pagseguro'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-muted text-muted-foreground'
+                        }>
+                          {order.payment_gateway === 'stripe' ? 'Stripe' : order.payment_gateway === 'pagseguro' ? 'PagSeguro' : 'N/A'}
+                        </Badge>
+                      </td>
                       <td className="py-3 px-4">{order.payment_method || 'N/A'}</td>
                       <td className="py-3 px-4">
                         <Badge className={
@@ -120,7 +132,7 @@ const Payments = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={6} className="py-8 text-center text-muted-foreground">
                       Nenhuma transação ainda
                     </td>
                   </tr>

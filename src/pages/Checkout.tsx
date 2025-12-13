@@ -689,7 +689,7 @@ const Checkout = () => {
                       <>
                         <CreditCard className="h-6 w-6" />
                         <span className="font-semibold">Pagar com Stripe</span>
-                        <span className="text-xs opacity-80">Cartão • Boleto</span>
+                        <span className="text-xs opacity-80">Cartão</span>
                       </>
                     )}
                   </Button>
@@ -711,7 +711,7 @@ const Checkout = () => {
                       <>
                         <QrCode className="h-6 w-6" />
                         <span className="font-semibold">Pagar com PagSeguro</span>
-                        <span className="text-xs opacity-80">Cartão • Pix • Boleto</span>
+                        <span className="text-xs opacity-80">Cartão • Pix</span>
                       </>
                     )}
                   </Button>
