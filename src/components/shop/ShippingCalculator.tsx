@@ -22,11 +22,20 @@ interface ShippingCalculatorProps {
   initialCep?: string; // Pre-fill CEP if available
 }
 
-const ShippingCalculator = ({ onSelectOption, selectedOption, compact = false, peso = 300, initialCep = '' }: ShippingCalculatorProps) => {
+const ShippingCalculator = ({ onSelectOption, selectedOption: externalSelectedOption, compact = false, peso = 300, initialCep = '' }: ShippingCalculatorProps) => {
   const [cep, setCep] = useState(initialCep);
   const [isLoading, setIsLoading] = useState(false);
   const [options, setOptions] = useState<ShippingOption[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [internalSelectedOption, setInternalSelectedOption] = useState<ShippingOption | null>(null);
+  
+  // Use external state if provided, otherwise use internal state
+  const selectedOption = externalSelectedOption !== undefined ? externalSelectedOption : internalSelectedOption;
+  
+  const handleSelectOption = (option: ShippingOption) => {
+    setInternalSelectedOption(option);
+    onSelectOption?.(option);
+  };
 
   const formatCep = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 8);
@@ -65,9 +74,9 @@ const ShippingCalculator = ({ onSelectOption, selectedOption, compact = false, p
 
       setOptions(data.options);
       
-      // Auto-select first option if callback provided
-      if (onSelectOption && data.options.length > 0) {
-        onSelectOption(data.options[0]);
+      // Auto-select first option
+      if (data.options.length > 0) {
+        handleSelectOption(data.options[0]);
       }
 
     } catch (err: unknown) {
@@ -122,17 +131,17 @@ const ShippingCalculator = ({ onSelectOption, selectedOption, compact = false, p
 
       {options.length > 0 && (
         <RadioGroup
-          value={selectedOption?.service || options[0].service}
+          value={selectedOption?.service || options[0]?.service}
           onValueChange={(value) => {
             const option = options.find(o => o.service === value);
-            if (option && onSelectOption) onSelectOption(option);
+            if (option) handleSelectOption(option);
           }}
           className="space-y-2"
         >
           {options.map((option) => (
             <div
               key={option.service}
-              onClick={() => onSelectOption?.(option)}
+              onClick={() => handleSelectOption(option)}
               className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
                 selectedOption?.service === option.service 
                   ? 'border-primary bg-primary/5' 
