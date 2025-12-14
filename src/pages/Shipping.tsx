@@ -2,57 +2,46 @@ import MainLayout from "@/components/layout/MainLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { 
-  Truck, 
-  Clock, 
-  MapPin, 
-  Package, 
-  CheckCircle, 
-  AlertCircle,
-  ArrowRight,
-  MessageCircle
-} from "lucide-react";
+import { Truck, Clock, MapPin, Package, CheckCircle, AlertCircle, ArrowRight, MessageCircle } from "lucide-react";
 import { useStoreSettings } from "@/hooks/useStoreSettings";
-
 const Shipping = () => {
-  const { settings } = useStoreSettings();
-
+  const {
+    settings
+  } = useStoreSettings();
   const deliveryMinDays = settings?.delivery_min_days || 5;
   const deliveryMaxDays = settings?.delivery_max_days || 10;
   const freeShippingThreshold = settings?.free_shipping_threshold || 250;
-
-  const regions = [
-    { name: "Sul e Sudeste", days: "5 a 8 dias úteis" },
-    { name: "Centro-Oeste", days: "6 a 10 dias úteis" },
-    { name: "Nordeste", days: "5 a 8 dias úteis" },
-    { name: "Norte", days: "8 a 12 dias úteis" },
-  ];
-
-  const trackingSteps = [
-    {
-      icon: Package,
-      title: "Pedido Confirmado",
-      description: "Recebemos seu pagamento e separamos seu pedido.",
-    },
-    {
-      icon: Truck,
-      title: "Em Trânsito",
-      description: "Seu pedido foi postado e está a caminho.",
-    },
-    {
-      icon: MapPin,
-      title: "Saiu para Entrega",
-      description: "Seu pedido está com o entregador na sua região.",
-    },
-    {
-      icon: CheckCircle,
-      title: "Entregue",
-      description: "Pedido entregue! Hora de curtir sua nova capa.",
-    },
-  ];
-
-  return (
-    <MainLayout>
+  const regions = [{
+    name: "Sul e Sudeste",
+    days: "5 a 8 dias úteis"
+  }, {
+    name: "Centro-Oeste",
+    days: "6 a 10 dias úteis"
+  }, {
+    name: "Nordeste",
+    days: "5 a 8 dias úteis"
+  }, {
+    name: "Norte",
+    days: "8 a 12 dias úteis"
+  }];
+  const trackingSteps = [{
+    icon: Package,
+    title: "Pedido Confirmado",
+    description: "Recebemos seu pagamento e separamos seu pedido."
+  }, {
+    icon: Truck,
+    title: "Em Trânsito",
+    description: "Seu pedido foi postado e está a caminho."
+  }, {
+    icon: MapPin,
+    title: "Saiu para Entrega",
+    description: "Seu pedido está com o entregador na sua região."
+  }, {
+    icon: CheckCircle,
+    title: "Entregue",
+    description: "Pedido entregue! Hora de curtir sua nova capa."
+  }];
+  return <MainLayout>
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-primary/10 via-accent/5 to-background py-20 md:py-28">
         <div className="container mx-auto px-4 text-center">
@@ -95,7 +84,7 @@ const Shipping = () => {
                 </li>
                 <li className="flex items-start gap-3">
                   <CheckCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                  <span className="text-muted-foreground">Pedidos feitos antes das 14h são postados no mesmo dia</span>
+                  <span className="text-muted-foreground">Pedidos feitos antes das 14h são postados até o próximo dia útil</span>
                 </li>
               </ul>
             </div>
@@ -153,8 +142,7 @@ const Shipping = () => {
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {regions.map((region, index) => (
-              <Card key={index} className="border-border/50 hover:border-primary/30 transition-colors">
+            {regions.map((region, index) => <Card key={index} className="border-border/50 hover:border-primary/30 transition-colors">
                 <CardContent className="p-6 text-center">
                   <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
                     <MapPin className="w-6 h-6 text-primary" />
@@ -162,8 +150,7 @@ const Shipping = () => {
                   <h3 className="font-semibold text-foreground mb-2">{region.name}</h3>
                   <p className="text-primary font-medium">{region.days}</p>
                 </CardContent>
-              </Card>
-            ))}
+              </Card>)}
           </div>
           <div className="mt-8 p-4 bg-accent/10 rounded-lg border border-accent/20">
             <div className="flex items-start gap-3">
@@ -190,8 +177,7 @@ const Shipping = () => {
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {trackingSteps.map((step, index) => (
-              <div key={index} className="relative">
+            {trackingSteps.map((step, index) => <div key={index} className="relative">
                 <Card className="h-full border-border/50">
                   <CardContent className="p-6 text-center">
                     <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
@@ -201,13 +187,10 @@ const Shipping = () => {
                     <p className="text-sm text-muted-foreground">{step.description}</p>
                   </CardContent>
                 </Card>
-                {index < trackingSteps.length - 1 && (
-                  <div className="hidden lg:block absolute top-1/2 -right-3 transform -translate-y-1/2 z-10">
+                {index < trackingSteps.length - 1 && <div className="hidden lg:block absolute top-1/2 -right-3 transform -translate-y-1/2 z-10">
                     <ArrowRight className="w-6 h-6 text-muted-foreground/50" />
-                  </div>
-                )}
-              </div>
-            ))}
+                  </div>}
+              </div>)}
           </div>
         </div>
       </section>
@@ -263,11 +246,7 @@ const Shipping = () => {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button asChild size="lg">
-              <a 
-                href="https://wa.me/5581994446464?text=Oi%20Cali!%20Preciso%20de%20ajuda%20com%20minha%20entrega" 
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
+              <a href="https://wa.me/5581994446464?text=Oi%20Cali!%20Preciso%20de%20ajuda%20com%20minha%20entrega" target="_blank" rel="noopener noreferrer">
                 <MessageCircle className="mr-2 w-5 h-5" />
                 Falar no WhatsApp
               </a>
@@ -281,8 +260,6 @@ const Shipping = () => {
           </div>
         </div>
       </section>
-    </MainLayout>
-  );
+    </MainLayout>;
 };
-
 export default Shipping;
