@@ -21,6 +21,9 @@ const OrderConfirmation = lazy(() => import("./pages/OrderConfirmation"));
 const Auth = lazy(() => import("./pages/Auth"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
+const FAQ = lazy(() => import("./pages/FAQ"));
+const Shipping = lazy(() => import("./pages/Shipping"));
+const Returns = lazy(() => import("./pages/Returns"));
 const Wishlist = lazy(() => import("./pages/Wishlist"));
 const Profile = lazy(() => import("./pages/Profile"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail"));
@@ -65,6 +68,9 @@ const App = () => (
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/contact" element={<Contact />} />
+                  <Route path="/faq" element={<FAQ />} />
+                  <Route path="/shipping" element={<Shipping />} />
+                  <Route path="/returns" element={<Returns />} />
                   <Route path="/order-received" element={<OrderReceived />} />
                   <Route path="/wishlist" element={<Wishlist />} />
                   <Route
