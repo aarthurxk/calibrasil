@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import ShippingCalculator from '@/components/shop/ShippingCalculator';
 const ProductDetail = () => {
   const {
     id
@@ -347,6 +348,11 @@ const ProductDetail = () => {
               </Button>
             </div>
 
+            {/* Shipping Calculator */}
+            <div className="pt-6 border-t border-border">
+              <ShippingCalculator peso={300} compact />
+            </div>
+
             {/* Features */}
             <div className="grid grid-cols-2 gap-4 pt-6 border-t border-border">
               <div className="flex items-center gap-3">
@@ -355,7 +361,7 @@ const ProductDetail = () => {
               </div>
               <div className="flex items-center gap-3">
                 <Shield className="h-5 w-5 text-primary" />
-                <span className="text-sm">6 meses de garantia  </span>
+                <span className="text-sm">6 meses de garantia</span>
               </div>
             </div>
           </div>

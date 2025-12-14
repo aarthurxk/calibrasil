@@ -7,7 +7,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-interface ShippingOption {
+export interface ShippingOption {
   service: string;
   name: string;
   price: number;
@@ -19,10 +19,12 @@ interface ShippingCalculatorProps {
   onSelectOption?: (option: ShippingOption) => void;
   selectedOption?: ShippingOption | null;
   compact?: boolean;
+  peso?: number; // Weight in grams, defaults to 300
+  initialCep?: string; // Pre-fill CEP if available
 }
 
-const ShippingCalculator = ({ onSelectOption, selectedOption, compact = false }: ShippingCalculatorProps) => {
-  const [cep, setCep] = useState('');
+const ShippingCalculator = ({ onSelectOption, selectedOption, compact = false, peso = 300, initialCep = '' }: ShippingCalculatorProps) => {
+  const [cep, setCep] = useState(initialCep);
   const [isLoading, setIsLoading] = useState(false);
   const [options, setOptions] = useState<ShippingOption[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +55,7 @@ const ShippingCalculator = ({ onSelectOption, selectedOption, compact = false }:
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke('calculate-shipping', {
-        body: { cep_destino: cepClean },
+        body: { cep_destino: cepClean, peso },
       });
 
       if (fnError) throw fnError;
