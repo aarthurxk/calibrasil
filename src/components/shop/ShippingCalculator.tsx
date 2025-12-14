@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Truck, Loader2, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -131,9 +130,9 @@ const ShippingCalculator = ({ onSelectOption, selectedOption, compact = false, p
           className="space-y-2"
         >
           {options.map((option) => (
-            <Label
+            <div
               key={option.service}
-              htmlFor={option.service}
+              onClick={() => onSelectOption?.(option)}
               className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
                 selectedOption?.service === option.service 
                   ? 'border-primary bg-primary/5' 
@@ -142,13 +141,13 @@ const ShippingCalculator = ({ onSelectOption, selectedOption, compact = false, p
             >
               <div className="flex items-center gap-3">
                 <RadioGroupItem value={option.service} id={option.service} />
-                <div>
+                <label htmlFor={option.service} className="cursor-pointer">
                   <p className="font-medium text-sm">{option.name}</p>
                   <p className="text-xs text-muted-foreground">{option.delivery_range}</p>
-                </div>
+                </label>
               </div>
               <span className="font-semibold text-primary">{formatPrice(option.price)}</span>
-            </Label>
+            </div>
           ))}
         </RadioGroup>
       )}

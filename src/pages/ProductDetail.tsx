@@ -343,6 +343,11 @@ const ProductDetail = () => {
                 <ShoppingCart className="mr-2 h-5 w-5" />
                 {!product.in_stock || isOutOfStock ? 'Esgotado' : 'Joga na Sacola'}
               </Button>
+              <Link to="/cart">
+                <Button size="lg" variant="outline">
+                  Ver Carrinho
+                </Button>
+              </Link>
               <Button size="lg" variant="outline">
                 <Heart className="h-5 w-5" />
               </Button>
