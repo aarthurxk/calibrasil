@@ -38,7 +38,7 @@ const checkoutSchema = z.object({
   state: z.string().trim().length(2, "Estado inválido"),
 });
 
-type PaymentGateway = "stripe" | "pagseguro";
+type PaymentGateway = "stripe" | "mercadopago";
 
 const Checkout = () => {
   const { items, total } = useCart();
@@ -48,7 +48,7 @@ const Checkout = () => {
   const { addresses, isLoading: isLoadingAddresses, addAddress, canAddMore } = useUserAddresses();
   const { appliedCoupon, isValidating, validateCoupon, removeCoupon, discountAmount } = useCoupon(total);
   const [isProcessingStripe, setIsProcessingStripe] = useState(false);
-  const [isProcessingPagseguro, setIsProcessingPagseguro] = useState(false);
+  const [isProcessingMercadoPago, setIsProcessingMercadoPago] = useState(false);
   const [couponCode, setCouponCode] = useState("");
 
   // Address selection state
@@ -71,7 +71,7 @@ const Checkout = () => {
   const [state, setState] = useState("");
   const [isLoadingCep, setIsLoadingCep] = useState(false);
 
-  const isProcessing = isProcessingStripe || isProcessingPagseguro;
+  const isProcessing = isProcessingStripe || isProcessingMercadoPago;
 
   const shipping = total >= settings.free_shipping_threshold ? 0 : settings.standard_shipping_rate;
   const totalAfterDiscount = total - discountAmount;
@@ -347,11 +347,11 @@ const Checkout = () => {
     }
   };
 
-  const handlePagseguroCheckout = async (e: React.FormEvent) => {
+  const handleMercadoPagoCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
     
-    setIsProcessingPagseguro(true);
+    setIsProcessingMercadoPago(true);
 
     try {
       await saveAddressIfNeeded();
@@ -365,14 +365,14 @@ const Checkout = () => {
         cancel_url: `${baseUrl}/checkout`,
       };
 
-      console.log("Creating PagSeguro checkout session:", { itemCount: items.length });
+      console.log("Creating Mercado Pago checkout session:", { itemCount: items.length });
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const session = await supabase.auth.getSession();
       const accessToken = session.data.session?.access_token;
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/create-pagseguro-checkout`, {
+      const response = await fetch(`${supabaseUrl}/functions/v1/create-mercadopago-checkout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -385,8 +385,8 @@ const Checkout = () => {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        console.error("PagSeguro checkout error:", data);
-        throw new Error(data.error || "Erro ao criar sessão de pagamento PagSeguro");
+        console.error("Mercado Pago checkout error:", data);
+        throw new Error(data.error || "Erro ao criar sessão de pagamento Mercado Pago");
       }
 
       if (data.url) {
@@ -397,16 +397,16 @@ const Checkout = () => {
         throw new Error("URL de pagamento não recebida");
       }
     } catch (error: any) {
-      console.error("Error creating PagSeguro checkout:", error);
+      console.error("Error creating Mercado Pago checkout:", error);
       const errorMessage = error.message || '';
       
       if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch')) {
         toast.error('Erro de conexão. Verifique sua internet.');
       } else {
-        toast.error(errorMessage || 'Erro ao processar pagamento PagSeguro. Tente novamente.');
+        toast.error(errorMessage || 'Erro ao processar pagamento Mercado Pago. Tente novamente.');
       }
       
-      setIsProcessingPagseguro(false);
+      setIsProcessingMercadoPago(false);
     }
   };
 
@@ -694,17 +694,26 @@ const Checkout = () => {
                     )}
                   </Button>
 
-                  {/* PagSeguro Button - Temporariamente desabilitado */}
+                  {/* Mercado Pago Button */}
                   <Button
                     type="button"
                     size="lg"
-                    disabled={true}
-                    className="h-auto py-4 flex flex-col items-center gap-2 bg-muted text-muted-foreground cursor-not-allowed opacity-60"
+                    onClick={handleMercadoPagoCheckout}
+                    disabled={isProcessing}
+                    className="h-auto py-4 flex flex-col items-center gap-2 bg-[#009EE3] hover:bg-[#007eb8] text-white"
                   >
-                    <QrCode className="h-6 w-6" />
-                    <span className="font-semibold">PagSeguro</span>
-                    <span className="text-xs">Em breve</span>
-                    <span className="text-[10px] opacity-70">Em fase de implementação</span>
+                    {isProcessingMercadoPago ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span className="text-sm">Redirecionando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <QrCode className="h-6 w-6" />
+                        <span className="font-semibold">Pagar com Mercado Pago</span>
+                        <span className="text-xs opacity-80">Cartão, Pix e Boleto</span>
+                      </>
+                    )}
                   </Button>
                 </div>
 
