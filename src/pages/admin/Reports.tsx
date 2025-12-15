@@ -52,6 +52,25 @@ const Reports = () => {
 
   const { start, end } = getPeriodDates();
 
+  // Calculate previous period dates for comparison
+  const getPreviousPeriodDates = () => {
+    const now = new Date();
+    switch (period) {
+      case '7d':
+        return { start: subDays(now, 14), end: subDays(now, 7) };
+      case '30d':
+        return { start: subDays(now, 60), end: subDays(now, 30) };
+      case '90d':
+        return { start: subDays(now, 180), end: subDays(now, 90) };
+      case '12m':
+        return { start: subMonths(now, 24), end: subMonths(now, 12) };
+      default:
+        return { start: subDays(now, 60), end: subDays(now, 30) };
+    }
+  };
+
+  const { start: prevStart, end: prevEnd } = getPreviousPeriodDates();
+
   // Fetch orders for the period
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ['reports-orders', period],
@@ -61,6 +80,22 @@ const Reports = () => {
         .select('*, order_items(*)')
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString())
+        .eq('payment_status', 'paid');
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch orders for the previous period (for comparison)
+  const { data: previousPeriodOrders = [] } = useQuery({
+    queryKey: ['reports-orders-previous', period],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('total')
+        .gte('created_at', prevStart.toISOString())
+        .lte('created_at', prevEnd.toISOString())
         .eq('payment_status', 'paid');
 
       if (error) throw error;
@@ -168,14 +203,14 @@ const Reports = () => {
       .slice(0, 5);
   };
 
-  // Compare with previous period
-  const getPreviousPeriodRevenue = () => {
-    // Simplified - would need another query for accurate comparison
-    return totalRevenue * 0.85; // Placeholder
-  };
+  // Compare with previous period - using real data from database
+  const previousPeriodRevenue = previousPeriodOrders.reduce(
+    (sum, order) => sum + Number(order.total), 
+    0
+  );
 
-  const revenueGrowth = totalRevenue > 0 
-    ? ((totalRevenue - getPreviousPeriodRevenue()) / getPreviousPeriodRevenue()) * 100 
+  const revenueGrowth = previousPeriodRevenue > 0 
+    ? ((totalRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100 
     : 0;
 
   const chartData = revenueByPeriod();
