@@ -108,11 +108,11 @@ const Payments = () => {
                         <Badge className={
                           order.payment_gateway === 'stripe' 
                             ? 'bg-purple-100 text-purple-800' 
-                            : order.payment_gateway === 'pagseguro'
-                            ? 'bg-green-100 text-green-800'
+                            : order.payment_gateway === 'mercadopago'
+                            ? 'bg-blue-100 text-blue-800'
                             : 'bg-muted text-muted-foreground'
                         }>
-                          {order.payment_gateway === 'stripe' ? 'Stripe' : order.payment_gateway === 'pagseguro' ? 'PagSeguro' : 'N/A'}
+                          {order.payment_gateway === 'stripe' ? 'Stripe' : order.payment_gateway === 'mercadopago' ? 'Mercado Pago' : 'N/A'}
                         </Badge>
                       </td>
                       <td className="py-3 px-4">{order.payment_method || 'N/A'}</td>
