@@ -32,6 +32,7 @@ interface CheckoutRequest {
   };
   shippingCost: number;
   couponCode?: string;
+  sellerCode?: string;
   success_url: string;
   cancel_url: string;
   user_id?: string;
@@ -103,6 +104,23 @@ async function validateCoupon(supabase: any, couponCode: string, orderTotal: num
   return coupon;
 }
 
+// Validate seller
+async function validateSeller(supabase: any, sellerCode: string) {
+  const { data: seller, error } = await supabase
+    .from('sellers')
+    .select('*')
+    .eq('code', sellerCode.toUpperCase())
+    .eq('is_active', true)
+    .single();
+
+  if (error || !seller) {
+    logStep('Seller not found or inactive', { sellerCode });
+    return null;
+  }
+
+  return seller;
+}
+
 // Get installment plan based on order total
 function getInstallments(total: number): number {
   if (total < 100) return 1;
@@ -141,7 +159,7 @@ serve(async (req) => {
     const requestData: CheckoutRequest = await req.json();
     logStep('Request received', { itemCount: requestData.items.length });
 
-    const { items, customerEmail, customerName, customerPhone, shippingAddress, shippingCost, couponCode, success_url, cancel_url, user_id } = requestData;
+    const { items, customerEmail, customerName, customerPhone, shippingAddress, shippingCost, couponCode, sellerCode, success_url, cancel_url, user_id } = requestData;
 
     // Validate URLs
     const allowedDomains = ["localhost", "lovableproject.com", "lovable.app", "calibrasil.com"];
@@ -209,8 +227,22 @@ serve(async (req) => {
       }
     }
 
-    const finalTotal = realItemsTotal + realShippingCost - discountAmount;
-    logStep('Order totals calculated', { itemsTotal: realItemsTotal, shipping: realShippingCost, discount: discountAmount, final: finalTotal });
+    // Validate and apply seller discount
+    let sellerDiscountAmount = 0;
+    let validatedSeller = null;
+    if (sellerCode) {
+      validatedSeller = await validateSeller(supabase, sellerCode);
+      if (validatedSeller && validatedSeller.discount_percent > 0) {
+        sellerDiscountAmount = ((realItemsTotal - discountAmount) * validatedSeller.discount_percent) / 100;
+        logStep('Seller applied', { code: sellerCode, discount: sellerDiscountAmount });
+      } else if (validatedSeller) {
+        logStep('Seller applied (tracking only)', { code: sellerCode });
+      }
+    }
+
+    const totalDiscount = discountAmount + sellerDiscountAmount;
+    const finalTotal = realItemsTotal + realShippingCost - totalDiscount;
+    logStep('Order totals calculated', { itemsTotal: realItemsTotal, shipping: realShippingCost, couponDiscount: discountAmount, sellerDiscount: sellerDiscountAmount, final: finalTotal });
 
     // Create order in database
     const { data: order, error: orderError } = await supabase
@@ -226,7 +258,9 @@ serve(async (req) => {
         payment_gateway: 'mercadopago',
         shipping_address: shippingAddress,
         coupon_code: validatedCoupon?.code || null,
-        discount_amount: discountAmount
+        discount_amount: discountAmount,
+        seller_code: validatedSeller?.code || null,
+        seller_discount_amount: sellerDiscountAmount
       })
       .select()
       .single();
@@ -279,7 +313,7 @@ serve(async (req) => {
       });
     }
 
-    // Add discount as negative item if applicable
+    // Add coupon discount as negative item if applicable
     if (discountAmount > 0) {
       mercadoPagoItems.push({
         id: 'discount',
@@ -288,6 +322,19 @@ serve(async (req) => {
         picture_url: undefined,
         quantity: 1,
         unit_price: -Number(discountAmount),
+        currency_id: 'BRL'
+      });
+    }
+
+    // Add seller discount as negative item if applicable
+    if (sellerDiscountAmount > 0) {
+      mercadoPagoItems.push({
+        id: 'seller-discount',
+        title: `Desconto Vendedor (${validatedSeller?.code})`,
+        description: `Desconto do vendedor: ${validatedSeller?.discount_percent}%`,
+        picture_url: undefined,
+        quantity: 1,
+        unit_price: -Number(sellerDiscountAmount),
         currency_id: 'BRL'
       });
     }

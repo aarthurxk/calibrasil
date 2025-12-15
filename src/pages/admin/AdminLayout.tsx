@@ -15,6 +15,7 @@ import {
   Ticket,
   Layers,
   Mail,
+  UserCheck,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -44,6 +45,7 @@ const AdminLayout = () => {
     { name: 'Pagamentos', icon: CreditCard, path: '/admin/payments', showFor: ['admin', 'manager'] },
     { name: 'Relatórios', icon: BarChart3, path: '/admin/reports', showFor: ['admin', 'manager'] },
     { name: 'Cupons', icon: Ticket, path: '/admin/coupons', showFor: ['admin', 'manager'] },
+    { name: 'Vendedores', icon: UserCheck, path: '/admin/sellers', showFor: ['admin', 'manager'] },
     { name: 'Categorias', icon: Layers, path: '/admin/categories', showFor: ['admin'] },
     { name: 'Templates de Email', icon: Mail, path: '/admin/email-templates', showFor: ['admin'] },
     { name: 'Roadmap', icon: Map, path: '/admin/roadmap', showFor: ['admin'] },
