@@ -221,6 +221,8 @@ export type Database = {
           phone: string | null
           received_at: string | null
           review_email_sent: boolean | null
+          seller_code: string | null
+          seller_discount_amount: number | null
           shipping_address: Json | null
           status: string
           total: number
@@ -242,6 +244,8 @@ export type Database = {
           phone?: string | null
           received_at?: string | null
           review_email_sent?: boolean | null
+          seller_code?: string | null
+          seller_discount_amount?: number | null
           shipping_address?: Json | null
           status?: string
           total: number
@@ -263,6 +267,8 @@ export type Database = {
           phone?: string | null
           received_at?: string | null
           review_email_sent?: boolean | null
+          seller_code?: string | null
+          seller_discount_amount?: number | null
           shipping_address?: Json | null
           status?: string
           total?: number
@@ -475,6 +481,45 @@ export type Database = {
           title?: string
           updated_at?: string | null
           version?: string | null
+        }
+        Relationships: []
+      }
+      sellers: {
+        Row: {
+          code: string
+          commission_percent: number | null
+          created_at: string | null
+          discount_percent: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          total_orders: number | null
+          total_sales: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          commission_percent?: number | null
+          created_at?: string | null
+          discount_percent?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          total_orders?: number | null
+          total_sales?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          commission_percent?: number | null
+          created_at?: string | null
+          discount_percent?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          total_orders?: number | null
+          total_sales?: number | null
+          updated_at?: string | null
         }
         Relationships: []
       }

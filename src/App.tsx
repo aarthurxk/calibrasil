@@ -44,6 +44,7 @@ const Roadmap = lazy(() => import("./pages/admin/Roadmap"));
 const Coupons = lazy(() => import("./pages/admin/Coupons"));
 const Categories = lazy(() => import("./pages/admin/Categories"));
 const EmailTemplates = lazy(() => import("./pages/admin/EmailTemplates"));
+const Sellers = lazy(() => import("./pages/admin/Sellers"));
 
 const queryClient = new QueryClient();
 
@@ -113,6 +114,7 @@ const App = () => (
                   <Route path="payments" element={<Payments />} />
                   <Route path="reports" element={<Reports />} />
                   <Route path="coupons" element={<Coupons />} />
+                  <Route path="sellers" element={<Sellers />} />
                   <Route path="categories" element={<Categories />} />
                   <Route path="email-templates" element={<EmailTemplates />} />
                   <Route path="settings" element={<Settings />} />
