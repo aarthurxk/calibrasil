@@ -201,8 +201,8 @@ const ShippingCalculator = ({
             }}
             className="space-y-2"
           >
-            <div
-              onClick={() => handleSelectOption(freeShippingOption)}
+            <label
+              htmlFor="free-mode-free"
               className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
                 selectedOption?.service === 'free' 
                   ? 'border-primary bg-primary/5' 
@@ -210,17 +210,17 @@ const ShippingCalculator = ({
               }`}
             >
               <div className="flex items-center gap-3">
-                <RadioGroupItem value="free" id="free" />
-                <label htmlFor="free" className="cursor-pointer">
+                <RadioGroupItem value="free" id="free-mode-free" />
+                <div>
                   <p className="font-medium text-sm">Entrega em casa</p>
                   <p className="text-xs text-muted-foreground">{freeShippingOption.delivery_range}</p>
-                </label>
+                </div>
               </div>
               <span className="font-semibold text-primary">Grátis</span>
-            </div>
+            </label>
 
-            <div
-              onClick={() => handleSelectOption(pickupOption)}
+            <label
+              htmlFor="free-mode-pickup"
               className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
                 selectedOption?.service === 'pickup' 
                   ? 'border-primary bg-primary/5' 
@@ -228,8 +228,8 @@ const ShippingCalculator = ({
               }`}
             >
               <div className="flex items-center gap-3">
-                <RadioGroupItem value="pickup" id="pickup" />
-                <label htmlFor="pickup" className="cursor-pointer">
+                <RadioGroupItem value="pickup" id="free-mode-pickup" />
+                <div>
                   <div className="flex items-center gap-2">
                     <Store className="h-4 w-4 text-primary" />
                     <p className="font-medium text-sm">Retirar na Loja</p>
@@ -238,10 +238,10 @@ const ShippingCalculator = ({
                   {settings.store_pickup_address && (
                     <p className="text-xs text-muted-foreground mt-1">📍 {settings.store_pickup_address}</p>
                   )}
-                </label>
+                </div>
               </div>
               <span className="font-semibold text-primary">Grátis</span>
-            </div>
+            </label>
           </RadioGroup>
         )}
       </div>
@@ -268,8 +268,8 @@ const ShippingCalculator = ({
           }}
           className="space-y-2"
         >
-          <div
-            onClick={() => handleSelectOption(isEligibleForFreeShipping ? freeShippingOption : fixedShippingOption)}
+          <label
+            htmlFor="fixed-mode-delivery"
             className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
               selectedOption?.service !== 'pickup' 
                 ? 'border-primary bg-primary/5' 
@@ -277,22 +277,22 @@ const ShippingCalculator = ({
             }`}
           >
             <div className="flex items-center gap-3">
-              <RadioGroupItem value={isEligibleForFreeShipping ? 'free' : 'fixed'} id="delivery" />
-              <label htmlFor="delivery" className="cursor-pointer">
+              <RadioGroupItem value={isEligibleForFreeShipping ? 'free' : 'fixed'} id="fixed-mode-delivery" />
+              <div>
                 <p className="font-medium text-sm">Entrega Padrão</p>
                 <p className="text-xs text-muted-foreground">
                   {settings.delivery_min_days} a {settings.delivery_max_days} dias úteis
                 </p>
-              </label>
+              </div>
             </div>
             <span className={`font-semibold ${isEligibleForFreeShipping ? 'text-primary' : ''}`}>
               {isEligibleForFreeShipping ? 'Grátis' : formatPrice(settings.standard_shipping_rate)}
             </span>
-          </div>
+          </label>
 
           {showPickup && settings.store_pickup_enabled && (
-            <div
-              onClick={() => handleSelectOption(pickupOption)}
+            <label
+              htmlFor="fixed-mode-pickup"
               className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
                 selectedOption?.service === 'pickup' 
                   ? 'border-primary bg-primary/5' 
@@ -300,8 +300,8 @@ const ShippingCalculator = ({
               }`}
             >
               <div className="flex items-center gap-3">
-                <RadioGroupItem value="pickup" id="pickup" />
-                <label htmlFor="pickup" className="cursor-pointer">
+                <RadioGroupItem value="pickup" id="fixed-mode-pickup" />
+                <div>
                   <div className="flex items-center gap-2">
                     <Store className="h-4 w-4 text-primary" />
                     <p className="font-medium text-sm">Retirar na Loja</p>
@@ -310,10 +310,10 @@ const ShippingCalculator = ({
                   {settings.store_pickup_address && (
                     <p className="text-xs text-muted-foreground mt-1">📍 {settings.store_pickup_address}</p>
                   )}
-                </label>
+                </div>
               </div>
               <span className="font-semibold text-primary">Grátis</span>
-            </div>
+            </label>
           )}
         </RadioGroup>
 
@@ -374,9 +374,9 @@ const ShippingCalculator = ({
           className="space-y-2"
         >
           {options.map((option) => (
-            <div
+            <label
               key={option.service}
-              onClick={() => handleSelectOption(option)}
+              htmlFor={`correios-${option.service}`}
               className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
                 selectedOption?.service === option.service 
                   ? 'border-primary bg-primary/5' 
@@ -384,8 +384,8 @@ const ShippingCalculator = ({
               }`}
             >
               <div className="flex items-center gap-3">
-                <RadioGroupItem value={option.service} id={option.service} />
-                <label htmlFor={option.service} className="cursor-pointer">
+                <RadioGroupItem value={option.service} id={`correios-${option.service}`} />
+                <div>
                   <div className="flex items-center gap-2">
                     {option.service === 'pickup' && <Store className="h-4 w-4 text-primary" />}
                     <p className="font-medium text-sm">{option.name}</p>
@@ -394,12 +394,12 @@ const ShippingCalculator = ({
                   {option.service === 'pickup' && settings.store_pickup_address && (
                     <p className="text-xs text-muted-foreground mt-1">📍 {settings.store_pickup_address}</p>
                   )}
-                </label>
+                </div>
               </div>
               <span className={`font-semibold ${option.price === 0 ? 'text-primary' : ''}`}>
                 {formatPrice(option.price)}
               </span>
-            </div>
+            </label>
           ))}
         </RadioGroup>
       )}
