@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Shield, User, UserCog, Plus } from 'lucide-react';
+import { Loader2, Shield, User, UserCog, Plus, Truck, Store } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { UserDetailsDialog } from '@/components/admin/UserDetailsDialog';
@@ -33,6 +34,11 @@ interface StoreSettings {
   tax_rate: number;
   free_shipping_threshold: number;
   standard_shipping_rate: number;
+  delivery_min_days: number;
+  delivery_max_days: number;
+  shipping_mode: 'correios' | 'free' | 'fixed';
+  store_pickup_enabled: boolean;
+  store_pickup_address: string | null;
   notify_orders: boolean;
   notify_low_stock: boolean;
   notify_messages: boolean;
@@ -44,6 +50,12 @@ const ROLE_CONFIG = {
   manager: { label: 'Gerente', icon: UserCog, variant: 'secondary' as const },
   customer: { label: 'Cliente', icon: User, variant: 'outline' as const },
 };
+
+const SHIPPING_MODE_OPTIONS = [
+  { value: 'correios', label: '📦 Correios (API)', description: 'Calcular frete via API dos Correios' },
+  { value: 'free', label: '🎁 Frete Grátis (Teste)', description: 'Todos os pedidos com frete grátis' },
+  { value: 'fixed', label: '💰 Taxa Fixa', description: 'Usar valor fixo configurado' },
+];
 
 const Settings = () => {
   const { isAdmin } = useAuth();
@@ -64,11 +76,10 @@ const Settings = () => {
   // Store settings state
   const [settings, setSettings] = useState<StoreSettings | null>(null);
 
-  // Fetch users with roles - using separate queries and combining
+  // Fetch users with roles
   const { data: users = [], isLoading: loadingUsers } = useQuery({
     queryKey: ['users-with-roles'],
     queryFn: async () => {
-      // Fetch user_roles
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id, role')
@@ -76,14 +87,12 @@ const Settings = () => {
       
       if (rolesError) throw rolesError;
       
-      // Fetch profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('user_id, full_name, phone');
       
       if (profilesError) throw profilesError;
       
-      // Combine the data
       const combined: UserWithRole[] = (roles || []).map(role => ({
         user_id: role.user_id,
         role: role.role as 'admin' | 'manager' | 'customer',
@@ -152,6 +161,7 @@ const Settings = () => {
     onSuccess: () => {
       toast.success('Configurações salvas!');
       queryClient.invalidateQueries({ queryKey: ['store-settings'] });
+      queryClient.invalidateQueries({ queryKey: ['store-settings-public'] });
     },
     onError: () => {
       toast.error('Erro ao salvar configurações');
@@ -172,8 +182,6 @@ const Settings = () => {
 
     setIsCreatingUser(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      
       const response = await supabase.functions.invoke('create-user', {
         body: {
           email: newUserEmail.trim(),
@@ -217,6 +225,11 @@ const Settings = () => {
       tax_rate: settings.tax_rate,
       free_shipping_threshold: settings.free_shipping_threshold,
       standard_shipping_rate: settings.standard_shipping_rate,
+      delivery_min_days: settings.delivery_min_days,
+      delivery_max_days: settings.delivery_max_days,
+      shipping_mode: settings.shipping_mode,
+      store_pickup_enabled: settings.store_pickup_enabled,
+      store_pickup_address: settings.store_pickup_address,
       notify_orders: settings.notify_orders,
       notify_low_stock: settings.notify_low_stock,
       notify_messages: settings.notify_messages,
@@ -521,39 +534,144 @@ const Settings = () => {
           </div>
           <div className="p-4 bg-muted rounded-lg">
             <p className="text-sm text-muted-foreground">
-              <strong className="text-primary">Gateway de Pagamento:</strong> Conecte o Lovable Cloud 
-              e ative o Stripe ou PagSeguro pra configurar o processamento de pagamentos.
+              <strong className="text-primary">Gateway de Pagamento:</strong> Stripe e Mercado Pago estão configurados.
             </p>
           </div>
         </CardContent>
       </Card>
 
-      {/* Shipping */}
+      {/* Shipping Settings */}
       <Card>
         <CardHeader>
-          <CardTitle>Entrega</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Truck className="h-5 w-5" />
+            Configurações de Frete
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
+          {/* Shipping Mode */}
+          <div>
+            <Label htmlFor="shippingMode" className="text-base font-medium">Modo de Frete</Label>
+            <p className="text-sm text-muted-foreground mb-3">
+              Escolha como o frete será calculado para os clientes
+            </p>
+            <Select 
+              value={settings?.shipping_mode || 'correios'} 
+              onValueChange={(v: 'correios' | 'free' | 'fixed') => updateSetting('shipping_mode', v)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SHIPPING_MODE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    <div className="flex flex-col">
+                      <span>{option.label}</span>
+                      <span className="text-xs text-muted-foreground">{option.description}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            {settings?.shipping_mode === 'free' && (
+              <div className="mt-3 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                <p className="text-sm text-primary font-medium">🎉 Modo de teste ativo!</p>
+                <p className="text-xs text-muted-foreground">
+                  Todos os pedidos terão frete grátis. Ideal para testar a loja.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Fixed Rate Settings (only show when mode is fixed or correios) */}
+          {(settings?.shipping_mode === 'fixed' || settings?.shipping_mode === 'correios') && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="freeShipping">Frete Grátis a partir de (R$)</Label>
+                <Input 
+                  id="freeShipping" 
+                  type="number" 
+                  value={settings?.free_shipping_threshold ?? 250} 
+                  onChange={(e) => updateSetting('free_shipping_threshold', Number(e.target.value))}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Pedidos acima deste valor terão frete grátis
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="standardShipping">Taxa de Frete Padrão (R$)</Label>
+                <Input 
+                  id="standardShipping" 
+                  type="number" 
+                  step="0.01"
+                  value={settings?.standard_shipping_rate ?? 29.90} 
+                  onChange={(e) => updateSetting('standard_shipping_rate', Number(e.target.value))}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {settings?.shipping_mode === 'fixed' 
+                    ? 'Valor fixo cobrado quando abaixo do limite de frete grátis'
+                    : 'Valor usado como fallback quando API dos Correios falha'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Delivery Time Settings */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="freeShipping">Frete Grátis a partir de (R$)</Label>
+              <Label htmlFor="deliveryMinDays">Prazo Mínimo (dias úteis)</Label>
               <Input 
-                id="freeShipping" 
+                id="deliveryMinDays" 
                 type="number" 
-                value={settings?.free_shipping_threshold ?? 250} 
-                onChange={(e) => updateSetting('free_shipping_threshold', Number(e.target.value))}
+                value={settings?.delivery_min_days ?? 5} 
+                onChange={(e) => updateSetting('delivery_min_days', Number(e.target.value))}
               />
             </div>
             <div>
-              <Label htmlFor="standardShipping">Taxa de Frete Padrão (R$)</Label>
+              <Label htmlFor="deliveryMaxDays">Prazo Máximo (dias úteis)</Label>
               <Input 
-                id="standardShipping" 
+                id="deliveryMaxDays" 
                 type="number" 
-                step="0.01"
-                value={settings?.standard_shipping_rate ?? 29.90} 
-                onChange={(e) => updateSetting('standard_shipping_rate', Number(e.target.value))}
+                value={settings?.delivery_max_days ?? 10} 
+                onChange={(e) => updateSetting('delivery_max_days', Number(e.target.value))}
               />
             </div>
+          </div>
+
+          {/* Store Pickup */}
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Store className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="font-medium">Retirada na Loja</p>
+                  <p className="text-sm text-muted-foreground">
+                    Permitir que clientes retirem pedidos na loja física
+                  </p>
+                </div>
+              </div>
+              <Switch 
+                checked={settings?.store_pickup_enabled ?? true} 
+                onCheckedChange={(checked) => updateSetting('store_pickup_enabled', checked)}
+              />
+            </div>
+            
+            {settings?.store_pickup_enabled && (
+              <div>
+                <Label htmlFor="storePickupAddress">Endereço da Loja para Retirada</Label>
+                <Textarea 
+                  id="storePickupAddress" 
+                  value={settings?.store_pickup_address || ''} 
+                  onChange={(e) => updateSetting('store_pickup_address', e.target.value)}
+                  placeholder="Ex: Shopping RioMar, Av. República do Líbano, 251 - Piso L1, Recife - PE"
+                  rows={2}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Este endereço será exibido aos clientes que escolherem retirar na loja
+                </p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
