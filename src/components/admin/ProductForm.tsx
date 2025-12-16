@@ -199,6 +199,40 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
     }
   }, [formData.colors, formData.models]);
 
+  const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
+  const validateImageFile = (file: File): { valid: boolean; error?: string } => {
+    // Validate MIME type
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      return { 
+        valid: false, 
+        error: `Tipo de arquivo não permitido: ${file.type}. Use JPEG, PNG, WebP ou GIF.` 
+      };
+    }
+    
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      return { 
+        valid: false, 
+        error: `Arquivo muito grande (${sizeMB}MB). Máximo permitido: 5MB.` 
+      };
+    }
+    
+    // Validate file extension matches MIME type
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const validExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+    if (!ext || !validExtensions.includes(ext)) {
+      return { 
+        valid: false, 
+        error: `Extensão de arquivo inválida. Use .jpg, .jpeg, .png, .webp ou .gif.` 
+      };
+    }
+    
+    return { valid: true };
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -211,9 +245,24 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
       return;
     }
 
-    const filesToUpload = Array.from(files).slice(0, remainingSlots);
+    // Validate all files before upload
+    const validFiles: File[] = [];
+    for (const file of Array.from(files)) {
+      const validation = validateImageFile(file);
+      if (!validation.valid) {
+        toast.error(validation.error);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) {
+      return;
+    }
+
+    const filesToUpload = validFiles.slice(0, remainingSlots);
     
-    if (files.length > remainingSlots) {
+    if (validFiles.length > remainingSlots) {
       toast.warning(`Apenas ${remainingSlots} foto(s) serão adicionadas (limite de ${MAX_IMAGES})`);
     }
 
@@ -222,12 +271,15 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
 
     try {
       for (const file of filesToUpload) {
-        const fileExt = file.name.split('.').pop();
+        const fileExt = file.name.split('.').pop()?.toLowerCase();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
           .from('product-images')
-          .upload(fileName, file);
+          .upload(fileName, file, {
+            contentType: file.type,
+            cacheControl: '3600',
+          });
 
         if (uploadError) throw uploadError;
 
