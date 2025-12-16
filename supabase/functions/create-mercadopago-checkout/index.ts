@@ -29,8 +29,9 @@ interface CheckoutRequest {
     city: string;
     state: string;
     zip: string;
-  };
+  } | null;
   shippingCost: number;
+  shippingMethod?: string;
   couponCode?: string;
   sellerCode?: string;
   success_url: string;
@@ -157,9 +158,9 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const requestData: CheckoutRequest = await req.json();
-    logStep('Request received', { itemCount: requestData.items.length });
+    logStep('Request received', { itemCount: requestData.items.length, shippingMethod: requestData.shippingMethod });
 
-    const { items, customerEmail, customerName, customerPhone, shippingAddress, shippingCost, couponCode, sellerCode, success_url, cancel_url, user_id } = requestData;
+    const { items, customerEmail, customerName, customerPhone, shippingAddress, shippingCost, shippingMethod, couponCode, sellerCode, success_url, cancel_url, user_id } = requestData;
 
     // Validate URLs
     const allowedDomains = ["localhost", "lovableproject.com", "lovable.app", "calibrasil.com"];
@@ -204,17 +205,39 @@ serve(async (req) => {
     // Get store settings for shipping validation
     const { data: storeSettings } = await supabase
       .from('store_settings')
-      .select('free_shipping_threshold, standard_shipping_rate')
+      .select('free_shipping_threshold, standard_shipping_rate, shipping_mode')
       .single();
 
+    // Determine real shipping cost based on shipping mode and method
     let realShippingCost = shippingCost;
-    if (storeSettings) {
-      if (realItemsTotal >= (storeSettings.free_shipping_threshold || 250)) {
+    const isPickup = shippingMethod === 'pickup';
+    
+    if (isPickup) {
+      // Pickup is always free
+      realShippingCost = 0;
+    } else if (storeSettings) {
+      const shippingMode = storeSettings.shipping_mode || 'correios';
+      
+      if (shippingMode === 'free') {
+        // Free shipping mode - always free
         realShippingCost = 0;
+      } else if (shippingMode === 'fixed') {
+        // Fixed rate mode - check threshold
+        if (realItemsTotal >= (storeSettings.free_shipping_threshold || 250)) {
+          realShippingCost = 0;
+        } else {
+          realShippingCost = storeSettings.standard_shipping_rate || 29.90;
+        }
       } else {
-        realShippingCost = storeSettings.standard_shipping_rate || 29.90;
+        // Correios mode - trust frontend calculation but validate against threshold
+        if (realItemsTotal >= (storeSettings.free_shipping_threshold || 250)) {
+          realShippingCost = 0;
+        }
+        // Otherwise use the frontend-provided shipping cost from Correios calculation
       }
     }
+
+    logStep('Shipping calculated', { mode: storeSettings?.shipping_mode, method: shippingMethod, cost: realShippingCost });
 
     // Validate and apply coupon
     let discountAmount = 0;
@@ -257,6 +280,8 @@ serve(async (req) => {
         payment_method: 'mercadopago',
         payment_gateway: 'mercadopago',
         shipping_address: shippingAddress,
+        shipping_method: shippingMethod || 'standard',
+        shipping_cost: realShippingCost,
         coupon_code: validatedCoupon?.code || null,
         discount_amount: discountAmount,
         seller_code: validatedSeller?.code || null,
@@ -304,7 +329,7 @@ serve(async (req) => {
     if (realShippingCost > 0) {
       mercadoPagoItems.push({
         id: 'shipping',
-        title: 'Frete',
+        title: shippingMethod === 'pickup' ? 'Retirada na Loja' : 'Frete',
         description: 'Custo de envio',
         picture_url: undefined,
         quantity: 1,
@@ -353,7 +378,7 @@ serve(async (req) => {
     const maxInstallments = getInstallments(finalTotal);
 
     // Build Mercado Pago Preference payload
-    const preferencePayload = {
+    const preferencePayload: any = {
       items: mercadoPagoItems,
       payer: {
         name: firstName,
@@ -362,20 +387,6 @@ serve(async (req) => {
         phone: {
           area_code: phoneAreaCode,
           number: phoneNumber
-        },
-        address: {
-          street_name: shippingAddress.street,
-          street_number: parseInt(shippingAddress.houseNumber) || 1,
-          zip_code: shippingAddress.zip.replace(/\D/g, '')
-        }
-      },
-      shipments: {
-        receiver_address: {
-          street_name: shippingAddress.street,
-          street_number: parseInt(shippingAddress.houseNumber) || 1,
-          zip_code: shippingAddress.zip.replace(/\D/g, ''),
-          city_name: shippingAddress.city,
-          state_name: shippingAddress.state
         }
       },
       back_urls: {
@@ -397,6 +408,24 @@ serve(async (req) => {
       expiration_date_from: new Date().toISOString(),
       expiration_date_to: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
     };
+
+    // Only add shipping address if not pickup
+    if (shippingAddress && !isPickup) {
+      preferencePayload.payer.address = {
+        street_name: shippingAddress.street,
+        street_number: parseInt(shippingAddress.houseNumber) || 1,
+        zip_code: shippingAddress.zip.replace(/\D/g, '')
+      };
+      preferencePayload.shipments = {
+        receiver_address: {
+          street_name: shippingAddress.street,
+          street_number: parseInt(shippingAddress.houseNumber) || 1,
+          zip_code: shippingAddress.zip.replace(/\D/g, ''),
+          city_name: shippingAddress.city,
+          state_name: shippingAddress.state
+        }
+      };
+    }
 
     logStep('Creating Mercado Pago preference', { reference: order.id, maxInstallments });
 

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { z } from "zod";
+import ShippingCalculator, { ShippingOption } from "@/components/shop/ShippingCalculator";
 
 // Validation schema for checkout form
 const checkoutSchema = z.object({
@@ -30,13 +31,13 @@ const checkoutSchema = z.object({
     .regex(/^\(\d{2}\)\s?\d{4,5}-?\d{4}$/, "Telefone inválido (ex: (11) 99999-9999)"),
   firstName: z.string().trim().min(2, "Nome muito curto").max(100, "Nome muito longo"),
   lastName: z.string().trim().min(2, "Sobrenome muito curto").max(100, "Sobrenome muito longo"),
-  zip: z.string().trim().regex(/^\d{5}-?\d{3}$/, "CEP inválido (ex: 12345-678)"),
-  street: z.string().trim().min(3, "Rua é obrigatória"),
-  houseNumber: z.string().trim().min(1, "Número é obrigatório"),
+  zip: z.string().trim().regex(/^\d{5}-?\d{3}$/, "CEP inválido (ex: 12345-678)").optional(),
+  street: z.string().trim().min(3, "Rua é obrigatória").optional(),
+  houseNumber: z.string().trim().min(1, "Número é obrigatório").optional(),
   complement: z.string().optional(),
-  neighborhood: z.string().trim().min(2, "Bairro é obrigatório"),
-  city: z.string().trim().min(2, "Cidade é obrigatória"),
-  state: z.string().trim().length(2, "Estado inválido"),
+  neighborhood: z.string().trim().min(2, "Bairro é obrigatório").optional(),
+  city: z.string().trim().min(2, "Cidade é obrigatória").optional(),
+  state: z.string().trim().length(2, "Estado inválido").optional(),
 });
 
 type PaymentGateway = "stripe" | "mercadopago";
@@ -53,6 +54,9 @@ const Checkout = () => {
   const [isProcessingMercadoPago, setIsProcessingMercadoPago] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [sellerCode, setSellerCode] = useState("");
+
+  // Shipping selection state
+  const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null);
 
   // Address selection state
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -76,7 +80,11 @@ const Checkout = () => {
 
   const isProcessing = isProcessingStripe || isProcessingMercadoPago;
 
-  const shipping = total >= settings.free_shipping_threshold ? 0 : settings.standard_shipping_rate;
+  // Check if pickup is selected
+  const isPickup = selectedShipping?.service === 'pickup';
+
+  // Calculate shipping based on selected option
+  const shipping = selectedShipping?.price ?? 0;
   const totalAfterCouponDiscount = total - discountAmount;
   const totalAfterSellerDiscount = totalAfterCouponDiscount - sellerDiscount;
   const finalTotal = totalAfterSellerDiscount + shipping;
@@ -203,30 +211,56 @@ const Checkout = () => {
   };
 
   const validateForm = () => {
-    const validationResult = checkoutSchema.safeParse({
+    // Build validation object based on whether pickup is selected
+    const validationData: Record<string, any> = {
       email,
       phone,
       firstName,
       lastName,
-      zip,
-      street,
-      houseNumber,
-      complement: complement || undefined,
-      neighborhood,
-      city,
-      state,
-    });
+    };
+
+    // Only validate address if not pickup
+    if (!isPickup) {
+      validationData.zip = zip;
+      validationData.street = street;
+      validationData.houseNumber = houseNumber;
+      validationData.complement = complement || undefined;
+      validationData.neighborhood = neighborhood;
+      validationData.city = city;
+      validationData.state = state;
+    }
+
+    // Create schema based on pickup mode
+    const schema = isPickup 
+      ? checkoutSchema.omit({ zip: true, street: true, houseNumber: true, complement: true, neighborhood: true, city: true, state: true })
+      : checkoutSchema.extend({
+          zip: z.string().trim().regex(/^\d{5}-?\d{3}$/, "CEP inválido (ex: 12345-678)"),
+          street: z.string().trim().min(3, "Rua é obrigatória"),
+          houseNumber: z.string().trim().min(1, "Número é obrigatório"),
+          neighborhood: z.string().trim().min(2, "Bairro é obrigatório"),
+          city: z.string().trim().min(2, "Cidade é obrigatória"),
+          state: z.string().trim().length(2, "Estado inválido"),
+        });
+
+    const validationResult = schema.safeParse(validationData);
 
     if (!validationResult.success) {
       const firstError = validationResult.error.errors[0];
       toast.error(firstError.message);
       return false;
     }
+
+    // Validate shipping method is selected (for non-free modes)
+    if (!selectedShipping && settings.shipping_mode !== 'free') {
+      toast.error("Selecione um método de entrega");
+      return false;
+    }
+
     return true;
   };
 
   const saveAddressIfNeeded = async () => {
-    if (user && (useNewAddress || addresses.length === 0) && saveNewAddress && canAddMore && addressLabel) {
+    if (user && !isPickup && (useNewAddress || addresses.length === 0) && saveNewAddress && canAddMore && addressLabel) {
       await addAddress({
         label: addressLabel,
         zip,
@@ -255,7 +289,7 @@ const Checkout = () => {
     customerEmail: email,
     customerName: `${firstName} ${lastName}`,
     customerPhone: phone,
-    shippingAddress: {
+    shippingAddress: isPickup ? null : {
       street,
       houseNumber,
       complement: complement || null,
@@ -265,6 +299,7 @@ const Checkout = () => {
       zip,
     },
     shippingCost: shipping,
+    shippingMethod: selectedShipping?.service || 'standard',
     couponCode: appliedCoupon?.code || null,
     sellerCode: appliedSeller?.code || null,
     user_id: user?.id || null,
@@ -286,26 +321,38 @@ const Checkout = () => {
         items: payload.items,
         email: payload.customerEmail,
         phone: payload.customerPhone,
-        shipping_address: {
+        shipping_address: isPickup ? {
           firstName,
           lastName,
-          street: payload.shippingAddress.street,
-          number: payload.shippingAddress.houseNumber,
-          complement: payload.shippingAddress.complement,
-          neighborhood: payload.shippingAddress.neighborhood,
-          city: payload.shippingAddress.city,
-          state: payload.shippingAddress.state,
-          zip: payload.shippingAddress.zip,
+          street: 'Retirada na Loja',
+          number: '',
+          complement: settings.store_pickup_address || '',
+          neighborhood: '',
+          city: '',
+          state: '',
+          zip: '',
+        } : {
+          firstName,
+          lastName,
+          street: payload.shippingAddress?.street,
+          number: payload.shippingAddress?.houseNumber,
+          complement: payload.shippingAddress?.complement,
+          neighborhood: payload.shippingAddress?.neighborhood,
+          city: payload.shippingAddress?.city,
+          state: payload.shippingAddress?.state,
+          zip: payload.shippingAddress?.zip,
         },
         user_id: payload.user_id,
         total: finalTotal,
-        shipping,
+        shipping: shipping,
+        shipping_method: payload.shippingMethod,
         payment_method: "card",
         success_url: `${baseUrl}/order-confirmation`,
         cancel_url: `${baseUrl}/checkout`,
+        coupon_code: payload.couponCode,
       };
 
-      console.log("Creating Stripe checkout session:", { itemCount: items.length });
+      console.log("Creating Stripe checkout session:", { itemCount: items.length, shippingMethod: payload.shippingMethod });
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -366,11 +413,20 @@ const Checkout = () => {
 
       const checkoutData = {
         ...payload,
+        shippingAddress: isPickup ? {
+          street: 'Retirada na Loja',
+          houseNumber: '',
+          complement: settings.store_pickup_address || '',
+          neighborhood: '',
+          city: '',
+          state: '',
+          zip: '',
+        } : payload.shippingAddress,
         success_url: `${baseUrl}/order-confirmation`,
         cancel_url: `${baseUrl}/checkout`,
       };
 
-      console.log("Creating Mercado Pago checkout session:", { itemCount: items.length });
+      console.log("Creating Mercado Pago checkout session:", { itemCount: items.length, shippingMethod: payload.shippingMethod });
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -482,188 +538,202 @@ const Checkout = () => {
                 </div>
               </div>
 
-              {/* Shipping Address */}
+              {/* Shipping Method Selection */}
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Endereço de Entrega</h2>
-
-                {/* Prompt for users without addresses */}
-                {user && addresses.length === 0 && !isLoadingAddresses && (
-                  <div className="p-4 border border-dashed border-primary/50 bg-primary/5 rounded-lg">
-                    <p className="text-sm text-foreground">
-                      Você ainda não tem endereços salvos. Preencha o endereço abaixo e salve para usar em compras futuras!
-                    </p>
-                  </div>
-                )}
-
-                {/* Saved Addresses */}
-                {hasAddresses && (
-                  <div className="space-y-3">
-                    <Label className="text-sm text-muted-foreground">Endereços salvos</Label>
-                    <div className="space-y-2">
-                      {addresses.map((addr) => (
-                        <div
-                          key={addr.id}
-                          onClick={() => handleSelectAddress(addr)}
-                          className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                            selectedAddressId === addr.id && !useNewAddress
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:border-primary/50"
-                          }`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <MapPin className="h-4 w-4 mt-0.5 text-primary" />
-                            <div className="flex-1">
-                              <p className="font-medium text-sm">{addr.label}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {addr.street}, {addr.house_number}
-                                {addr.complement && ` - ${addr.complement}`}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {addr.neighborhood}, {addr.city} - {addr.state}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <Button
-                      type="button"
-                      variant={useNewAddress ? "default" : "outline"}
-                      size="sm"
-                      onClick={handleUseNewAddress}
-                      className="w-full"
-                    >
-                      Usar outro endereço
-                    </Button>
-                  </div>
-                )}
-
-                {/* New Address Form */}
-                {(!hasAddresses || useNewAddress) && (
-                  <Collapsible open={!hasAddresses || useNewAddress} className="space-y-4">
-                    <CollapsibleContent className="space-y-4">
-                      {/* CEP */}
-                      <div>
-                        <Label htmlFor="zip">CEP *</Label>
-                        <div className="relative">
-                          <Input
-                            id="zip"
-                            required
-                            placeholder="00000-000"
-                            value={zip}
-                            onChange={handleCepChange}
-                            maxLength={9}
-                          />
-                          {isLoadingCep && (
-                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Street */}
-                      <div>
-                        <Label htmlFor="street">Rua *</Label>
-                        <Input
-                          id="street"
-                          required
-                          placeholder="Preenchido automaticamente pelo CEP"
-                          value={street}
-                          onChange={(e) => setStreet(e.target.value)}
-                        />
-                      </div>
-
-                      {/* Number & Complement */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="houseNumber">Número *</Label>
-                          <Input
-                            id="houseNumber"
-                            required
-                            placeholder="123"
-                            value={houseNumber}
-                            onChange={(e) => setHouseNumber(e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="complement">Complemento</Label>
-                          <Input
-                            id="complement"
-                            placeholder="Apto, bloco, etc. (opcional)"
-                            value={complement}
-                            onChange={(e) => setComplement(e.target.value)}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Neighborhood */}
-                      <div>
-                        <Label htmlFor="neighborhood">Bairro *</Label>
-                        <Input
-                          id="neighborhood"
-                          required
-                          placeholder="Preenchido automaticamente pelo CEP"
-                          value={neighborhood}
-                          onChange={(e) => setNeighborhood(e.target.value)}
-                        />
-                      </div>
-
-                      {/* City & State */}
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="col-span-2">
-                          <Label htmlFor="city">Cidade *</Label>
-                          <Input
-                            id="city"
-                            required
-                            placeholder="Preenchido pelo CEP"
-                            value={city}
-                            onChange={(e) => setCity(e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="state">Estado *</Label>
-                          <Input
-                            id="state"
-                            required
-                            placeholder="UF"
-                            value={state}
-                            onChange={(e) => setState(e.target.value.toUpperCase())}
-                            maxLength={2}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Save address option (only for logged-in users) */}
-                      {user && canAddMore && (useNewAddress || addresses.length === 0) && (
-                        <div className="space-y-3 pt-2 border-t border-border">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="saveAddress"
-                              checked={saveNewAddress}
-                              onCheckedChange={(checked) => setSaveNewAddress(checked === true)}
-                            />
-                            <Label htmlFor="saveAddress" className="text-sm font-normal cursor-pointer">
-                              Salvar este endereço no meu perfil
-                            </Label>
-                          </div>
-                          {saveNewAddress && (
-                            <div>
-                              <Label htmlFor="addressLabel">Nome do endereço *</Label>
-                              <Input
-                                id="addressLabel"
-                                required={saveNewAddress}
-                                placeholder="Ex: Casa, Trabalho"
-                                value={addressLabel}
-                                onChange={(e) => setAddressLabel(e.target.value)}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </CollapsibleContent>
-                  </Collapsible>
-                )}
+                <h2 className="text-xl font-semibold">Entrega</h2>
+                <ShippingCalculator
+                  onSelectOption={setSelectedShipping}
+                  selectedOption={selectedShipping}
+                  showPickup={true}
+                  itemsTotal={total}
+                  initialCep={zip}
+                />
               </div>
+
+              {/* Shipping Address - Only show if not pickup */}
+              {!isPickup && (
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold">Endereço de Entrega</h2>
+
+                  {/* Prompt for users without addresses */}
+                  {user && addresses.length === 0 && !isLoadingAddresses && (
+                    <div className="p-4 border border-dashed border-primary/50 bg-primary/5 rounded-lg">
+                      <p className="text-sm text-foreground">
+                        Você ainda não tem endereços salvos. Preencha o endereço abaixo e salve para usar em compras futuras!
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Saved Addresses */}
+                  {hasAddresses && (
+                    <div className="space-y-3">
+                      <Label className="text-sm text-muted-foreground">Endereços salvos</Label>
+                      <div className="space-y-2">
+                        {addresses.map((addr) => (
+                          <div
+                            key={addr.id}
+                            onClick={() => handleSelectAddress(addr)}
+                            className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                              selectedAddressId === addr.id && !useNewAddress
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-primary/50"
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <MapPin className="h-4 w-4 mt-0.5 text-primary" />
+                              <div className="flex-1">
+                                <p className="font-medium text-sm">{addr.label}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {addr.street}, {addr.house_number}
+                                  {addr.complement && ` - ${addr.complement}`}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {addr.neighborhood}, {addr.city} - {addr.state}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant={useNewAddress ? "default" : "outline"}
+                        size="sm"
+                        onClick={handleUseNewAddress}
+                        className="w-full"
+                      >
+                        Usar outro endereço
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* New Address Form */}
+                  {(!hasAddresses || useNewAddress) && (
+                    <Collapsible open={!hasAddresses || useNewAddress} className="space-y-4">
+                      <CollapsibleContent className="space-y-4">
+                        {/* CEP */}
+                        <div>
+                          <Label htmlFor="zip">CEP *</Label>
+                          <div className="relative">
+                            <Input
+                              id="zip"
+                              required
+                              placeholder="00000-000"
+                              value={zip}
+                              onChange={handleCepChange}
+                              maxLength={9}
+                            />
+                            {isLoadingCep && (
+                              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Street */}
+                        <div>
+                          <Label htmlFor="street">Rua *</Label>
+                          <Input
+                            id="street"
+                            required
+                            placeholder="Preenchido automaticamente pelo CEP"
+                            value={street}
+                            onChange={(e) => setStreet(e.target.value)}
+                          />
+                        </div>
+
+                        {/* Number & Complement */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="houseNumber">Número *</Label>
+                            <Input
+                              id="houseNumber"
+                              required
+                              placeholder="123"
+                              value={houseNumber}
+                              onChange={(e) => setHouseNumber(e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="complement">Complemento</Label>
+                            <Input
+                              id="complement"
+                              placeholder="Apto, bloco, etc. (opcional)"
+                              value={complement}
+                              onChange={(e) => setComplement(e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Neighborhood */}
+                        <div>
+                          <Label htmlFor="neighborhood">Bairro *</Label>
+                          <Input
+                            id="neighborhood"
+                            required
+                            placeholder="Preenchido automaticamente pelo CEP"
+                            value={neighborhood}
+                            onChange={(e) => setNeighborhood(e.target.value)}
+                          />
+                        </div>
+
+                        {/* City & State */}
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="col-span-2">
+                            <Label htmlFor="city">Cidade *</Label>
+                            <Input
+                              id="city"
+                              required
+                              placeholder="Preenchido pelo CEP"
+                              value={city}
+                              onChange={(e) => setCity(e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="state">Estado *</Label>
+                            <Input
+                              id="state"
+                              required
+                              placeholder="UF"
+                              value={state}
+                              onChange={(e) => setState(e.target.value.toUpperCase())}
+                              maxLength={2}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Save address option (only for logged-in users) */}
+                        {user && canAddMore && (useNewAddress || addresses.length === 0) && (
+                          <div className="space-y-3 pt-2 border-t border-border">
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id="saveAddress"
+                                checked={saveNewAddress}
+                                onCheckedChange={(checked) => setSaveNewAddress(checked === true)}
+                              />
+                              <Label htmlFor="saveAddress" className="text-sm font-normal cursor-pointer">
+                                Salvar este endereço no meu perfil
+                              </Label>
+                            </div>
+                            {saveNewAddress && (
+                              <div>
+                                <Label htmlFor="addressLabel">Nome do endereço *</Label>
+                                <Input
+                                  id="addressLabel"
+                                  required={saveNewAddress}
+                                  placeholder="Ex: Casa, Trabalho"
+                                  value={addressLabel}
+                                  onChange={(e) => setAddressLabel(e.target.value)}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
+                </div>
+              )}
 
               {/* Payment Gateway Selection */}
               <div className="space-y-4">
@@ -867,7 +937,12 @@ const Checkout = () => {
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
-                  <span>Frete</span>
+                  <span>
+                    {selectedShipping?.service === 'pickup' ? 'Retirada na Loja' : 'Frete'}
+                    {selectedShipping && selectedShipping.service !== 'pickup' && selectedShipping.service !== 'free' && selectedShipping.service !== 'fixed' && (
+                      <span className="text-xs text-muted-foreground ml-1">({selectedShipping.name})</span>
+                    )}
+                  </span>
                   <span>
                     {shipping === 0 ? (
                       <span className="text-primary font-medium">Grátis</span>
@@ -876,9 +951,9 @@ const Checkout = () => {
                     )}
                   </span>
                 </div>
-                {shipping > 0 && total < settings.free_shipping_threshold && (
+                {selectedShipping && selectedShipping.delivery_range && (
                   <p className="text-xs text-muted-foreground">
-                    Faltam {formatPrice(settings.free_shipping_threshold - total)} para frete grátis!
+                    Prazo: {selectedShipping.delivery_range}
                   </p>
                 )}
                 <div className="flex justify-between font-semibold text-lg pt-2 border-t border-border">

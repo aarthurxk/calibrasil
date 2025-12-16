@@ -224,6 +224,8 @@ export type Database = {
           seller_code: string | null
           seller_discount_amount: number | null
           shipping_address: Json | null
+          shipping_cost: number | null
+          shipping_method: string | null
           status: string
           total: number
           tracking_code: string | null
@@ -247,6 +249,8 @@ export type Database = {
           seller_code?: string | null
           seller_discount_amount?: number | null
           shipping_address?: Json | null
+          shipping_cost?: number | null
+          shipping_method?: string | null
           status?: string
           total: number
           tracking_code?: string | null
@@ -270,6 +274,8 @@ export type Database = {
           seller_code?: string | null
           seller_discount_amount?: number | null
           shipping_address?: Json | null
+          shipping_cost?: number | null
+          shipping_method?: string | null
           status?: string
           total?: number
           tracking_code?: string | null
@@ -535,10 +541,13 @@ export type Database = {
           notify_low_stock: boolean | null
           notify_messages: boolean | null
           notify_orders: boolean | null
+          shipping_mode: string | null
           standard_shipping_rate: number | null
           store_description: string | null
           store_email: string | null
           store_name: string | null
+          store_pickup_address: string | null
+          store_pickup_enabled: boolean | null
           tax_rate: number | null
           updated_at: string
         }
@@ -553,10 +562,13 @@ export type Database = {
           notify_low_stock?: boolean | null
           notify_messages?: boolean | null
           notify_orders?: boolean | null
+          shipping_mode?: string | null
           standard_shipping_rate?: number | null
           store_description?: string | null
           store_email?: string | null
           store_name?: string | null
+          store_pickup_address?: string | null
+          store_pickup_enabled?: boolean | null
           tax_rate?: number | null
           updated_at?: string
         }
@@ -571,10 +583,13 @@ export type Database = {
           notify_low_stock?: boolean | null
           notify_messages?: boolean | null
           notify_orders?: boolean | null
+          shipping_mode?: string | null
           standard_shipping_rate?: number | null
           store_description?: string | null
           store_email?: string | null
           store_name?: string | null
+          store_pickup_address?: string | null
+          store_pickup_enabled?: boolean | null
           tax_rate?: number | null
           updated_at?: string
         }
