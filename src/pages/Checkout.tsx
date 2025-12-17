@@ -426,7 +426,18 @@ const Checkout = () => {
         cancel_url: `${baseUrl}/checkout`,
       };
 
-      console.log("Creating Mercado Pago checkout session:", { itemCount: items.length, shippingMethod: payload.shippingMethod });
+      // DEBUG: Log full checkout data being sent
+      console.log("🛒 ========== MERCADO PAGO DEBUG ==========");
+      console.log("📦 CHECKOUT DATA BEING SENT TO EDGE FUNCTION:");
+      console.log(JSON.stringify(checkoutData, null, 2));
+      console.log("📊 Summary:", { 
+        itemCount: items.length, 
+        shippingMethod: payload.shippingMethod,
+        total: finalTotal,
+        shipping: shipping,
+        coupon: appliedCoupon?.code || 'none',
+        seller: appliedSeller?.code || 'none'
+      });
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -445,12 +456,25 @@ const Checkout = () => {
 
       const data = await response.json();
 
+      // DEBUG: Log full response from Edge Function
+      console.log("📥 EDGE FUNCTION RESPONSE:");
+      console.log(JSON.stringify(data, null, 2));
+      
+      if (data.debug) {
+        console.log("🔧 DEBUG INFO FROM BACKEND:");
+        console.log("   Token Type:", data.debug.tokenType);
+        console.log("   Preference Payload Sent to MP:", JSON.stringify(data.debug.preferencePayload, null, 2));
+        console.log("   Mercado Pago Response:", JSON.stringify(data.debug.mercadoPagoResponse, null, 2));
+      }
+      console.log("🛒 ========== END DEBUG ==========");
+
       if (!response.ok || !data.success) {
-        console.error("Mercado Pago checkout error:", data);
+        console.error("❌ Mercado Pago checkout error:", data);
         throw new Error(data.error || "Erro ao criar sessão de pagamento Mercado Pago");
       }
 
       if (data.url) {
+        console.log("✅ Redirecting to:", data.url);
         isRedirecting.current = true;
         window.location.href = data.url;
         return;
@@ -458,7 +482,7 @@ const Checkout = () => {
         throw new Error("URL de pagamento não recebida");
       }
     } catch (error: any) {
-      console.error("Error creating Mercado Pago checkout:", error);
+      console.error("❌ Error creating Mercado Pago checkout:", error);
       const errorMessage = error.message || '';
       
       if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch')) {
