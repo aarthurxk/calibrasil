@@ -427,6 +427,18 @@ serve(async (req) => {
       };
     }
 
+    // DEBUG: Log token type (masked for security)
+    const tokenType = mercadoPagoToken.startsWith('APP_USR-') ? 'PRODUCTION' : 
+                      mercadoPagoToken.startsWith('TEST-') ? 'SANDBOX' : 'UNKNOWN';
+    logStep('🔑 TOKEN INFO', { 
+      type: tokenType, 
+      last4: mercadoPagoToken.slice(-4),
+      length: mercadoPagoToken.length 
+    });
+
+    // DEBUG: Log full preference payload
+    logStep('📦 FULL PREFERENCE PAYLOAD', JSON.stringify(preferencePayload, null, 2));
+
     logStep('Creating Mercado Pago preference', { reference: order.id, maxInstallments });
 
     // Create Mercado Pago Preference
@@ -442,7 +454,14 @@ serve(async (req) => {
     });
 
     const responseText = await mercadoPagoResponse.text();
-    logStep('Mercado Pago raw response', { status: mercadoPagoResponse.status, body: responseText.substring(0, 500) });
+    
+    // DEBUG: Log full raw response
+    logStep('📥 MERCADO PAGO RAW RESPONSE', { 
+      status: mercadoPagoResponse.status, 
+      statusText: mercadoPagoResponse.statusText,
+      headers: Object.fromEntries(mercadoPagoResponse.headers.entries()),
+      body: responseText 
+    });
     
     let mercadoPagoData;
     try {
@@ -452,8 +471,11 @@ serve(async (req) => {
       throw new Error(`Erro na resposta do Mercado Pago: ${responseText || 'Resposta vazia'}`);
     }
 
+    // DEBUG: Log parsed response
+    logStep('📥 MERCADO PAGO PARSED RESPONSE', JSON.stringify(mercadoPagoData, null, 2));
+
     if (!mercadoPagoResponse.ok) {
-      logStep('Mercado Pago error', { error: mercadoPagoData });
+      logStep('❌ Mercado Pago error', { error: mercadoPagoData });
       
       // Update order status to failed
       await supabase
@@ -478,14 +500,20 @@ serve(async (req) => {
     // Get checkout URL (init_point for production, sandbox_init_point for testing)
     const checkoutUrl = mercadoPagoData.init_point || mercadoPagoData.sandbox_init_point;
 
-    logStep('Preference created successfully', { preferenceId, url: checkoutUrl });
+    logStep('✅ Preference created successfully', { preferenceId, url: checkoutUrl });
 
+    // Return with debug info
     return new Response(
       JSON.stringify({ 
         success: true,
         url: checkoutUrl,
         orderId: order.id,
-        preferenceId
+        preferenceId,
+        debug: {
+          tokenType,
+          preferencePayload,
+          mercadoPagoResponse: mercadoPagoData
+        }
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
