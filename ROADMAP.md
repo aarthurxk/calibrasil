@@ -7,6 +7,18 @@
 - [ ] **Integração API Correios** - Integração direta com API oficial dos Correios
   - Rastreamento de encomendas
   - ⏳ *Aguardando contrato comercial ativo com Correios*
+- [ ] **Geração de Etiquetas de Envio** - Sistema gratuito para gerar e imprimir etiquetas no padrão Correios
+  - Código de barras Code 128 para rastreamento (JsBarcode - MIT License)
+  - Configuração de dados do remetente no admin
+  - Suporte a impressoras térmicas (10x15cm, 10x10cm) e comuns (A4)
+  - Botão "Gerar Etiqueta" no detalhe do pedido (apenas pedidos pagos)
+
+### Gestão de Produtos
+- [ ] **Geração de Código de Barras EAN** - Sistema gratuito para gerar e imprimir códigos EAN-13/EAN-8
+  - Geração automática ou manual de códigos EAN (JsBarcode - MIT License)
+  - Impressão de etiquetas de preço com código de barras
+  - Campo EAN no cadastro de produtos
+  - Compatível com leitores de código de barras padrão
 
 ### Pagamentos
 - [x] **Parcelamento no Cartão** - Opção de parcelamento em até 6x (configurável por faixa de valor)
