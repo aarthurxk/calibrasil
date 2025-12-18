@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   DollarSign,
   ShoppingCart,
@@ -8,6 +9,13 @@ import {
   Loader2,
   Percent,
   ShoppingBag,
+  Radio,
+  Package,
+  Truck,
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -32,8 +40,10 @@ const formatPrice = (price: number) => {
 };
 
 const Dashboard = () => {
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+
   // Fetch orders for stats
-  const { data: orders = [], isLoading: ordersLoading } = useQuery({
+  const { data: orders = [], isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
     queryKey: ['admin-orders-stats'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -44,6 +54,26 @@ const Dashboard = () => {
       return data;
     },
   });
+
+  // Realtime subscription for orders
+  useEffect(() => {
+    const channel = supabase
+      .channel('orders-status-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        () => {
+          refetchOrders();
+        }
+      )
+      .subscribe((status) => {
+        setIsRealtimeConnected(status === 'SUBSCRIBED');
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetchOrders]);
 
   // Fetch customers count
   const { data: customersCount = 0, isLoading: customersLoading } = useQuery({
@@ -123,6 +153,75 @@ const Dashboard = () => {
 
   // Recent orders (last 5)
   const recentOrders = orders.slice(0, 5);
+
+  // Calculate order status counts for the status table
+  const statusCounts = [
+    {
+      key: 'awaiting_payment',
+      label: 'Aguardando Pagamento',
+      count: orders.filter(o => o.payment_status === 'pending' || o.status === 'awaiting_payment').length,
+      icon: Clock,
+      priority: 'critical',
+      bgClass: 'bg-red-500/10',
+      textClass: 'text-red-600',
+      borderClass: 'border-red-500/20',
+    },
+    {
+      key: 'paid_no_tracking',
+      label: 'Pagos sem Rastreio',
+      count: orders.filter(o => 
+        o.payment_status === 'paid' && 
+        !o.tracking_code && 
+        o.status !== 'delivered' &&
+        o.shipping_method !== 'pickup'
+      ).length,
+      icon: AlertCircle,
+      priority: 'high',
+      bgClass: 'bg-orange-500/10',
+      textClass: 'text-orange-600',
+      borderClass: 'border-orange-500/20',
+    },
+    {
+      key: 'processing',
+      label: 'Processando',
+      count: orders.filter(o => o.status === 'processing').length,
+      icon: Package,
+      priority: 'medium',
+      bgClass: 'bg-yellow-500/10',
+      textClass: 'text-yellow-600',
+      borderClass: 'border-yellow-500/20',
+    },
+    {
+      key: 'shipped',
+      label: 'Enviado',
+      count: orders.filter(o => o.status === 'shipped').length,
+      icon: Truck,
+      priority: 'normal',
+      bgClass: 'bg-blue-500/10',
+      textClass: 'text-blue-600',
+      borderClass: 'border-blue-500/20',
+    },
+    {
+      key: 'delivered',
+      label: 'Entregue',
+      count: orders.filter(o => o.status === 'delivered').length,
+      icon: CheckCircle,
+      priority: 'done',
+      bgClass: 'bg-green-500/10',
+      textClass: 'text-green-600',
+      borderClass: 'border-green-500/20',
+    },
+    {
+      key: 'cancelled',
+      label: 'Cancelado',
+      count: orders.filter(o => o.status === 'cancelled').length,
+      icon: XCircle,
+      priority: 'archived',
+      bgClass: 'bg-muted',
+      textClass: 'text-muted-foreground',
+      borderClass: 'border-border',
+    },
+  ];
 
   const stats = [
     {
@@ -222,6 +321,45 @@ const Dashboard = () => {
           </Card>
         ))}
       </div>
+
+      {/* Order Status Table */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div className="flex items-center gap-3">
+            <CardTitle>Status dos Pedidos</CardTitle>
+            {isRealtimeConnected && (
+              <div className="flex items-center gap-1.5 text-xs text-green-600">
+                <Radio className="h-3 w-3 animate-pulse" />
+                <span>Ao vivo</span>
+              </div>
+            )}
+          </div>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/admin/orders">Ver todos</Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {statusCounts.map((status) => (
+              <Link
+                key={status.key}
+                to={`/admin/orders?status=${status.key}`}
+                className={`p-4 rounded-lg border ${status.bgClass} ${status.borderClass} hover:opacity-80 transition-opacity cursor-pointer`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <status.icon className={`h-4 w-4 ${status.textClass}`} />
+                  <span className={`text-xs font-medium ${status.textClass}`}>
+                    {status.label}
+                  </span>
+                </div>
+                <div className={`text-2xl font-bold ${status.textClass}`}>
+                  {status.count}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
