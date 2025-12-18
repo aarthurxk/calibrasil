@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Search, Eye, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Search, Eye, Loader2, X, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -104,12 +105,83 @@ const formatPrice = (price: number) => {
   return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
 
+// Helper to filter by date
+const filterByDate = (orderDate: string, period: string): boolean => {
+  if (period === 'all') return true;
+  
+  const date = new Date(orderDate);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  switch (period) {
+    case 'today':
+      return date >= today;
+    case 'week': {
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return date >= weekAgo;
+    }
+    case 'month': {
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      return date >= monthStart;
+    }
+    case '30days': {
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      return date >= thirtyDaysAgo;
+    }
+    case '90days': {
+      const ninetyDaysAgo = new Date(today);
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      return date >= ninetyDaysAgo;
+    }
+    default:
+      return true;
+  }
+};
+
 const Orders = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const { canEditOrders } = useAuth();
   const queryClient = useQueryClient();
+
+  // Read URL params on mount
+  useEffect(() => {
+    const status = searchParams.get('status');
+    const payment = searchParams.get('payment');
+    const period = searchParams.get('period');
+    
+    if (status) setStatusFilter(status);
+    if (payment) setPaymentStatusFilter(payment);
+    if (period) setDateFilter(period);
+  }, [searchParams]);
+
+  // Update URL when filters change
+  const updateFilters = (key: string, value: string) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (value === 'all') {
+      newParams.delete(key);
+    } else {
+      newParams.set(key, value);
+    }
+    setSearchParams(newParams);
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setPaymentStatusFilter('all');
+    setDateFilter('all');
+    setSearchParams(new URLSearchParams());
+  };
+
+  const hasActiveFilters = statusFilter !== 'all' || paymentStatusFilter !== 'all' || dateFilter !== 'all' || searchTerm !== '';
 
   // Fetch orders with items
   const { data: orders = [], isLoading } = useQuery({
@@ -161,9 +233,14 @@ const Orders = () => {
     },
   });
 
-  const filteredOrders = orders.filter((order) =>
-    order.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOrders = orders.filter((order) => {
+    const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+    const matchesPayment = paymentStatusFilter === 'all' || order.payment_status === paymentStatusFilter;
+    const matchesDate = filterByDate(order.created_at, dateFilter);
+    
+    return matchesSearch && matchesStatus && matchesPayment && matchesDate;
+  });
 
   // Calculate stats
   const totalOrders = orders.length;
@@ -233,9 +310,10 @@ const Orders = () => {
         </Card>
       </div>
 
-      {/* Search */}
+      {/* Search and Filters */}
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 space-y-4">
+          {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -244,6 +322,97 @@ const Orders = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
+          </div>
+          
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Filter className="h-4 w-4" />
+              <span>Filtros:</span>
+            </div>
+            
+            {/* Order Status Filter */}
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => {
+                setStatusFilter(value);
+                updateFilters('status', value);
+              }}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Status do Pedido" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Status</SelectItem>
+                <SelectItem value="awaiting_payment">Aguardando Pagamento</SelectItem>
+                <SelectItem value="pending">Pendente</SelectItem>
+                <SelectItem value="processing">Processando</SelectItem>
+                <SelectItem value="shipped">Enviado</SelectItem>
+                <SelectItem value="delivered">Entregue</SelectItem>
+                <SelectItem value="cancelled">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Payment Status Filter */}
+            <Select
+              value={paymentStatusFilter}
+              onValueChange={(value) => {
+                setPaymentStatusFilter(value);
+                updateFilters('payment', value);
+              }}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Status Pagamento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Pagamentos</SelectItem>
+                <SelectItem value="paid">Pago</SelectItem>
+                <SelectItem value="pending">Pendente</SelectItem>
+                <SelectItem value="awaiting_payment">Aguardando</SelectItem>
+                <SelectItem value="failed">Falhou</SelectItem>
+                <SelectItem value="expired">Expirado</SelectItem>
+                <SelectItem value="refunded">Reembolsado</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Date Filter */}
+            <Select
+              value={dateFilter}
+              onValueChange={(value) => {
+                setDateFilter(value);
+                updateFilters('period', value);
+              }}
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todo Período</SelectItem>
+                <SelectItem value="today">Hoje</SelectItem>
+                <SelectItem value="week">Esta Semana</SelectItem>
+                <SelectItem value="month">Este Mês</SelectItem>
+                <SelectItem value="30days">Últimos 30 dias</SelectItem>
+                <SelectItem value="90days">Últimos 90 dias</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Clear Filters */}
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Limpar
+              </Button>
+            )}
+          </div>
+
+          {/* Results Counter */}
+          <div className="text-sm text-muted-foreground">
+            Mostrando {filteredOrders.length} de {orders.length} pedidos
           </div>
         </CardContent>
       </Card>
