@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Star, ShoppingCart, Heart, Truck, Shield, ArrowLeft, Minus, Plus, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import MainLayout from '@/components/layout/MainLayout';
@@ -138,6 +138,18 @@ const ProductDetail = () => {
   
   const variantStock = getSelectedVariantStock();
   const isOutOfStock = variantStock !== null && variantStock <= 0;
+
+  // Scroll to reviews section if hash is #reviews
+  useEffect(() => {
+    if (window.location.hash === '#reviews' && !isLoading && product) {
+      const reviewsSection = document.getElementById('reviews');
+      if (reviewsSection) {
+        setTimeout(() => {
+          reviewsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    }
+  }, [isLoading, product]);
 
   // Calculate average rating
   const averageRating = reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : product?.rating || 0;
