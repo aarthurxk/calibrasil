@@ -127,7 +127,7 @@ serve(async (req) => {
       throw new Error("Template not found");
     }
 
-    const baseUrl = "https://calibrasil.com";
+    const baseUrl = Deno.env.get("FRONTEND_URL") || "https://calibrasil.com";
     const processedOrders: string[] = [];
 
     for (const order of orders) {
