@@ -88,11 +88,16 @@ const getStatusInfo = (status: string): { label: string; emoji: string; color: s
 };
 
 // Replaces template variables like {{variable_name}} with actual values
+// HTML sections (tracking_section, confirmation_section, review_section) are not escaped
 const replaceTemplateVariables = (template: string, variables: Record<string, string>): string => {
   let result = template;
+  const htmlSections = ['tracking_section', 'confirmation_section', 'review_section'];
+  
   for (const [key, value] of Object.entries(variables)) {
     const regex = new RegExp(`{{${key}}}`, 'g');
-    result = result.replace(regex, escapeHtml(value));
+    // Don't escape HTML for section variables that contain pre-formatted HTML
+    const replacement = htmlSections.includes(key) ? value : escapeHtml(value);
+    result = result.replace(regex, replacement);
   }
   return result;
 };
@@ -298,6 +303,53 @@ serve(async (req) => {
     } else {
       // For other status updates, use order_status_update template
       const statusInfo = getStatusInfo(data.newStatus);
+      const confirmationToken = await generateConfirmationToken(data.orderId);
+      const confirmationUrl = `${supabaseUrl}/functions/v1/confirm-order-received?orderId=${data.orderId}&token=${confirmationToken}`;
+      const reviewUrl = 'https://calibrasil.lovable.app/orders';
+      const trackingUrl = 'https://www.linkcorreios.com.br/';
+      
+      // Generate dynamic sections based on status
+      let trackingSection = '';
+      let confirmationSection = '';
+      let reviewSection = '';
+      
+      // Tracking section - show if tracking code exists
+      if (data.trackingCode) {
+        trackingSection = `
+          <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 15px 0;">
+            <p style="margin: 0 0 10px 0;"><strong>🚚 Código de Rastreamento:</strong></p>
+            <p style="margin: 0; font-family: monospace; font-size: 18px; letter-spacing: 1px;">${data.trackingCode}</p>
+            <a href="${trackingUrl}" style="display: inline-block; margin-top: 10px; color: #059669; text-decoration: underline;">Rastrear Pedido</a>
+          </div>
+        `;
+      }
+      
+      // Confirmation section - show for shipped/delivered status
+      if (data.newStatus === 'shipped') {
+        confirmationSection = `
+          <div style="text-align: center; margin: 20px 0;">
+            <p style="color: #666;">Já recebeu? Confirme para nós:</p>
+            <a href="${confirmationUrl}" style="display: inline-block; background: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">✅ Recebi meu Pedido</a>
+          </div>
+        `;
+      }
+      
+      // Review section - show for delivered status
+      if (data.newStatus === 'delivered') {
+        reviewSection = `
+          <div style="text-align: center; margin: 20px 0;">
+            <p style="color: #666;">Conta pra gente o que achou!</p>
+            <a href="${reviewUrl}" style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">⭐ Avaliar minha Compra</a>
+          </div>
+        `;
+      }
+      
+      // Calculate lighter color for gradient
+      const colorLight = statusInfo.color.replace('#', '');
+      const r = Math.min(255, parseInt(colorLight.substr(0, 2), 16) + 40).toString(16).padStart(2, '0');
+      const g = Math.min(255, parseInt(colorLight.substr(2, 2), 16) + 40).toString(16).padStart(2, '0');
+      const b = Math.min(255, parseInt(colorLight.substr(4, 2), 16) + 40).toString(16).padStart(2, '0');
+      const statusColorLight = `#${r}${g}${b}`;
       
       const variables: Record<string, string> = {
         customer_name: data.customerName,
@@ -305,8 +357,12 @@ serve(async (req) => {
         status_label: statusInfo.label,
         status_emoji: statusInfo.emoji,
         status_color: statusInfo.color,
+        status_color_light: statusColorLight,
         status_message: statusInfo.message,
-        tracking_code: data.trackingCode || ''
+        tracking_code: data.trackingCode || '',
+        tracking_section: trackingSection,
+        confirmation_section: confirmationSection,
+        review_section: reviewSection
       };
       
       emailContent = await generateEmailFromTemplate(
