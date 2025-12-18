@@ -98,10 +98,10 @@ const ProductDetail = () => {
       } = await supabase.from('product_reviews').select('id').eq('product_id', id).eq('user_id', user.id).maybeSingle();
       if (existingReview) return false;
 
-      // Check if user has a delivered order with this product
+      // Check if user has a delivered order with this product (status delivered OR received_at set)
       const {
         data: orders
-      } = await supabase.from('orders').select('id').eq('user_id', user.id).eq('status', 'delivered');
+      } = await supabase.from('orders').select('id').eq('user_id', user.id).or('status.eq.delivered,received_at.not.is.null');
       if (!orders || orders.length === 0) return false;
       const orderIds = orders.map(o => o.id);
       const {
@@ -373,11 +373,12 @@ const ProductDetail = () => {
         </div>
 
         {/* Reviews Section */}
-        <div className="mt-16 pt-8 border-t border-border">
+        <div id="reviews" className="mt-16 pt-8 border-t border-border">
           <h2 className="text-2xl font-bold mb-6">Avaliações ({reviews.length})</h2>
 
           {/* Review Form (only for eligible users) */}
-          {canReview && <div className="bg-muted/30 rounded-xl p-6 mb-8">
+          {canReview ? (
+            <div className="bg-muted/30 rounded-xl p-6 mb-8">
               <h3 className="font-semibold mb-4">Curtiu o produto? Deixa sua avaliação! 🌴</h3>
               <div className="space-y-4">
                 <div>
@@ -398,7 +399,27 @@ const ProductDetail = () => {
                     </> : 'Enviar Avaliação'}
                 </Button>
               </div>
-            </div>}
+            </div>
+          ) : (
+            <div className="bg-muted/30 rounded-xl p-6 mb-8 text-center">
+              {user ? (
+                <p className="text-muted-foreground">
+                  Para avaliar este produto, você precisa ter comprado e recebido ele primeiro! 🛍️
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-muted-foreground">
+                    Faça login para avaliar produtos que você comprou
+                  </p>
+                  <Link to="/auth">
+                    <Button variant="outline" size="sm">
+                      Entrar na Conta
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Reviews List */}
           {reviews.length === 0 ? <p className="text-muted-foreground text-center py-8">
