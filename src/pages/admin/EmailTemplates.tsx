@@ -298,6 +298,7 @@ export default function EmailTemplates() {
                         srcDoc={previewHtml}
                         className="w-full min-h-[400px] bg-white"
                         title="Email Preview"
+                        sandbox=""
                       />
                     </div>
                   </TabsContent>
