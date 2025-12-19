@@ -91,27 +91,27 @@ const Auth = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
-  const { signIn, signUp, resetPassword, updatePassword, user, role, isLoading: authLoading } = useAuth();
+  const { signIn, signUp, resetPassword, updatePassword, user, role, isLoading: authLoading, isPasswordRecovery, clearPasswordRecovery } = useAuth();
   const navigate = useNavigate();
 
-  // Check if user came from password reset email
+  // Check if user came from password reset email (via URL or auth event)
   useEffect(() => {
     const mode = searchParams.get('mode');
-    if (mode === 'reset') {
+    if (mode === 'reset' || isPasswordRecovery) {
       setAuthView('reset-password');
     }
-  }, [searchParams]);
+  }, [searchParams, isPasswordRecovery]);
 
   // Redirect if already logged in (but not during password reset)
   useEffect(() => {
-    if (!authLoading && user && authView !== 'reset-password') {
+    if (!authLoading && user && authView !== 'reset-password' && !isPasswordRecovery) {
       if (role === 'admin' || role === 'manager') {
         navigate('/admin');
       } else {
         navigate('/');
       }
     }
-  }, [user, role, authLoading, navigate, authView]);
+  }, [user, role, authLoading, navigate, authView, isPasswordRecovery]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -264,6 +264,7 @@ const Auth = () => {
     }
 
     toast.success('Senha atualizada com sucesso! 🤙');
+    clearPasswordRecovery();
     setAuthView('login');
     setNewPassword('');
     setConfirmPassword('');
