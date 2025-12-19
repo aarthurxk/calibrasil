@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,9 +10,10 @@ import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MapPin, Phone, Mail, Package, CreditCard, Calendar, Truck, Loader2 } from 'lucide-react';
+import { MapPin, Phone, Mail, Package, CreditCard, Calendar, Truck, Loader2, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useQuery } from '@tanstack/react-query';
 
 interface OrderItem {
   id: string;
@@ -48,6 +49,7 @@ interface Order {
   created_at: string;
   order_items?: OrderItem[];
   tracking_code?: string;
+  user_id?: string;
 }
 
 interface OrderDetailsDialogProps {
@@ -111,14 +113,61 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onTrackingCodeSa
   const [trackingCode, setTrackingCode] = useState(order?.tracking_code || '');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Buscar dados do perfil quando há user_id
+  const { data: profile } = useQuery({
+    queryKey: ['order-profile', order?.user_id],
+    queryFn: async () => {
+      if (!order?.user_id) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, phone')
+        .eq('user_id', order.user_id)
+        .single();
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return null;
+      }
+      return data;
+    },
+    enabled: !!order?.user_id && open,
+  });
+
+  // Buscar email do usuário quando há user_id
+  const { data: userEmailData } = useQuery({
+    queryKey: ['order-user-email', order?.user_id],
+    queryFn: async () => {
+      if (!order?.user_id) return null;
+      const { data, error } = await supabase.functions.invoke('get-user-email', {
+        body: { userId: order.user_id }
+      });
+      if (error) {
+        console.error('Error fetching user email:', error);
+        return null;
+      }
+      return data?.email;
+    },
+    enabled: !!order?.user_id && open,
+  });
+
+  useEffect(() => {
+    if (order?.tracking_code) {
+      setTrackingCode(order.tracking_code);
+    }
+  }, [order?.tracking_code]);
+
   if (!order) return null;
 
   const address = order.shipping_address;
-  const customerName = address?.name || 
+  
+  // Priorizar dados do perfil sobre dados guest
+  const customerName = profile?.full_name || 
+    address?.name || 
     `${address?.firstName || ''} ${address?.lastName || ''}`.trim() || 
     'Cliente';
-
-  const customerEmail = order.guest_email || '';
+  
+  const customerEmail = userEmailData || order.guest_email || '';
+  const customerPhone = profile?.phone || order.phone || '';
+  const isRegisteredUser = !!order.user_id;
 
   const subtotal = order.order_items?.reduce(
     (acc, item) => acc + item.price * item.quantity, 
@@ -260,21 +309,29 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onTrackingCodeSa
 
           {/* Informações do Cliente */}
           <div>
-            <h3 className="font-semibold mb-3">Informações do Cliente</h3>
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Informações do Cliente
+              {isRegisteredUser && (
+                <Badge variant="outline" className="text-xs">
+                  Cadastrado
+                </Badge>
+              )}
+            </h3>
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2">
                 <span className="font-medium">{customerName}</span>
               </div>
-              {order.guest_email && (
+              {customerEmail && (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Mail className="h-4 w-4" />
-                  {order.guest_email}
+                  {customerEmail}
                 </div>
               )}
-              {order.phone && (
+              {customerPhone && (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Phone className="h-4 w-4" />
-                  {order.phone}
+                  {customerPhone}
                 </div>
               )}
             </div>
