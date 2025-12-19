@@ -39,6 +39,22 @@ setInterval(() => {
   }
 }, 60000);
 
+// HMAC-SHA256 token generation for secure order confirmation access
+async function generateHMAC(data: string, secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 interface CartItem {
   id: string;
   name: string;
@@ -425,11 +441,18 @@ serve(async (req) => {
       return { enabled: true };
     };
 
+    // Generate secure confirmation token
+    const internalSecret = Deno.env.get('INTERNAL_API_SECRET');
+    let confirmationToken = '';
+    if (internalSecret) {
+      confirmationToken = await generateHMAC(order.id, internalSecret);
+    }
+
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: paymentMethodTypes,
       line_items: lineItems,
       mode: "payment",
-      success_url: `${body.success_url}?order_id=${order.id}&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${body.success_url}?order_id=${order.id}&token=${confirmationToken}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${body.cancel_url}?order_id=${order.id}`,
       customer_email: body.email,
       metadata: {

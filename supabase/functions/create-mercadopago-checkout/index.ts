@@ -67,6 +67,22 @@ function checkRateLimit(clientIP: string): boolean {
   return true;
 }
 
+// HMAC-SHA256 token generation for secure order confirmation access
+async function generateHMAC(data: string, secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 // Validate coupon
 async function validateCoupon(supabase: any, couponCode: string, orderTotal: number) {
   const { data: coupon, error } = await supabase
@@ -377,6 +393,13 @@ serve(async (req) => {
     // Get max installments based on total
     const maxInstallments = getInstallments(finalTotal);
 
+    // Generate secure confirmation token
+    const internalSecret = Deno.env.get('INTERNAL_API_SECRET');
+    let confirmationToken = '';
+    if (internalSecret) {
+      confirmationToken = await generateHMAC(order.id, internalSecret);
+    }
+
     // Build Mercado Pago Preference payload
     const preferencePayload: any = {
       items: mercadoPagoItems,
@@ -390,9 +413,9 @@ serve(async (req) => {
         }
       },
       back_urls: {
-        success: `${success_url}?order_id=${order.id}&gateway=mercadopago`,
+        success: `${success_url}?order_id=${order.id}&token=${confirmationToken}&gateway=mercadopago`,
         failure: cancel_url,
-        pending: `${success_url}?order_id=${order.id}&gateway=mercadopago&status=pending`
+        pending: `${success_url}?order_id=${order.id}&token=${confirmationToken}&gateway=mercadopago&status=pending`
       },
       auto_return: 'approved',
       external_reference: order.id,

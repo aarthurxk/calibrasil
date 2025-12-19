@@ -22,6 +22,7 @@ interface OrderData {
 const OrderConfirmation = () => {
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get('order_id');
+  const token = searchParams.get('token');
   const [status, setStatus] = useState<OrderStatus>('loading');
   const [order, setOrder] = useState<OrderData | null>(null);
   const { clearCart } = useCart();
@@ -29,15 +30,15 @@ const OrderConfirmation = () => {
 
   useEffect(() => {
     const fetchOrder = async () => {
-      if (!orderId) {
+      if (!orderId || !token) {
         setStatus('not_found');
         return;
       }
 
       try {
-        // Use Edge Function to bypass RLS and fetch order securely
+        // Use Edge Function with secure token to fetch order
         const { data, error } = await supabase.functions.invoke('get-order-confirmation', {
-          body: { order_id: orderId }
+          body: { order_id: orderId, token }
         });
 
         if (error || !data?.order) {

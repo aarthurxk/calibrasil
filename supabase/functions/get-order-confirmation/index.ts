@@ -6,6 +6,44 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Rate limiting
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+
+function checkRateLimit(clientIP: string): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(clientIP);
+  
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(clientIP, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  
+  if (record.count >= RATE_LIMIT_MAX) {
+    return false;
+  }
+  
+  record.count++;
+  return true;
+}
+
+// HMAC-SHA256 token generation/verification
+async function generateHMAC(data: string, secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 const logStep = (step: string, details?: Record<string, unknown>) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[GET-ORDER-CONFIRMATION] ${step}${detailsStr}`);
@@ -19,7 +57,20 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    const { order_id } = await req.json();
+    // Rate limiting check
+    const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                     req.headers.get('cf-connecting-ip') || 
+                     'unknown';
+    
+    if (!checkRateLimit(clientIP)) {
+      logStep("Rate limit exceeded", { ip: clientIP });
+      return new Response(
+        JSON.stringify({ error: "Too many requests. Please try again later." }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }
+      );
+    }
+
+    const { order_id, token } = await req.json();
     
     if (!order_id) {
       logStep("Missing order_id");
@@ -29,7 +80,34 @@ serve(async (req) => {
       );
     }
 
-    logStep("Fetching order", { order_id });
+    if (!token) {
+      logStep("Missing token");
+      return new Response(
+        JSON.stringify({ error: "token is required" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
+    // Verify HMAC token
+    const secret = Deno.env.get("INTERNAL_API_SECRET");
+    if (!secret) {
+      logStep("ERROR: INTERNAL_API_SECRET not configured");
+      return new Response(
+        JSON.stringify({ error: "Server configuration error" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+
+    const expectedToken = await generateHMAC(order_id, secret);
+    if (token !== expectedToken) {
+      logStep("Invalid token", { order_id });
+      return new Response(
+        JSON.stringify({ error: "Invalid or expired token" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403 }
+      );
+    }
+
+    logStep("Token verified, fetching order", { order_id });
 
     // Use SERVICE_ROLE_KEY to bypass RLS
     const supabaseAdmin = createClient(
@@ -97,7 +175,7 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: errorMessage });
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: "Internal server error" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
