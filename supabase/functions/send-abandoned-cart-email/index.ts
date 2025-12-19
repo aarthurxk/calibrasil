@@ -124,7 +124,7 @@ serve(async (req) => {
   try {
     // Verify internal secret to prevent unauthorized access
     const internalSecret = req.headers.get("x-internal-secret");
-    const expectedSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+    const expectedSecret = Deno.env.get("INTERNAL_API_SECRET");
     
     if (!internalSecret || internalSecret !== expectedSecret) {
       console.error("[ABANDONED-CART] Unauthorized: Invalid or missing internal secret");
