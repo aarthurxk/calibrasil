@@ -1,43 +1,52 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface CartItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  color?: string;
-  model?: string;
-  image?: string;
-}
+// Input validation schemas
+const brazilianPhoneRegex = /^(\+?55\s?)?(\(?\d{2}\)?[\s-]?)?\d{4,5}[\s-]?\d{4}$/;
+const cepRegex = /^\d{5}-?\d{3}$/;
 
-interface CheckoutRequest {
-  items: CartItem[];
-  customerEmail: string;
-  customerName: string;
-  customerPhone: string;
-  shippingAddress: {
-    street: string;
-    houseNumber: string;
-    complement?: string;
-    neighborhood: string;
-    city: string;
-    state: string;
-    zip: string;
-  } | null;
-  shippingCost: number;
-  shippingMethod?: string;
-  couponCode?: string;
-  sellerCode?: string;
-  success_url: string;
-  cancel_url: string;
-  user_id?: string;
-}
+const CartItemSchema = z.object({
+  id: z.string().uuid("ID do produto inválido"),
+  name: z.string().min(1).max(255),
+  price: z.number().positive(),
+  quantity: z.number().int().min(1, "Quantidade mínima é 1").max(100, "Quantidade máxima é 100 por item"),
+  color: z.string().max(50).optional(),
+  model: z.string().max(50).optional(),
+  image: z.string().url().optional().or(z.literal("")),
+});
+
+const ShippingAddressSchema = z.object({
+  street: z.string().min(1, "Rua é obrigatória").max(200, "Nome da rua muito longo"),
+  houseNumber: z.string().min(1, "Número é obrigatório").max(20),
+  complement: z.string().max(100).optional().or(z.literal("")),
+  neighborhood: z.string().min(1, "Bairro é obrigatório").max(100),
+  city: z.string().min(1, "Cidade é obrigatória").max(100),
+  state: z.string().length(2, "Estado deve ter 2 caracteres"),
+  zip: z.string().regex(cepRegex, "CEP inválido (formato: 00000-000)"),
+}).nullable();
+
+const CheckoutRequestSchema = z.object({
+  items: z.array(CartItemSchema).min(1, "Carrinho vazio").max(50, "Limite de 50 itens por pedido"),
+  customerEmail: z.string().email("Email inválido").max(255, "Email muito longo"),
+  customerName: z.string().min(1, "Nome é obrigatório").max(200, "Nome muito longo").regex(/^[a-zA-ZÀ-ÿ\s'-]+$/, "Nome contém caracteres inválidos"),
+  customerPhone: z.string().regex(brazilianPhoneRegex, "Telefone inválido"),
+  shippingAddress: ShippingAddressSchema,
+  shippingCost: z.number().min(0),
+  shippingMethod: z.string().max(50).optional(),
+  couponCode: z.string().max(50).optional().or(z.literal("")),
+  sellerCode: z.string().max(50).optional().or(z.literal("")),
+  success_url: z.string().url("URL de sucesso inválida"),
+  cancel_url: z.string().url("URL de cancelamento inválida"),
+  user_id: z.string().uuid().optional().nullable(),
+});
+
+type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;
 
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
@@ -173,12 +182,23 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const requestData: CheckoutRequest = await req.json();
-    logStep('Request received', { itemCount: requestData.items.length, shippingMethod: requestData.shippingMethod });
+    const rawBody = await req.json();
+    
+    // Validate input using Zod schema
+    const validationResult = CheckoutRequestSchema.safeParse(rawBody);
+    
+    if (!validationResult.success) {
+      const errors = validationResult.error.errors.map(e => e.message).join(', ');
+      logStep('Validation failed', validationResult.error.errors);
+      throw new Error(`Dados inválidos: ${errors}`);
+    }
+    
+    const requestData = validationResult.data;
+    logStep('Validated request', { itemCount: requestData.items.length, shippingMethod: requestData.shippingMethod });
 
     const { items, customerEmail, customerName, customerPhone, shippingAddress, shippingCost, shippingMethod, couponCode, sellerCode, success_url, cancel_url, user_id } = requestData;
 
-    // Validate URLs
+    // Validate URLs against allowed domains
     const allowedDomains = ["localhost", "lovableproject.com", "lovable.app", "calibrasil.com"];
     const isValidUrl = (url: string) => {
       try {
