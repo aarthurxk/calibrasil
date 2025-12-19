@@ -712,6 +712,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      validate_seller_code: {
+        Args: { seller_code: string }
+        Returns: {
+          code: string
+          discount_percent: number
+          id: string
+          name: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "customer"
