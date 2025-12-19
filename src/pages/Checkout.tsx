@@ -42,6 +42,18 @@ const checkoutSchema = z.object({
 
 type PaymentGateway = "stripe" | "mercadopago";
 
+// Format phone number to (XX) XXXXX-XXXX or (XX) XXXX-XXXX
+const formatPhone = (phone: string): string => {
+  if (!phone) return "";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 11) {
+    return digits.replace(/^(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3");
+  } else if (digits.length === 10) {
+    return digits.replace(/^(\d{2})(\d{4})(\d{4})$/, "($1) $2-$3");
+  }
+  return phone;
+};
+
 const Checkout = () => {
   const { items, total } = useCart();
   const isRedirecting = useRef(false);
@@ -111,7 +123,7 @@ const Checkout = () => {
           setLastName(nameParts.slice(1).join(" ") || "");
         }
         if (data.phone) {
-          setPhone(data.phone);
+          setPhone(formatPhone(data.phone));
         }
       }
     };
@@ -205,9 +217,8 @@ const Checkout = () => {
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const valor = e.target.value.replace(/\D/g, "");
-    const formatado = valor.replace(/^(\d{2})(\d{5})(\d{4}).*/, "($1) $2-$3");
-    setPhone(formatado);
+    const digits = e.target.value.replace(/\D/g, "").slice(0, 11);
+    setPhone(formatPhone(digits));
   };
 
   const validateForm = () => {

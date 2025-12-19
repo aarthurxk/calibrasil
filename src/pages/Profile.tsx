@@ -15,6 +15,18 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+// Format phone number to (XX) XXXXX-XXXX or (XX) XXXX-XXXX
+const formatPhone = (phone: string): string => {
+  if (!phone) return "";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 11) {
+    return digits.replace(/^(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3");
+  } else if (digits.length === 10) {
+    return digits.replace(/^(\d{2})(\d{4})(\d{4})$/, "($1) $2-$3");
+  }
+  return phone;
+};
+
 interface Profile {
   full_name: string | null;
   phone: string | null;
@@ -192,7 +204,10 @@ const Profile = () => {
                   <Input
                     id="phone"
                     value={profile.phone || ""}
-                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, "").slice(0, 11);
+                      setProfile({ ...profile, phone: formatPhone(digits) });
+                    }}
                     placeholder="(11) 99999-9999"
                   />
                 </div>
