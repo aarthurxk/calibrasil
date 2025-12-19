@@ -38,6 +38,22 @@ setInterval(() => {
   }
 }, 60000);
 
+// HMAC-SHA256 token generation for secure order confirmation access
+async function generateHMAC(data: string, secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 interface CartItem {
   id: string;
   name: string;
@@ -268,10 +284,21 @@ serve(async (req) => {
       // Don't fail the order for low stock check errors
     }
 
+    // Generate secure token for order confirmation access
+    const internalSecret = Deno.env.get('INTERNAL_API_SECRET');
+    let confirmationToken = '';
+    if (internalSecret) {
+      confirmationToken = await generateHMAC(order.id, internalSecret);
+      console.log('Generated confirmation token for order:', order.id);
+    } else {
+      console.warn('INTERNAL_API_SECRET not configured - confirmation token not generated');
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
         order_id: order.id,
+        confirmation_token: confirmationToken,
         message: 'Pedido criado com sucesso!' 
       }),
       { 
