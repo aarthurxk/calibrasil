@@ -10,11 +10,13 @@ interface AuthContextType {
   session: Session | null;
   role: AppRole | null;
   isLoading: boolean;
+  isPasswordRecovery: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
+  clearPasswordRecovery: () => void;
   isAdmin: boolean;
   isManager: boolean;
   canManageProducts: boolean;
@@ -30,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   const fetchUserRole = async (userId: string) => {
     try {
@@ -58,6 +61,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
 
+        // Handle PASSWORD_RECOVERY event
+        if (event === 'PASSWORD_RECOVERY') {
+          setIsPasswordRecovery(true);
+        }
+
         // Defer role fetch with setTimeout to avoid deadlock
         if (session?.user) {
           setTimeout(() => {
@@ -69,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (event === 'SIGNED_OUT') {
           setRole(null);
+          setIsPasswordRecovery(false);
         }
       }
     );
@@ -161,6 +170,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updatePassword = async (newPassword: string) => {
     try {
+      // Verify we have a valid session before updating password
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession) {
+        return { error: new Error('Sessão expirada. Solicite um novo link de recuperação.') };
+      }
+
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
@@ -169,10 +184,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error };
       }
 
+      // Clear password recovery state on success
+      setIsPasswordRecovery(false);
       return { error: null };
     } catch (err) {
       return { error: err as Error };
     }
+  };
+
+  const clearPasswordRecovery = () => {
+    setIsPasswordRecovery(false);
   };
 
   // Permission helpers
@@ -190,11 +211,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         role,
         isLoading,
+        isPasswordRecovery,
         signIn,
         signUp,
         signOut,
         resetPassword,
         updatePassword,
+        clearPasswordRecovery,
         isAdmin,
         isManager,
         canManageProducts,
