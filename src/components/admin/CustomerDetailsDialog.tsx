@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { User, Loader2, Trash2, Package, Calendar, Phone, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -71,8 +71,25 @@ export function CustomerDetailsDialog({ customer, open, onOpenChange }: Customer
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [editedPhone, setEditedPhone] = useState('');
+  const [editedEmail, setEditedEmail] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Fetch customer email
+  const { data: customerEmail, isLoading: loadingEmail } = useQuery({
+    queryKey: ['customer-email', customer?.user_id],
+    queryFn: async () => {
+      if (!customer?.user_id) return null;
+      
+      const { data, error } = await supabase.functions.invoke('get-user-email', {
+        body: { userId: customer.user_id }
+      });
+      
+      if (error) throw error;
+      return data?.email || null;
+    },
+    enabled: !!customer?.user_id && open,
+  });
 
   // Fetch customer orders
   const { data: orders = [], isLoading: loadingOrders } = useQuery({
@@ -93,28 +110,31 @@ export function CustomerDetailsDialog({ customer, open, onOpenChange }: Customer
     enabled: !!customer?.user_id && open,
   });
 
-  // Update profile mutation
-  const updateProfileMutation = useMutation({
-    mutationFn: async ({ fullName, phone }: { fullName: string; phone: string }) => {
+  // Update user mutation (uses edge function for email updates)
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ email, fullName, phone }: { email: string; fullName: string; phone: string }) => {
       if (!customer?.user_id) throw new Error('No customer');
       
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          full_name: fullName,
+      const { data, error } = await supabase.functions.invoke('update-user', {
+        body: { 
+          userId: customer.user_id,
+          email,
+          fullName,
           phone: phone || null 
-        })
-        .eq('user_id', customer.user_id);
+        }
+      });
       
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => {
-      toast.success('Perfil atualizado!');
+      toast.success('Cliente atualizado!');
       setIsEditing(false);
       queryClient.invalidateQueries({ queryKey: ['admin-customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customer-email', customer?.user_id] });
     },
-    onError: () => {
-      toast.error('Erro ao atualizar perfil');
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erro ao atualizar cliente');
     },
   });
 
@@ -145,15 +165,29 @@ export function CustomerDetailsDialog({ customer, open, onOpenChange }: Customer
   const handleStartEdit = () => {
     setEditedName(customer?.full_name || '');
     setEditedPhone(customer?.phone || '');
+    setEditedEmail(customerEmail || '');
     setIsEditing(true);
   };
 
   const handleSaveEdit = () => {
-    updateProfileMutation.mutate({
+    if (!editedEmail) {
+      toast.error('Email é obrigatório');
+      return;
+    }
+    
+    updateUserMutation.mutate({
+      email: editedEmail,
       fullName: editedName,
       phone: editedPhone
     });
   };
+
+  // Reset state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setIsEditing(false);
+    }
+  }, [open]);
 
   if (!customer) return null;
 
@@ -185,6 +219,16 @@ export function CustomerDetailsDialog({ customer, open, onOpenChange }: Customer
                     />
                   </div>
                   <div>
+                    <Label htmlFor="editEmail">Email</Label>
+                    <Input
+                      id="editEmail"
+                      type="email"
+                      value={editedEmail}
+                      onChange={(e) => setEditedEmail(e.target.value)}
+                      placeholder="email@exemplo.com"
+                    />
+                  </div>
+                  <div>
                     <Label htmlFor="editPhone">Telefone</Label>
                     <Input
                       id="editPhone"
@@ -202,6 +246,17 @@ export function CustomerDetailsDialog({ customer, open, onOpenChange }: Customer
                     <span className="font-medium">{customer.full_name || 'Sem nome'}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Email:</span>
+                    <span className="font-medium">
+                      {loadingEmail ? (
+                        <Loader2 className="h-3 w-3 animate-spin inline" />
+                      ) : (
+                        customerEmail || '-'
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
                     <Phone className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Telefone:</span>
                     <span className="font-medium">{customer.phone || '-'}</span>
@@ -212,11 +267,6 @@ export function CustomerDetailsDialog({ customer, open, onOpenChange }: Customer
                     <span className="font-medium">
                       {new Date(customer.created_at).toLocaleDateString('pt-BR')}
                     </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">ID:</span>
-                    <span className="font-medium text-xs">{customer.user_id.slice(0, 12)}...</span>
                   </div>
                 </div>
               )}
@@ -289,9 +339,9 @@ export function CustomerDetailsDialog({ customer, open, onOpenChange }: Customer
                 </Button>
                 <Button
                   onClick={handleSaveEdit}
-                  disabled={updateProfileMutation.isPending}
+                  disabled={updateUserMutation.isPending}
                 >
-                  {updateProfileMutation.isPending ? (
+                  {updateUserMutation.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
                       Salvando...
