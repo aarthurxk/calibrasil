@@ -29,6 +29,7 @@ const Profile = lazy(() => import("./pages/Profile"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail"));
 const MyOrders = lazy(() => import("./pages/MyOrders"));
 const OrderReceived = lazy(() => import("./pages/OrderReceived"));
+const Review = lazy(() => import("./pages/Review"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Lazy load Admin Pages
@@ -73,6 +74,7 @@ const App = () => (
                   <Route path="/shipping" element={<Shipping />} />
                   <Route path="/returns" element={<Returns />} />
                   <Route path="/order-received" element={<OrderReceived />} />
+                  <Route path="/review/:productId" element={<Review />} />
                   <Route path="/wishlist" element={<Wishlist />} />
                   <Route
                     path="/profile"

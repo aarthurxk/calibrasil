@@ -56,7 +56,7 @@ function generateProductsHtml(items: OrderItem[], baseUrl: string): string {
         <h4 style="margin:0 0 5px 0">${escapeHtml(item.product_name)}</h4>
         <p style="margin:0;color:#666">Quantidade: ${item.quantity} | ${formatPrice(item.price)}</p>
       </div>
-      <a href="${baseUrl}/product/${item.product_id}#reviews" class="btn">Avaliar ⭐</a>
+      <a href="${baseUrl}/review/${item.product_id}" class="btn">Avaliar ⭐</a>
     </div>
   `).join('');
 }
