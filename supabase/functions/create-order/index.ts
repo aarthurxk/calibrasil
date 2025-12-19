@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -54,34 +55,40 @@ async function generateHMAC(data: string, secret: string): Promise<string> {
     .join('');
 }
 
-interface CartItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  image?: string;
-  size?: string;
-  color?: string;
-}
+// Input validation schemas
+const brazilianPhoneRegex = /^(\+?55\s?)?(\(?\d{2}\)?[\s-]?)?\d{4,5}[\s-]?\d{4}$/;
+const cepRegex = /^\d{5}-?\d{3}$/;
 
-interface ShippingAddress {
-  firstName: string;
-  lastName: string;
-  address: string;
-  city: string;
-  zip: string;
-}
+const CartItemSchema = z.object({
+  id: z.string().uuid("ID do produto inválido"),
+  name: z.string().min(1).max(255),
+  price: z.number().positive(),
+  quantity: z.number().int().min(1, "Quantidade mínima é 1").max(100, "Quantidade máxima é 100 por item"),
+  image: z.string().url().optional().or(z.literal("")),
+  size: z.string().max(50).optional(),
+  color: z.string().max(50).optional(),
+});
 
-interface OrderRequest {
-  items: CartItem[];
-  email: string;
-  phone?: string;
-  shipping_address: ShippingAddress;
-  user_id?: string;
-  total: number;
-  shipping: number;
-  payment_method: string;
-}
+const ShippingAddressSchema = z.object({
+  firstName: z.string().min(1, "Nome é obrigatório").max(100, "Nome muito longo").regex(/^[a-zA-ZÀ-ÿ\s'-]+$/, "Nome contém caracteres inválidos"),
+  lastName: z.string().min(1, "Sobrenome é obrigatório").max(100, "Sobrenome muito longo").regex(/^[a-zA-ZÀ-ÿ\s'-]+$/, "Sobrenome contém caracteres inválidos"),
+  address: z.string().min(1, "Endereço é obrigatório").max(200, "Endereço muito longo"),
+  city: z.string().min(1, "Cidade é obrigatória").max(100, "Nome da cidade muito longo"),
+  zip: z.string().regex(cepRegex, "CEP inválido (formato: 00000-000)"),
+});
+
+const OrderRequestSchema = z.object({
+  items: z.array(CartItemSchema).min(1, "Carrinho vazio").max(50, "Limite de 50 itens por pedido"),
+  email: z.string().email("Email inválido").max(255, "Email muito longo"),
+  phone: z.string().regex(brazilianPhoneRegex, "Telefone inválido").optional().or(z.literal("")),
+  shipping_address: ShippingAddressSchema,
+  user_id: z.string().uuid().optional().nullable(),
+  total: z.number().positive(),
+  shipping: z.number().min(0),
+  payment_method: z.string().min(1).max(50),
+});
+
+type OrderRequest = z.infer<typeof OrderRequestSchema>;
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -115,34 +122,27 @@ serve(async (req) => {
     // Use service role to bypass RLS
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const body: OrderRequest = await req.json();
+    const rawBody = await req.json();
+    
+    // Validate input using Zod schema
+    const validationResult = OrderRequestSchema.safeParse(rawBody);
+    
+    if (!validationResult.success) {
+      const errors = validationResult.error.errors.map(e => e.message).join(', ');
+      console.error('[CREATE-ORDER] Validation failed:', validationResult.error.errors);
+      throw new Error(`Dados inválidos: ${errors}`);
+    }
+    
+    const body = validationResult.data;
     
     // Log order request without sensitive data
-    console.log('Received order request:', {
-      itemCount: body.items?.length,
+    console.log('[CREATE-ORDER] Validated request:', {
+      itemCount: body.items.length,
       hasEmail: !!body.email,
       hasPhone: !!body.phone,
       hasShippingAddress: !!body.shipping_address,
       paymentMethod: body.payment_method
     });
-
-    // Validate required fields
-    if (!body.items || body.items.length === 0) {
-      throw new Error('Carrinho vazio');
-    }
-    
-    if (!body.email) {
-      throw new Error('Email é obrigatório');
-    }
-    
-    if (!body.shipping_address) {
-      throw new Error('Endereço de entrega é obrigatório');
-    }
-
-    const { firstName, lastName, address, city, zip } = body.shipping_address;
-    if (!firstName || !lastName || !address || !city || !zip) {
-      throw new Error('Todos os campos do endereço são obrigatórios');
-    }
 
     // SECURITY: Fetch real prices from database to prevent price manipulation
     const productIds = body.items.map(item => item.id);

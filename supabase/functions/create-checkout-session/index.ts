@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,40 +56,48 @@ async function generateHMAC(data: string, secret: string): Promise<string> {
     .join('');
 }
 
-interface CartItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  image?: string;
-  size?: string;
-  color?: string;
-}
+// Input validation schemas
+const brazilianPhoneRegex = /^(\+?55\s?)?(\(?\d{2}\)?[\s-]?)?\d{4,5}[\s-]?\d{4}$/;
+const cepRegex = /^\d{5}-?\d{3}$/;
 
-interface CheckoutRequest {
-  items: CartItem[];
-  email: string;
-  phone?: string;
-  shipping_address: {
-    firstName: string;
-    lastName: string;
-    street?: string;
-    number?: string;
-    complement?: string;
-    neighborhood?: string;
-    city?: string;
-    state?: string;
-    zip?: string;
-  };
-  user_id?: string;
-  total: number;
-  shipping: number;
-  shipping_method?: string;
-  payment_method: "pix" | "boleto" | "card";
-  success_url: string;
-  cancel_url: string;
-  coupon_code?: string;
-}
+const CartItemSchema = z.object({
+  id: z.string().uuid("ID do produto inválido"),
+  name: z.string().min(1).max(255),
+  price: z.number().positive(),
+  quantity: z.number().int().min(1, "Quantidade mínima é 1").max(100, "Quantidade máxima é 100 por item"),
+  image: z.string().url().optional().or(z.literal("")),
+  size: z.string().max(50).optional(),
+  color: z.string().max(50).optional(),
+});
+
+const ShippingAddressSchema = z.object({
+  firstName: z.string().min(1, "Nome é obrigatório").max(100, "Nome muito longo").regex(/^[a-zA-ZÀ-ÿ\s'-]+$/, "Nome contém caracteres inválidos"),
+  lastName: z.string().min(1, "Sobrenome é obrigatório").max(100, "Sobrenome muito longo").regex(/^[a-zA-ZÀ-ÿ\s'-]+$/, "Sobrenome contém caracteres inválidos"),
+  street: z.string().max(200).optional(),
+  number: z.string().max(20).optional(),
+  complement: z.string().max(100).optional(),
+  neighborhood: z.string().max(100).optional(),
+  city: z.string().max(100).optional(),
+  state: z.string().max(2).optional(),
+  zip: z.string().regex(cepRegex, "CEP inválido").optional().or(z.literal("")),
+});
+
+const CheckoutRequestSchema = z.object({
+  items: z.array(CartItemSchema).min(1, "Carrinho vazio").max(50, "Limite de 50 itens por pedido"),
+  email: z.string().email("Email inválido").max(255, "Email muito longo"),
+  phone: z.string().regex(brazilianPhoneRegex, "Telefone inválido").optional().or(z.literal("")),
+  shipping_address: ShippingAddressSchema,
+  user_id: z.string().uuid().optional().nullable(),
+  total: z.number().positive(),
+  shipping: z.number().min(0),
+  shipping_method: z.string().max(50).optional(),
+  payment_method: z.enum(["pix", "boleto", "card"]),
+  success_url: z.string().url("URL de sucesso inválida"),
+  cancel_url: z.string().url("URL de cancelamento inválida"),
+  coupon_code: z.string().max(50).optional().or(z.literal("")),
+});
+
+type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;
 
 interface ValidatedCoupon {
   code: string;
@@ -181,15 +190,19 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const body: CheckoutRequest = await req.json();
-    console.log("Creating checkout session:", { itemCount: body.items?.length, payment_method: body.payment_method, shipping_method: body.shipping_method });
-
-    if (!body.items || body.items.length === 0) {
-      throw new Error("Cart is empty");
+    const rawBody = await req.json();
+    
+    // Validate input using Zod schema
+    const validationResult = CheckoutRequestSchema.safeParse(rawBody);
+    
+    if (!validationResult.success) {
+      const errors = validationResult.error.errors.map(e => e.message).join(', ');
+      console.error('[CHECKOUT-SESSION] Validation failed:', validationResult.error.errors);
+      throw new Error(`Dados inválidos: ${errors}`);
     }
-    if (!body.email) {
-      throw new Error("Email is required");
-    }
+    
+    const body = validationResult.data;
+    console.log("[CHECKOUT-SESSION] Validated request:", { itemCount: body.items.length, payment_method: body.payment_method, shipping_method: body.shipping_method });
 
     const isValidUrl = (url: string): boolean => {
       try {
