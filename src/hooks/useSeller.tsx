@@ -22,12 +22,11 @@ export const useSeller = (cartTotal: number) => {
     setIsValidating(true);
 
     try {
-      const { data: seller, error } = await supabase
-        .from('sellers')
-        .select('id, name, code, discount_percent')
-        .eq('code', code.toUpperCase().trim())
-        .eq('is_active', true)
-        .maybeSingle();
+      // Use secure RPC function that only exposes minimal seller data
+      const { data: sellers, error } = await supabase
+        .rpc('validate_seller_code', { seller_code: code });
+      
+      const seller = sellers && sellers.length > 0 ? sellers[0] : null;
 
       if (error) throw error;
 
