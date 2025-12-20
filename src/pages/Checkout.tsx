@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, CreditCard, Lock, QrCode, Loader2, MapPin, Ticket, X, UserCheck } from "lucide-react";
+import { ArrowLeft, CreditCard, Lock, QrCode, Loader2, MapPin, Ticket, X, UserCheck, AlertCircle } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,25 +22,41 @@ import { toast } from "sonner";
 import { z } from "zod";
 import ShippingCalculator, { ShippingOption } from "@/components/shop/ShippingCalculator";
 
+// Validation regex patterns
+const brazilianPhoneRegex = /^\(\d{2}\)\s?\d{4,5}-\d{4}$/;
+const cepRegex = /^\d{5}-?\d{3}$/;
+const nameRegex = /^[a-zA-ZÀ-ÿ\s'-]+$/;
+
 // Validation schema for checkout form
 const checkoutSchema = z.object({
   email: z.string().trim().email("Email inválido").max(255, "Email muito longo"),
-  phone: z
-    .string()
-    .trim()
-    .regex(/^\(\d{2}\)\s?\d{4,5}-?\d{4}$/, "Telefone inválido (ex: (11) 99999-9999)"),
-  firstName: z.string().trim().min(2, "Nome muito curto").max(100, "Nome muito longo"),
-  lastName: z.string().trim().min(2, "Sobrenome muito curto").max(100, "Sobrenome muito longo"),
-  zip: z.string().trim().regex(/^\d{5}-?\d{3}$/, "CEP inválido (ex: 12345-678)").optional(),
-  street: z.string().trim().min(3, "Rua é obrigatória").optional(),
-  houseNumber: z.string().trim().min(1, "Número é obrigatório").optional(),
-  complement: z.string().optional(),
-  neighborhood: z.string().trim().min(2, "Bairro é obrigatório").optional(),
-  city: z.string().trim().min(2, "Cidade é obrigatória").optional(),
-  state: z.string().trim().length(2, "Estado inválido").optional(),
+  phone: z.string().trim().regex(brazilianPhoneRegex, "Telefone inválido (ex: (11) 99999-9999)"),
+  firstName: z.string().trim().min(2, "Nome muito curto").max(100, "Nome muito longo").regex(nameRegex, "Nome contém caracteres inválidos"),
+  lastName: z.string().trim().min(2, "Sobrenome muito curto").max(100, "Sobrenome muito longo").regex(nameRegex, "Sobrenome contém caracteres inválidos"),
+  zip: z.string().trim().regex(cepRegex, "CEP inválido (ex: 12345-678)").optional(),
+  street: z.string().trim().min(3, "Rua é obrigatória").max(200, "Nome da rua muito longo").optional(),
+  houseNumber: z.string().trim().min(1, "Número é obrigatório").max(20, "Número muito longo").optional(),
+  complement: z.string().max(100, "Complemento muito longo").optional(),
+  neighborhood: z.string().trim().min(2, "Bairro é obrigatório").max(100, "Bairro muito longo").optional(),
+  city: z.string().trim().min(2, "Cidade é obrigatória").max(100, "Cidade muito longa").optional(),
+  state: z.string().trim().length(2, "Estado deve ter 2 caracteres").optional(),
 });
 
 type PaymentGateway = "stripe" | "mercadopago";
+
+// Field error state type
+interface FieldErrors {
+  email?: string;
+  phone?: string;
+  firstName?: string;
+  lastName?: string;
+  zip?: string;
+  street?: string;
+  houseNumber?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+}
 
 // Format phone number to (XX) XXXXX-XXXX or (XX) XXXX-XXXX
 const formatPhone = (phone: string): string => {
@@ -66,6 +82,9 @@ const Checkout = () => {
   const [isProcessingMercadoPago, setIsProcessingMercadoPago] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [sellerCode, setSellerCode] = useState("");
+
+  // Field error states
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   // Shipping selection state
   const [selectedShipping, setSelectedShipping] = useState<ShippingOption | null>(null);
@@ -209,6 +228,11 @@ const Checkout = () => {
     const valor = e.target.value.replace(/\D/g, "");
     const formatado = valor.replace(/(\d{5})(\d{3})/, "$1-$2");
     setZip(formatado);
+    
+    // Clear error on change
+    if (fieldErrors.zip) {
+      setFieldErrors(prev => ({ ...prev, zip: undefined }));
+    }
 
     // Auto-fetch when CEP is complete
     if (valor.length === 8) {
@@ -219,45 +243,164 @@ const Checkout = () => {
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const digits = e.target.value.replace(/\D/g, "").slice(0, 11);
     setPhone(formatPhone(digits));
+    
+    // Clear error on change
+    if (fieldErrors.phone) {
+      setFieldErrors(prev => ({ ...prev, phone: undefined }));
+    }
+  };
+
+  // Validate a single field on blur
+  const validateField = useCallback((field: keyof FieldErrors, value: string) => {
+    let error: string | undefined;
+    
+    switch (field) {
+      case 'email':
+        if (!value.trim()) {
+          error = "Email é obrigatório";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+          error = "Email inválido";
+        }
+        break;
+      case 'phone':
+        if (!value.trim()) {
+          error = "Telefone é obrigatório";
+        } else if (!brazilianPhoneRegex.test(value)) {
+          error = "Telefone inválido (ex: (11) 99999-9999)";
+        }
+        break;
+      case 'firstName':
+        if (!value.trim()) {
+          error = "Nome é obrigatório";
+        } else if (value.trim().length < 2) {
+          error = "Nome muito curto";
+        } else if (!nameRegex.test(value)) {
+          error = "Nome contém caracteres inválidos";
+        }
+        break;
+      case 'lastName':
+        if (!value.trim()) {
+          error = "Sobrenome é obrigatório";
+        } else if (value.trim().length < 2) {
+          error = "Sobrenome muito curto";
+        } else if (!nameRegex.test(value)) {
+          error = "Sobrenome contém caracteres inválidos";
+        }
+        break;
+      case 'zip':
+        if (!isPickup && !cepRegex.test(value)) {
+          error = "CEP inválido (ex: 12345-678)";
+        }
+        break;
+      case 'street':
+        if (!isPickup && value.trim().length < 3) {
+          error = "Rua é obrigatória";
+        }
+        break;
+      case 'houseNumber':
+        if (!isPickup && !value.trim()) {
+          error = "Número é obrigatório";
+        }
+        break;
+      case 'neighborhood':
+        if (!isPickup && value.trim().length < 2) {
+          error = "Bairro é obrigatório";
+        }
+        break;
+      case 'city':
+        if (!isPickup && value.trim().length < 2) {
+          error = "Cidade é obrigatória";
+        }
+        break;
+      case 'state':
+        if (!isPickup && value.trim().length !== 2) {
+          error = "Estado deve ter 2 caracteres";
+        }
+        break;
+    }
+    
+    setFieldErrors(prev => ({ ...prev, [field]: error }));
+    return !error;
+  }, [isPickup]);
+
+  // Handle field blur for real-time validation
+  const handleFieldBlur = (field: keyof FieldErrors, value: string) => {
+    validateField(field, value);
+  };
+
+  // Clear field error on focus
+  const handleFieldFocus = (field: keyof FieldErrors) => {
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => ({ ...prev, [field]: undefined }));
+    }
   };
 
   const validateForm = () => {
-    // Build validation object based on whether pickup is selected
-    const validationData: Record<string, any> = {
-      email,
-      phone,
-      firstName,
-      lastName,
-    };
+    const errors: FieldErrors = {};
+    let hasErrors = false;
 
-    // Only validate address if not pickup
-    if (!isPickup) {
-      validationData.zip = zip;
-      validationData.street = street;
-      validationData.houseNumber = houseNumber;
-      validationData.complement = complement || undefined;
-      validationData.neighborhood = neighborhood;
-      validationData.city = city;
-      validationData.state = state;
+    // Validate contact fields
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = !email.trim() ? "Email é obrigatório" : "Email inválido";
+      hasErrors = true;
+    }
+    
+    if (!phone.trim() || !brazilianPhoneRegex.test(phone)) {
+      errors.phone = !phone.trim() ? "Telefone é obrigatório" : "Telefone inválido (ex: (11) 99999-9999)";
+      hasErrors = true;
+    }
+    
+    if (!firstName.trim() || firstName.trim().length < 2 || !nameRegex.test(firstName)) {
+      errors.firstName = !firstName.trim() ? "Nome é obrigatório" : firstName.trim().length < 2 ? "Nome muito curto" : "Nome contém caracteres inválidos";
+      hasErrors = true;
+    }
+    
+    if (!lastName.trim() || lastName.trim().length < 2 || !nameRegex.test(lastName)) {
+      errors.lastName = !lastName.trim() ? "Sobrenome é obrigatório" : lastName.trim().length < 2 ? "Sobrenome muito curto" : "Sobrenome contém caracteres inválidos";
+      hasErrors = true;
     }
 
-    // Create schema based on pickup mode
-    const schema = isPickup 
-      ? checkoutSchema.omit({ zip: true, street: true, houseNumber: true, complement: true, neighborhood: true, city: true, state: true })
-      : checkoutSchema.extend({
-          zip: z.string().trim().regex(/^\d{5}-?\d{3}$/, "CEP inválido (ex: 12345-678)"),
-          street: z.string().trim().min(3, "Rua é obrigatória"),
-          houseNumber: z.string().trim().min(1, "Número é obrigatório"),
-          neighborhood: z.string().trim().min(2, "Bairro é obrigatório"),
-          city: z.string().trim().min(2, "Cidade é obrigatória"),
-          state: z.string().trim().length(2, "Estado inválido"),
-        });
+    // Validate address fields only if not pickup
+    if (!isPickup) {
+      if (!zip.trim() || !cepRegex.test(zip)) {
+        errors.zip = "CEP inválido (ex: 12345-678)";
+        hasErrors = true;
+      }
+      
+      if (!street.trim() || street.trim().length < 3) {
+        errors.street = "Rua é obrigatória";
+        hasErrors = true;
+      }
+      
+      if (!houseNumber.trim()) {
+        errors.houseNumber = "Número é obrigatório";
+        hasErrors = true;
+      }
+      
+      if (!neighborhood.trim() || neighborhood.trim().length < 2) {
+        errors.neighborhood = "Bairro é obrigatório";
+        hasErrors = true;
+      }
+      
+      if (!city.trim() || city.trim().length < 2) {
+        errors.city = "Cidade é obrigatória";
+        hasErrors = true;
+      }
+      
+      if (!state.trim() || state.trim().length !== 2) {
+        errors.state = "Estado deve ter 2 caracteres";
+        hasErrors = true;
+      }
+    }
 
-    const validationResult = schema.safeParse(validationData);
+    setFieldErrors(errors);
 
-    if (!validationResult.success) {
-      const firstError = validationResult.error.errors[0];
-      toast.error(firstError.message);
+    if (hasErrors) {
+      // Show first error as toast
+      const firstError = Object.values(errors).find(e => e);
+      if (firstError) {
+        toast.error(firstError);
+      }
       return false;
     }
 
@@ -542,11 +685,43 @@ const Checkout = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="firstName">Nome *</Label>
-                    <Input id="firstName" required value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                    <Input 
+                      id="firstName" 
+                      required 
+                      value={firstName} 
+                      onChange={(e) => {
+                        setFirstName(e.target.value);
+                        if (fieldErrors.firstName) setFieldErrors(prev => ({ ...prev, firstName: undefined }));
+                      }}
+                      onBlur={() => handleFieldBlur('firstName', firstName)}
+                      className={fieldErrors.firstName ? "border-destructive" : ""}
+                    />
+                    {fieldErrors.firstName && (
+                      <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {fieldErrors.firstName}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="lastName">Sobrenome *</Label>
-                    <Input id="lastName" required value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                    <Input 
+                      id="lastName" 
+                      required 
+                      value={lastName} 
+                      onChange={(e) => {
+                        setLastName(e.target.value);
+                        if (fieldErrors.lastName) setFieldErrors(prev => ({ ...prev, lastName: undefined }));
+                      }}
+                      onBlur={() => handleFieldBlur('lastName', lastName)}
+                      className={fieldErrors.lastName ? "border-destructive" : ""}
+                    />
+                    {fieldErrors.lastName && (
+                      <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {fieldErrors.lastName}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -557,8 +732,19 @@ const Checkout = () => {
                     required
                     placeholder="seu@email.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (fieldErrors.email) setFieldErrors(prev => ({ ...prev, email: undefined }));
+                    }}
+                    onBlur={() => handleFieldBlur('email', email)}
+                    className={fieldErrors.email ? "border-destructive" : ""}
                   />
+                  {fieldErrors.email && (
+                    <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {fieldErrors.email}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="phone">Telefone *</Label>
@@ -569,7 +755,15 @@ const Checkout = () => {
                     placeholder="(11) 99999-9999"
                     value={phone}
                     onChange={handlePhoneChange}
+                    onBlur={() => handleFieldBlur('phone', phone)}
+                    className={fieldErrors.phone ? "border-destructive" : ""}
                   />
+                  {fieldErrors.phone && (
+                    <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {fieldErrors.phone}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -657,12 +851,20 @@ const Checkout = () => {
                               placeholder="00000-000"
                               value={zip}
                               onChange={handleCepChange}
+                              onBlur={() => handleFieldBlur('zip', zip)}
                               maxLength={9}
+                              className={fieldErrors.zip ? "border-destructive" : ""}
                             />
                             {isLoadingCep && (
                               <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
                             )}
                           </div>
+                          {fieldErrors.zip && (
+                            <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" />
+                              {fieldErrors.zip}
+                            </p>
+                          )}
                         </div>
 
                         {/* Street */}
@@ -673,8 +875,19 @@ const Checkout = () => {
                             required
                             placeholder="Preenchido automaticamente pelo CEP"
                             value={street}
-                            onChange={(e) => setStreet(e.target.value)}
+                            onChange={(e) => {
+                              setStreet(e.target.value);
+                              if (fieldErrors.street) setFieldErrors(prev => ({ ...prev, street: undefined }));
+                            }}
+                            onBlur={() => handleFieldBlur('street', street)}
+                            className={fieldErrors.street ? "border-destructive" : ""}
                           />
+                          {fieldErrors.street && (
+                            <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" />
+                              {fieldErrors.street}
+                            </p>
+                          )}
                         </div>
 
                         {/* Number & Complement */}
@@ -686,8 +899,19 @@ const Checkout = () => {
                               required
                               placeholder="123"
                               value={houseNumber}
-                              onChange={(e) => setHouseNumber(e.target.value)}
+                              onChange={(e) => {
+                                setHouseNumber(e.target.value);
+                                if (fieldErrors.houseNumber) setFieldErrors(prev => ({ ...prev, houseNumber: undefined }));
+                              }}
+                              onBlur={() => handleFieldBlur('houseNumber', houseNumber)}
+                              className={fieldErrors.houseNumber ? "border-destructive" : ""}
                             />
+                            {fieldErrors.houseNumber && (
+                              <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                {fieldErrors.houseNumber}
+                              </p>
+                            )}
                           </div>
                           <div>
                             <Label htmlFor="complement">Complemento</Label>
@@ -708,8 +932,19 @@ const Checkout = () => {
                             required
                             placeholder="Preenchido automaticamente pelo CEP"
                             value={neighborhood}
-                            onChange={(e) => setNeighborhood(e.target.value)}
+                            onChange={(e) => {
+                              setNeighborhood(e.target.value);
+                              if (fieldErrors.neighborhood) setFieldErrors(prev => ({ ...prev, neighborhood: undefined }));
+                            }}
+                            onBlur={() => handleFieldBlur('neighborhood', neighborhood)}
+                            className={fieldErrors.neighborhood ? "border-destructive" : ""}
                           />
+                          {fieldErrors.neighborhood && (
+                            <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" />
+                              {fieldErrors.neighborhood}
+                            </p>
+                          )}
                         </div>
 
                         {/* City & State */}
@@ -721,8 +956,19 @@ const Checkout = () => {
                               required
                               placeholder="Preenchido pelo CEP"
                               value={city}
-                              onChange={(e) => setCity(e.target.value)}
+                              onChange={(e) => {
+                                setCity(e.target.value);
+                                if (fieldErrors.city) setFieldErrors(prev => ({ ...prev, city: undefined }));
+                              }}
+                              onBlur={() => handleFieldBlur('city', city)}
+                              className={fieldErrors.city ? "border-destructive" : ""}
                             />
+                            {fieldErrors.city && (
+                              <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                {fieldErrors.city}
+                              </p>
+                            )}
                           </div>
                           <div>
                             <Label htmlFor="state">Estado *</Label>
@@ -731,9 +977,20 @@ const Checkout = () => {
                               required
                               placeholder="UF"
                               value={state}
-                              onChange={(e) => setState(e.target.value.toUpperCase())}
+                              onChange={(e) => {
+                                setState(e.target.value.toUpperCase());
+                                if (fieldErrors.state) setFieldErrors(prev => ({ ...prev, state: undefined }));
+                              }}
+                              onBlur={() => handleFieldBlur('state', state)}
                               maxLength={2}
+                              className={fieldErrors.state ? "border-destructive" : ""}
                             />
+                            {fieldErrors.state && (
+                              <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                {fieldErrors.state}
+                              </p>
+                            )}
                           </div>
                         </div>
 
