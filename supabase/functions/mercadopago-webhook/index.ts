@@ -197,22 +197,57 @@ serve(async (req) => {
 
     // Send confirmation emails if payment confirmed
     if (shouldSendEmails) {
-      logStep('Triggering confirmation emails');
+      logStep('EMAIL_PAYMENT_TRIGGERED', { orderId, hasUserId: !!order.user_id, hasGuestEmail: !!order.guest_email });
       
       try {
-        const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-order-emails`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-internal-secret': internalApiSecret
-          },
-          body: JSON.stringify({ orderId })
-        });
+        // Determine customer email - either from guest_email or fetch from auth.users
+        let customerEmail = order.guest_email;
+        let customerName = null;
         
-        const emailResult = await emailResponse.json();
-        logStep('Email trigger result', { result: emailResult });
+        if (!customerEmail && order.user_id) {
+          logStep('Fetching email for logged-in user', { userId: order.user_id });
+          
+          // Fetch user email from auth.users using service role
+          const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(order.user_id);
+          
+          if (authError) {
+            logStep('EMAIL_PAYMENT_ERROR', { error: 'Failed to fetch user email', details: authError.message });
+          } else if (authUser?.user?.email) {
+            customerEmail = authUser.user.email;
+            customerName = authUser.user.user_metadata?.full_name || null;
+            logStep('User email found', { email: customerEmail });
+          } else {
+            logStep('EMAIL_PAYMENT_ERROR', { error: 'User has no email' });
+          }
+        }
+        
+        if (!customerEmail) {
+          logStep('EMAIL_PAYMENT_ERROR', { error: 'No customer email available', orderId });
+        } else {
+          const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-order-emails`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-internal-secret': internalApiSecret
+            },
+            body: JSON.stringify({ 
+              orderId,
+              customerEmail,
+              customerName
+            })
+          });
+          
+          const emailResult = await emailResponse.json();
+          
+          if (emailResult.error) {
+            logStep('EMAIL_PAYMENT_ERROR', { error: emailResult.error, orderId });
+          } else {
+            logStep('EMAIL_PAYMENT_SENT', { orderId, email: customerEmail });
+          }
+        }
       } catch (emailError) {
-        logStep('Error triggering emails', { error: emailError });
+        const errorMsg = emailError instanceof Error ? emailError.message : String(emailError);
+        logStep('EMAIL_PAYMENT_ERROR', { error: errorMsg, orderId });
         // Don't fail webhook for email errors
       }
 
