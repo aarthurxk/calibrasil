@@ -305,11 +305,12 @@ serve(async (req) => {
     logStep('Order totals calculated', { itemsTotal: realItemsTotal, shipping: realShippingCost, couponDiscount: discountAmount, sellerDiscount: sellerDiscountAmount, final: finalTotal });
 
     // Create order in database
+    // IMPORTANT: Always save guest_email for email delivery, even for logged-in users
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
         user_id: user_id || null,
-        guest_email: user_id ? null : customerEmail,
+        guest_email: customerEmail, // Always save email for order confirmation delivery
         phone: customerPhone,
         total: finalTotal,
         status: 'pending',

@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.mercadopago-webhook]
 verify_jwt = false
+
+[functions.test-order-email]
+verify_jwt = false
