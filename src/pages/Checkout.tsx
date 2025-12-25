@@ -166,6 +166,21 @@ const Checkout = () => {
     }
   }, [user, addresses, isLoadingAddresses]);
 
+  // Clear address field errors when pickup is selected
+  useEffect(() => {
+    if (isPickup) {
+      setFieldErrors(prev => ({
+        ...prev,
+        zip: undefined,
+        street: undefined,
+        houseNumber: undefined,
+        neighborhood: undefined,
+        city: undefined,
+        state: undefined,
+      }));
+    }
+  }, [isPickup]);
+
   const fillFormFromAddress = (address: UserAddress) => {
     setZip(address.zip);
     setStreet(address.street);
@@ -250,8 +265,16 @@ const Checkout = () => {
     }
   };
 
-  // Validate a single field on blur
+  // Validate a single field on blur - skip address validation if pickup is selected
   const validateField = useCallback((field: keyof FieldErrors, value: string) => {
+    // Skip address field validation when pickup is selected
+    const addressFields: (keyof FieldErrors)[] = ['zip', 'street', 'houseNumber', 'neighborhood', 'city', 'state'];
+    if (isPickup && addressFields.includes(field)) {
+      // Clear any existing error for this field when pickup is selected
+      setFieldErrors(prev => ({ ...prev, [field]: undefined }));
+      return true;
+    }
+
     let error: string | undefined;
     
     switch (field) {
@@ -288,32 +311,32 @@ const Checkout = () => {
         }
         break;
       case 'zip':
-        if (!isPickup && !cepRegex.test(value)) {
+        if (!cepRegex.test(value)) {
           error = "CEP inválido (ex: 12345-678)";
         }
         break;
       case 'street':
-        if (!isPickup && value.trim().length < 3) {
+        if (value.trim().length < 3) {
           error = "Rua é obrigatória";
         }
         break;
       case 'houseNumber':
-        if (!isPickup && !value.trim()) {
+        if (!value.trim()) {
           error = "Número é obrigatório";
         }
         break;
       case 'neighborhood':
-        if (!isPickup && value.trim().length < 2) {
+        if (value.trim().length < 2) {
           error = "Bairro é obrigatório";
         }
         break;
       case 'city':
-        if (!isPickup && value.trim().length < 2) {
+        if (value.trim().length < 2) {
           error = "Cidade é obrigatória";
         }
         break;
       case 'state':
-        if (!isPickup && value.trim().length !== 2) {
+        if (value.trim().length !== 2) {
           error = "Estado deve ter 2 caracteres";
         }
         break;
@@ -405,6 +428,7 @@ const Checkout = () => {
     }
 
     // Validate shipping method is selected (for non-free modes)
+    // Skip this validation if pickup is selected - pickup is always valid without CEP calculation
     if (!selectedShipping && settings.shipping_mode !== 'free') {
       toast.error("Selecione um método de entrega");
       return false;
