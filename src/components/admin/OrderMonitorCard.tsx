@@ -1,0 +1,118 @@
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { useOrderFlowChecker } from '@/hooks/useOrderFlowChecker';
+import { cn } from '@/lib/utils';
+
+interface OrderMonitorCardProps {
+  order: any;
+  isSelected: boolean;
+  onClick: () => void;
+}
+
+export const OrderMonitorCard = ({ order, isSelected, onClick }: OrderMonitorCardProps) => {
+  const flowResult = useOrderFlowChecker(order);
+
+  const formatPrice = (price: number) => {
+    return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getStatusBadge = () => {
+    if (!flowResult) return null;
+    
+    switch (flowResult.overallStatus) {
+      case 'ok':
+        return <Badge className="bg-green-100 text-green-800 border-green-300">OK</Badge>;
+      case 'pending':
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">Pendente</Badge>;
+      case 'error':
+        return <Badge className="bg-red-100 text-red-800 border-red-300">Erro</Badge>;
+    }
+  };
+
+  const getProgressBar = () => {
+    if (!flowResult) return null;
+    const percentage = (flowResult.completedSteps / flowResult.totalSteps) * 100;
+    
+    return (
+      <div className="w-full bg-muted rounded-full h-1.5 mt-2">
+        <div 
+          className={cn(
+            "h-1.5 rounded-full transition-all",
+            flowResult.overallStatus === 'ok' ? 'bg-green-500' :
+            flowResult.overallStatus === 'pending' ? 'bg-yellow-500' : 'bg-red-500'
+          )}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    );
+  };
+
+  // Get customer name from shipping_address
+  const shippingAddress = order.shipping_address as any;
+  const customerName = shippingAddress?.name || 
+    `${shippingAddress?.firstName || ''} ${shippingAddress?.lastName || ''}`.trim() || 
+    'Cliente';
+
+  return (
+    <Card 
+      className={cn(
+        "p-4 cursor-pointer transition-all hover:shadow-md",
+        isSelected && "ring-2 ring-primary bg-accent/50",
+        flowResult?.overallStatus === 'error' && "border-red-200",
+        flowResult?.overallStatus === 'pending' && "border-yellow-200"
+      )}
+      onClick={onClick}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm font-medium">
+              #{order.id.slice(0, 8)}
+            </span>
+            {getStatusBadge()}
+          </div>
+          
+          <p className="text-sm text-muted-foreground truncate mt-1">
+            {customerName}
+          </p>
+          
+          <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">
+              {formatPrice(Number(order.total))}
+            </span>
+            <span>•</span>
+            <span>{formatDate(order.created_at)}</span>
+          </div>
+
+          {flowResult && (
+            <>
+              {getProgressBar()}
+              <div className="flex items-center justify-between mt-2 text-xs">
+                <span className="text-muted-foreground">
+                  {flowResult.completedSteps}/{flowResult.totalSteps} etapas
+                </span>
+                {flowResult.stoppedAt && flowResult.overallStatus !== 'ok' && (
+                  <span className={cn(
+                    "truncate ml-2",
+                    flowResult.overallStatus === 'error' ? 'text-red-600' : 'text-yellow-600'
+                  )}>
+                    Parou em: {flowResult.stoppedAt}
+                  </span>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+};
