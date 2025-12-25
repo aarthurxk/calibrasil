@@ -16,6 +16,7 @@ import {
   Layers,
   Mail,
   UserCheck,
+  Activity,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -28,6 +29,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { Badge } from '@/components/ui/badge';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import caliLogo from '@/assets/cali-logo.jpeg';
 
 const AdminLayout = () => {
@@ -36,11 +39,40 @@ const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, role, signOut, isAdmin, canManageRoles } = useAuth();
 
+  // Fetch order monitor stats for badge
+  const { data: monitorStats } = useQuery({
+    queryKey: ['monitor-stats'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, status, payment_status, guest_email')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      
+      if (error) return { errors: 0, pending: 0 };
+      
+      let errors = 0;
+      let pending = 0;
+      
+      data?.forEach(order => {
+        const isPaid = order.payment_status === 'paid' || order.payment_status === 'approved';
+        if (isPaid && order.status === 'pending') errors++;
+        else if (isPaid && !order.guest_email) errors++;
+        else if (order.payment_status === 'failed') errors++;
+        else if (!isPaid && order.payment_status !== 'failed') pending++;
+      });
+      
+      return { errors, pending };
+    },
+    refetchInterval: 60000, // Refetch every minute
+  });
+
   // Define menu items based on role
   const sidebarItems = [
     { name: 'Painel', icon: LayoutDashboard, path: '/admin', showFor: ['admin', 'manager'] },
     { name: 'Produtos', icon: Package, path: '/admin/products', showFor: ['admin', 'manager'] },
     { name: 'Pedidos', icon: ShoppingCart, path: '/admin/orders', showFor: ['admin', 'manager'] },
+    { name: 'Monitor', icon: Activity, path: '/admin/monitor', showFor: ['admin'], badge: monitorStats?.errors || 0, badgeType: monitorStats?.errors ? 'error' : monitorStats?.pending ? 'warning' : undefined },
     { name: 'Clientes', icon: Users, path: '/admin/customers', showFor: ['admin', 'manager'] },
     { name: 'Pagamentos', icon: CreditCard, path: '/admin/payments', showFor: ['admin', 'manager'] },
     { name: 'Relatórios', icon: BarChart3, path: '/admin/reports', showFor: ['admin', 'manager'] },
@@ -53,7 +85,7 @@ const AdminLayout = () => {
   ];
 
   const visibleItems = sidebarItems.filter(item => 
-    role && item.showFor.includes(role)
+    role && item.showFor.includes(role as 'admin' | 'manager')
   );
 
   const handleLogout = async () => {
@@ -98,6 +130,7 @@ const AdminLayout = () => {
           <nav className="flex-1 p-4 space-y-1">
             {visibleItems.map((item) => {
               const isActive = location.pathname === item.path;
+              const itemWithBadge = item as typeof item & { badge?: number; badgeType?: 'error' | 'warning' };
               return (
                 <Link
                   key={item.name}
@@ -110,7 +143,19 @@ const AdminLayout = () => {
                   onClick={() => setSidebarOpen(false)}
                 >
                   <item.icon className="h-5 w-5" />
-                  <span className="font-medium">{item.name}</span>
+                  <span className="font-medium flex-1">{item.name}</span>
+                  {itemWithBadge.badge !== undefined && itemWithBadge.badge > 0 && (
+                    <Badge 
+                      variant="outline" 
+                      className={
+                        itemWithBadge.badgeType === 'error' 
+                          ? 'bg-red-500 text-white border-red-500 text-xs px-1.5 py-0' 
+                          : 'bg-yellow-500 text-white border-yellow-500 text-xs px-1.5 py-0'
+                      }
+                    >
+                      {itemWithBadge.badge}
+                    </Badge>
+                  )}
                 </Link>
               );
             })}

@@ -46,6 +46,7 @@ const Coupons = lazy(() => import("./pages/admin/Coupons"));
 const Categories = lazy(() => import("./pages/admin/Categories"));
 const EmailTemplates = lazy(() => import("./pages/admin/EmailTemplates"));
 const Sellers = lazy(() => import("./pages/admin/Sellers"));
+const OrderMonitor = lazy(() => import("./pages/admin/OrderMonitor"));
 
 const queryClient = new QueryClient();
 
@@ -112,6 +113,7 @@ const App = () => (
                   <Route index element={<Dashboard />} />
                   <Route path="products" element={<Products />} />
                   <Route path="orders" element={<Orders />} />
+                  <Route path="monitor" element={<OrderMonitor />} />
                   <Route path="customers" element={<Customers />} />
                   <Route path="payments" element={<Payments />} />
                   <Route path="reports" element={<Reports />} />
