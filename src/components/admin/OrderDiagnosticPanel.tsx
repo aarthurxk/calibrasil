@@ -44,7 +44,8 @@ export const OrderDiagnosticPanel = ({ order, flowResult }: OrderDiagnosticPanel
   const customerName = shippingAddress?.name || 
     `${shippingAddress?.firstName || ''} ${shippingAddress?.lastName || ''}`.trim() || 
     'Cliente';
-  const customerEmail = order.guest_email || 'Não disponível';
+  const customerEmail = order.guest_email || (order.user_id ? 'Usuário logado' : 'Não disponível');
+  const hasEmail = !!(order.guest_email || order.user_id);
 
   // Build logs from order data
   const buildLogs = () => {
@@ -108,8 +109,30 @@ export const OrderDiagnosticPanel = ({ order, flowResult }: OrderDiagnosticPanel
   const handleResendEmail = async () => {
     setIsResending(true);
     try {
+      // Se temos guest_email, usar diretamente. Se não, buscar via get-user-email
+      let emailToUse = order.guest_email;
+      
+      if (!emailToUse && order.user_id) {
+        // Buscar email do usuário logado
+        const { data: emailData, error: emailError } = await supabase.functions.invoke('get-user-email', {
+          body: { userId: order.user_id },
+        });
+        
+        if (emailError) {
+          throw new Error(`Não foi possível obter o email do usuário: ${emailError.message}`);
+        }
+        
+        if (emailData?.email) {
+          emailToUse = emailData.email;
+        }
+      }
+      
+      if (!emailToUse) {
+        throw new Error('Email do cliente não encontrado');
+      }
+      
       const response = await supabase.functions.invoke('test-order-email', {
-        body: { orderId: order.id },
+        body: { orderId: order.id, customerEmail: emailToUse },
       });
       
       if (response.error) {
@@ -269,7 +292,7 @@ export const OrderDiagnosticPanel = ({ order, flowResult }: OrderDiagnosticPanel
               variant="outline" 
               size="sm"
               onClick={handleResendEmail}
-              disabled={isResending || !order.guest_email}
+              disabled={isResending || !hasEmail}
             >
               {isResending ? (
                 <RefreshCw className="h-4 w-4 mr-2 animate-spin" />

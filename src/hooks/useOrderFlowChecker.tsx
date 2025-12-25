@@ -130,13 +130,15 @@ export const useOrderFlowChecker = (order: Order | null): OrderFlowResult | null
       },
       
       // 9. Email de confirmação enviado
+      // Considerar OK se temos guest_email OU user_id (usuário logado pode ter email no auth)
       {
         id: 'confirmation_email',
         name: 'Email de confirmação enviado',
-        status: isPaid && order.guest_email ? 'ok' : 
-                isPaid && !order.guest_email ? 'error' : 'pending',
-        evidence: order.guest_email ? `Para: ${order.guest_email}` : undefined,
-        reason: isPaid && !order.guest_email ? 'Email do cliente não encontrado' : undefined,
+        status: isPaid && (order.guest_email || order.user_id) ? 'ok' : 
+                isPaid && !order.guest_email && !order.user_id ? 'error' : 'pending',
+        evidence: order.guest_email ? `Para: ${order.guest_email}` : 
+                  order.user_id ? 'Email do usuário logado' : undefined,
+        reason: isPaid && !order.guest_email && !order.user_id ? 'Email do cliente não encontrado' : undefined,
       },
       
       // 10. Pedido enviado
