@@ -65,10 +65,11 @@ export const OrderMonitorCard = ({ order, isSelected, onClick }: OrderMonitorCar
   return (
     <Card 
       className={cn(
-        "p-4 cursor-pointer transition-all hover:shadow-md",
-        isSelected && "ring-2 ring-primary bg-accent/50",
-        flowResult?.overallStatus === 'error' && "border-red-200",
-        flowResult?.overallStatus === 'pending' && "border-yellow-200"
+        "p-4 cursor-pointer transition-all duration-200",
+        "hover:shadow-lg hover:-translate-y-0.5",
+        isSelected && "ring-2 ring-primary bg-accent/50 shadow-lg",
+        flowResult?.overallStatus === 'error' && "border-red-200 hover:border-red-300",
+        flowResult?.overallStatus === 'pending' && "border-yellow-200 hover:border-yellow-300"
       )}
       onClick={onClick}
     >
@@ -78,7 +79,12 @@ export const OrderMonitorCard = ({ order, isSelected, onClick }: OrderMonitorCar
             <span className="font-mono text-sm font-medium">
               #{order.id.slice(0, 8)}
             </span>
-            {getStatusBadge()}
+            <div className={cn(
+              "transition-all duration-300",
+              flowResult?.overallStatus === 'error' && "animate-badge-pulse"
+            )}>
+              {getStatusBadge()}
+            </div>
           </div>
           
           <p className="text-sm text-muted-foreground truncate mt-1">
@@ -95,7 +101,16 @@ export const OrderMonitorCard = ({ order, isSelected, onClick }: OrderMonitorCar
 
           {flowResult && (
             <>
-              {getProgressBar()}
+              <div className="w-full bg-muted rounded-full h-1.5 mt-2 overflow-hidden">
+                <div 
+                  className={cn(
+                    "h-1.5 rounded-full transition-all duration-700 ease-out",
+                    flowResult.overallStatus === 'ok' ? 'bg-green-500' :
+                    flowResult.overallStatus === 'pending' ? 'bg-yellow-500' : 'bg-red-500'
+                  )}
+                  style={{ width: `${(flowResult.completedSteps / flowResult.totalSteps) * 100}%` }}
+                />
+              </div>
               <div className="flex items-center justify-between mt-2 text-xs">
                 <span className="text-muted-foreground">
                   {flowResult.completedSteps}/{flowResult.totalSteps} etapas

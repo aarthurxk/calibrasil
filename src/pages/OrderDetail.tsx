@@ -208,13 +208,19 @@ const OrderDetail = () => {
 
   return (
     <MainLayout>
-      <div className="container py-12">
-        <Link to="/orders" className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-8">
-          <ArrowLeft className="h-4 w-4 mr-2" />
+      <div className="container py-12 animate-fade-in">
+        <Link 
+          to="/orders" 
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-8 transition-all duration-200 hover:-translate-x-1 group"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2 transition-transform group-hover:-translate-x-1" />
           Voltar aos Meus Pedidos
         </Link>
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div 
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 animate-fade-in"
+          style={{ animationDelay: '100ms' }}
+        >
           <div>
             <h1 className="text-3xl font-bold">Pedido #{order.id.slice(0, 8).toUpperCase()}</h1>
             <p className="text-muted-foreground">
@@ -228,7 +234,7 @@ const OrderDetail = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Order Items */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 animate-fade-in" style={{ animationDelay: '200ms' }}>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -238,14 +244,18 @@ const OrderDetail = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {orderItems.map((item) => (
-                    <div key={item.id} className="flex gap-4 p-4 border border-border rounded-lg">
+                  {orderItems.map((item, index) => (
+                    <div 
+                      key={item.id} 
+                      className="flex gap-4 p-4 border border-border rounded-lg transition-all duration-200 hover:border-primary/30 hover:shadow-sm animate-fade-in"
+                      style={{ animationDelay: `${300 + index * 50}ms` }}
+                    >
                       <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                         {item.product_id && products[item.product_id]?.image ? (
                           <img
                             src={products[item.product_id].image!}
                             alt={item.product_name}
-                            className="h-full w-full object-cover"
+                            className="h-full w-full object-cover transition-transform duration-200 hover:scale-110"
                           />
                         ) : (
                           <div className="h-full w-full flex items-center justify-center">
@@ -272,7 +282,7 @@ const OrderDetail = () => {
           {/* Order Summary & Details */}
           <div className="space-y-6">
             {/* Delivery Address */}
-            <Card>
+            <Card className="animate-fade-in" style={{ animationDelay: '400ms' }}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <MapPin className="h-5 w-5" />
@@ -298,7 +308,7 @@ const OrderDetail = () => {
             </Card>
 
             {/* Payment */}
-            <Card>
+            <Card className="animate-fade-in" style={{ animationDelay: '500ms' }}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <CreditCard className="h-5 w-5" />
@@ -324,15 +334,15 @@ const OrderDetail = () => {
                   <span>{shipping > 0 ? formatPrice(shipping) : "Grátis"}</span>
                 </div>
                 <Separator />
-                <div className="flex justify-between font-semibold">
+                <div className="flex justify-between font-semibold text-lg">
                   <span>Total</span>
-                  <span>{formatPrice(order.total)}</span>
+                  <span className="text-primary">{formatPrice(order.total)}</span>
                 </div>
               </CardContent>
             </Card>
 
             {/* Delivery Estimate */}
-            <Card>
+            <Card className="animate-fade-in" style={{ animationDelay: '600ms' }}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Truck className="h-5 w-5" />

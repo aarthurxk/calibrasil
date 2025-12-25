@@ -104,18 +104,18 @@ const AdminLayout = () => {
     <div className="min-h-screen flex bg-background">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-sidebar transform transition-transform duration-300 lg:relative lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-sidebar transform transition-all duration-300 ease-out lg:relative lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="p-6 border-b border-sidebar-border">
-            <Link to="/admin" className="flex items-center gap-3">
+            <Link to="/admin" className="flex items-center gap-3 group">
               <img
                 src={caliLogo}
                 alt="Cali"
-                className="h-10 w-10 rounded-lg"
+                className="h-10 w-10 rounded-lg transition-transform duration-300 group-hover:scale-110"
               />
               <div>
                 <span className="font-bold text-sidebar-foreground">Cali</span>
@@ -128,30 +128,31 @@ const AdminLayout = () => {
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1">
-            {visibleItems.map((item) => {
+            {visibleItems.map((item, index) => {
               const isActive = location.pathname === item.path;
               const itemWithBadge = item as typeof item & { badge?: number; badgeType?: 'error' | 'warning' };
               return (
                 <Link
                   key={item.name}
                   to={item.path}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  className={`group flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 animate-fade-in ${
                     isActive
-                      ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                      ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-lg'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:translate-x-1'
                   }`}
+                  style={{ animationDelay: `${index * 50}ms` }}
                   onClick={() => setSidebarOpen(false)}
                 >
-                  <item.icon className="h-5 w-5" />
+                  <item.icon className={`h-5 w-5 transition-transform duration-200 ${isActive ? '' : 'group-hover:scale-110'}`} />
                   <span className="font-medium flex-1">{item.name}</span>
                   {itemWithBadge.badge !== undefined && itemWithBadge.badge > 0 && (
                     <Badge 
                       variant="outline" 
-                      className={
+                      className={`animate-bounce-subtle ${
                         itemWithBadge.badgeType === 'error' 
                           ? 'bg-red-500 text-white border-red-500 text-xs px-1.5 py-0' 
                           : 'bg-yellow-500 text-white border-yellow-500 text-xs px-1.5 py-0'
-                      }
+                      }`}
                     >
                       {itemWithBadge.badge}
                     </Badge>
@@ -165,16 +166,16 @@ const AdminLayout = () => {
           <div className="p-4 border-t border-sidebar-border space-y-2">
             <Link
               to="/"
-              className="flex items-center gap-3 px-4 py-3 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+              className="group flex items-center gap-3 px-4 py-3 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-200 hover:translate-x-1"
             >
-              <Package className="h-5 w-5" />
+              <Package className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
               <span className="font-medium">Ver Loja</span>
             </Link>
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+              className="w-full group flex items-center gap-3 px-4 py-3 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-200 hover:translate-x-1"
             >
-              <LogOut className="h-5 w-5" />
+              <LogOut className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
               <span className="font-medium">Sair</span>
             </button>
           </div>
@@ -184,7 +185,7 @@ const AdminLayout = () => {
       {/* Overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-foreground/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-foreground/50 backdrop-blur-sm z-40 lg:hidden animate-fade-in"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -192,31 +193,31 @@ const AdminLayout = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-screen">
         {/* Header */}
-        <header className="sticky top-0 z-30 bg-background border-b border-border px-6 py-4">
+        <header className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border px-6 py-4 transition-all duration-200">
           <div className="flex items-center justify-between">
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden"
+              className="lg:hidden hover:scale-105 transition-transform"
               onClick={() => setSidebarOpen(true)}
             >
               <Menu className="h-5 w-5" />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity">
+                <button className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-all duration-200 group">
                   <div className="text-right">
                     <p className="text-sm font-medium">{user?.email}</p>
                     <div className="flex items-center gap-2 justify-end">
                       {getRoleBadge()}
                     </div>
                   </div>
-                  <div className="w-10 h-10 rounded-full bg-gradient-ocean flex items-center justify-center text-primary-foreground font-bold">
+                  <div className="w-10 h-10 rounded-full bg-gradient-ocean flex items-center justify-center text-primary-foreground font-bold transition-transform duration-200 group-hover:scale-105">
                     {user?.email?.charAt(0).toUpperCase()}
                   </div>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 bg-popover">
+              <DropdownMenuContent align="end" className="w-48 bg-popover animate-scale-in">
                 <DropdownMenuItem asChild>
                   <Link to="/profile" className="flex items-center gap-2 cursor-pointer">
                     <UserCircle className="h-4 w-4" />
@@ -243,7 +244,7 @@ const AdminLayout = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-6 animate-fade-in">
           <Outlet />
         </main>
       </div>

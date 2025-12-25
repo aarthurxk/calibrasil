@@ -98,14 +98,22 @@ export const OrderFlowTimeline = ({ steps }: OrderFlowTimelineProps) => {
         const isLast = index === steps.length - 1;
 
         return (
-          <div key={step.id} className="relative flex gap-4">
+          <div 
+            key={step.id} 
+            className="relative flex gap-4 animate-fade-in"
+            style={{ animationDelay: `${index * 100}ms` }}
+          >
             {/* Timeline line */}
             {!isLast && (
               <div 
                 className={cn(
-                  "absolute left-5 top-10 w-0.5 h-[calc(100%-16px)]",
+                  "absolute left-5 top-10 w-0.5 origin-top transition-all duration-500",
                   getLineColor(step.status)
                 )}
+                style={{ 
+                  height: 'calc(100% - 16px)',
+                  animationDelay: `${index * 100 + 200}ms`
+                }}
               />
             )}
 
@@ -113,6 +121,7 @@ export const OrderFlowTimeline = ({ steps }: OrderFlowTimelineProps) => {
             <div 
               className={cn(
                 "relative z-10 flex-shrink-0 w-10 h-10 rounded-full border-2 flex items-center justify-center",
+                "transition-all duration-300 hover:scale-110",
                 getStatusColor(step.status)
               )}
             >
@@ -125,7 +134,9 @@ export const OrderFlowTimeline = ({ steps }: OrderFlowTimelineProps) => {
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm">{step.name}</span>
-                    {getStatusIcon(step.status)}
+                    <span className="transition-transform duration-200 hover:scale-110">
+                      {getStatusIcon(step.status)}
+                    </span>
                   </div>
                   
                   {step.timestamp && (

@@ -6,6 +6,7 @@ interface AnimatedNumberProps {
   suffix?: string;
   prefix?: string;
   className?: string;
+  formatFn?: (value: number) => string;
 }
 
 export const AnimatedNumber = ({
@@ -14,6 +15,7 @@ export const AnimatedNumber = ({
   suffix = '',
   prefix = '',
   className = '',
+  formatFn,
 }: AnimatedNumberProps) => {
   const [displayValue, setDisplayValue] = useState(0);
   const [hasAnimated, setHasAnimated] = useState(false);
@@ -58,16 +60,18 @@ export const AnimatedNumber = ({
     return () => observer.disconnect();
   }, [value, duration, hasAnimated]);
 
-  const formatNumber = (num: number) => {
+  const defaultFormat = (num: number) => {
     if (num >= 1000) {
       return `${(num / 1000).toFixed(0)}mil`;
     }
     return num.toString();
   };
 
+  const formattedValue = formatFn ? formatFn(displayValue) : defaultFormat(displayValue);
+
   return (
     <span ref={ref} className={className}>
-      {prefix}{formatNumber(displayValue)}{suffix}
+      {prefix}{formattedValue}{suffix}
     </span>
   );
 };

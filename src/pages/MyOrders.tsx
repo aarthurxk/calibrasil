@@ -123,8 +123,28 @@ const MyOrders = () => {
   if (isLoading) {
     return (
       <MainLayout>
-        <div className="container py-20 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="container py-12 animate-fade-in">
+          <div className="h-6 w-32 bg-muted rounded animate-shimmer mb-8" />
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+            <div>
+              <div className="h-8 w-48 bg-muted rounded animate-shimmer" />
+              <div className="h-4 w-24 bg-muted rounded mt-2 animate-shimmer" style={{ animationDelay: '100ms' }} />
+            </div>
+            <div className="h-10 w-48 bg-muted rounded animate-shimmer" style={{ animationDelay: '200ms' }} />
+          </div>
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="p-6 border border-border rounded-lg animate-fade-in" style={{ animationDelay: `${i * 100}ms` }}>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-lg bg-muted animate-shimmer" />
+                  <div className="flex-1">
+                    <div className="h-5 w-32 bg-muted rounded animate-shimmer" />
+                    <div className="h-4 w-48 bg-muted rounded mt-2 animate-shimmer" style={{ animationDelay: '100ms' }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </MainLayout>
     );
@@ -132,14 +152,17 @@ const MyOrders = () => {
 
   return (
     <MainLayout>
-      <div className="container py-12">
-        <Link to="/profile" className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-8">
-          <ArrowLeft className="h-4 w-4 mr-2" />
+      <div className="container py-12 animate-fade-in">
+        <Link 
+          to="/profile" 
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-8 transition-all duration-200 hover:-translate-x-1 group"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2 transition-transform group-hover:-translate-x-1" />
           Voltar ao Perfil
         </Link>
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-          <div>
+          <div className="animate-fade-in">
             <h1 className="text-3xl font-bold">Meus Pedidos</h1>
             <p className="text-muted-foreground">
               {orders.length} {orders.length === 1 ? "pedido" : "pedidos"} no total
@@ -147,7 +170,7 @@ const MyOrders = () => {
           </div>
           
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-[200px] transition-all duration-200 hover:border-primary">
               <SelectValue placeholder="Filtrar por status" />
             </SelectTrigger>
             <SelectContent>
@@ -163,9 +186,11 @@ const MyOrders = () => {
         </div>
 
         {filteredOrders.length === 0 ? (
-          <Card className="py-16">
+          <Card className="py-16 animate-fade-in">
             <CardContent className="flex flex-col items-center justify-center text-center">
-              <ShoppingBag className="h-16 w-16 text-muted-foreground mb-4" />
+              <div className="animate-float">
+                <ShoppingBag className="h-16 w-16 text-muted-foreground mb-4" />
+              </div>
               <h2 className="text-xl font-semibold mb-2">
                 {statusFilter === "all" ? "Nenhum pedido ainda" : "Nenhum pedido encontrado"}
               </h2>
@@ -175,7 +200,7 @@ const MyOrders = () => {
                   : "Não há pedidos com esse status."}
               </p>
               {statusFilter === "all" && (
-                <Button onClick={() => navigate("/shop")}>
+                <Button onClick={() => navigate("/shop")} className="hover:scale-105 transition-transform">
                   Ir para a Loja
                 </Button>
               )}
@@ -183,17 +208,18 @@ const MyOrders = () => {
           </Card>
         ) : (
           <div className="space-y-4">
-            {filteredOrders.map((order) => (
+            {filteredOrders.map((order, index) => (
               <Link 
                 key={order.id} 
                 to={`/order/${order.id}`}
-                className="block"
+                className="block animate-fade-in"
+                style={{ animationDelay: `${index * 50}ms` }}
               >
-                <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+                <Card className="transition-all duration-200 cursor-pointer hover:shadow-lg hover:-translate-y-0.5 hover:border-primary/50 group">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                        <Package className="h-6 w-6 text-muted-foreground" />
+                      <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 transition-all duration-200 group-hover:bg-primary/10">
+                        <Package className="h-6 w-6 text-muted-foreground transition-colors group-hover:text-primary" />
                       </div>
                       
                       <div className="flex-1 min-w-0">
@@ -220,7 +246,7 @@ const MyOrders = () => {
                         </div>
                       </div>
                       
-                      <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0 hidden sm:block" />
+                      <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0 hidden sm:block transition-transform group-hover:translate-x-1" />
                     </div>
                   </CardContent>
                 </Card>
