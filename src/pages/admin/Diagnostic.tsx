@@ -288,11 +288,8 @@ const Diagnostic = () => {
       try {
         const { data: shippingData, error: shippingError } = await supabase.functions.invoke('calculate-shipping', {
           body: { 
-            zipCode: '01310100', // CEP Av. Paulista
-            weight: 0.5,
-            length: 20,
-            width: 15,
-            height: 10
+            cep_destino: '01310100', // CEP Av. Paulista
+            peso: 300 // Weight in grams
           }
         });
 
