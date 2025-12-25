@@ -464,8 +464,8 @@ const DeliveryMethodCards = ({
           </button>
         )}
 
-        {/* CEP input block - Only show if NOT pickup and in correios mode */}
-        {isCorreiosMode && !isPickupSelected && (
+        {/* CEP input block - Always show in correios mode so user can calculate shipping */}
+        {isCorreiosMode && (
           <div className="bg-muted/50 rounded-xl p-4 space-y-3">
             <p className="text-sm font-medium text-foreground">Calcular frete</p>
             <div className="flex gap-2">
