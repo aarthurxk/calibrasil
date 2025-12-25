@@ -5,12 +5,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MapPin, Phone, Mail, Package, CreditCard, Calendar, Truck, Loader2, User } from 'lucide-react';
+import { MapPin, Phone, Mail, Package, CreditCard, Calendar, Truck, Loader2, User, Send, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
@@ -57,6 +68,7 @@ interface OrderDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onTrackingCodeSaved?: () => void;
+  onOrderDeleted?: () => void;
 }
 
 const getStatusBadge = (status: string) => {
@@ -109,9 +121,11 @@ const formatDate = (dateString: string) => {
   });
 };
 
-export function OrderDetailsDialog({ order, open, onOpenChange, onTrackingCodeSaved }: OrderDetailsDialogProps) {
+export function OrderDetailsDialog({ order, open, onOpenChange, onTrackingCodeSaved, onOrderDeleted }: OrderDetailsDialogProps) {
   const [trackingCode, setTrackingCode] = useState(order?.tracking_code || '');
   const [isSaving, setIsSaving] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Buscar dados do perfil quando há user_id
   const { data: profile } = useQuery({
@@ -241,6 +255,90 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onTrackingCodeSa
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleResendEmail = async () => {
+    setIsResending(true);
+    try {
+      let emailToUse = customerEmail;
+      
+      // Se não tem email e tem user_id, buscar via edge function
+      if (!emailToUse && order.user_id) {
+        const { data, error } = await supabase.functions.invoke('get-user-email', {
+          body: { userId: order.user_id }
+        });
+        if (!error && data?.email) {
+          emailToUse = data.email;
+        }
+      }
+      
+      if (!emailToUse) {
+        toast({
+          title: 'Sem email',
+          description: 'Não foi possível encontrar o email do cliente.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const { error } = await supabase.functions.invoke('test-order-email', {
+        body: { orderId: order.id }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Email enviado!',
+        description: `Email de confirmação reenviado para ${emailToUse}`,
+      });
+    } catch (error) {
+      console.error('Error resending email:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível reenviar o email.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  const handleDeleteOrder = async () => {
+    setIsDeleting(true);
+    try {
+      // Primeiro deletar os order_items
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('order_id', order.id);
+
+      if (itemsError) throw itemsError;
+
+      // Depois deletar o pedido
+      const { error: orderError } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', order.id);
+
+      if (orderError) throw orderError;
+
+      toast({
+        title: 'Pedido excluído',
+        description: 'O pedido foi removido permanentemente.',
+      });
+
+      onOpenChange(false);
+      onOrderDeleted?.();
+    } catch (error) {
+      console.error('Error deleting order:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível excluir o pedido.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -422,6 +520,58 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onTrackingCodeSa
             <span className="font-medium">
               {getPaymentMethodLabel(order.payment_method || undefined)}
             </span>
+          </div>
+
+          <Separator />
+
+          {/* Ações */}
+          <div>
+            <h3 className="font-semibold mb-3">Ações</h3>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleResendEmail}
+                disabled={isResending || (!customerEmail && !order.user_id)}
+              >
+                {isResending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                Reenviar Email
+              </Button>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir Pedido
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir pedido?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação não pode ser desfeita. O pedido #{order.id.slice(0, 8)} e todos os seus itens serão removidos permanentemente.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteOrder}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : null}
+                      Excluir
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </div>
       </DialogContent>
