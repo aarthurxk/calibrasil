@@ -184,9 +184,10 @@ serve(async (req) => {
     });
 
     // Create order with validated prices
+    // SEMPRE salvar o email no guest_email para garantir envio de emails pós-pagamento
     const orderData = {
       user_id: body.user_id || null,
-      guest_email: body.user_id ? null : body.email,
+      guest_email: body.email, // Sempre salvar email, mesmo para usuários logados
       phone: body.phone || null,
       total: finalTotal,
       status: 'pending',

@@ -207,22 +207,50 @@ serve(async (req) => {
         if (!customerEmail && order.user_id) {
           logStep('Fetching email for logged-in user', { userId: order.user_id });
           
-          // Fetch user email from auth.users using service role
-          const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(order.user_id);
+          // Tentativa 1: Buscar email do auth.users
+          try {
+            const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(order.user_id);
+            
+            if (authError) {
+              logStep('Auth getUserById failed', { error: authError.message });
+            } else if (authUser?.user?.email) {
+              customerEmail = authUser.user.email;
+              customerName = authUser.user.user_metadata?.full_name || null;
+              logStep('User email found via auth', { email: customerEmail });
+            }
+          } catch (authErr) {
+            logStep('Auth getUserById exception', { error: String(authErr) });
+          }
           
-          if (authError) {
-            logStep('EMAIL_PAYMENT_ERROR', { error: 'Failed to fetch user email', details: authError.message });
-          } else if (authUser?.user?.email) {
-            customerEmail = authUser.user.email;
-            customerName = authUser.user.user_metadata?.full_name || null;
-            logStep('User email found', { email: customerEmail });
-          } else {
-            logStep('EMAIL_PAYMENT_ERROR', { error: 'User has no email' });
+          // Tentativa 2: Buscar na tabela profiles se ainda não temos email
+          if (!customerEmail) {
+            logStep('Trying fallback: get-user-email function');
+            try {
+              const emailResponse = await fetch(`${supabaseUrl}/functions/v1/get-user-email`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${supabaseServiceKey}`
+                },
+                body: JSON.stringify({ userId: order.user_id })
+              });
+              
+              if (emailResponse.ok) {
+                const emailData = await emailResponse.json();
+                if (emailData.email) {
+                  customerEmail = emailData.email;
+                  customerName = emailData.full_name || null;
+                  logStep('User email found via get-user-email', { email: customerEmail });
+                }
+              }
+            } catch (fallbackErr) {
+              logStep('Fallback get-user-email failed', { error: String(fallbackErr) });
+            }
           }
         }
         
         if (!customerEmail) {
-          logStep('EMAIL_PAYMENT_ERROR', { error: 'No customer email available', orderId });
+          logStep('EMAIL_PAYMENT_ERROR', { error: 'No customer email available after all attempts', orderId, userId: order.user_id });
         } else {
           const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-order-emails`, {
             method: 'POST',
@@ -240,7 +268,7 @@ serve(async (req) => {
           const emailResult = await emailResponse.json();
           
           if (emailResult.error) {
-            logStep('EMAIL_PAYMENT_ERROR', { error: emailResult.error, orderId });
+            logStep('EMAIL_PAYMENT_ERROR', { error: emailResult.error, orderId, email: customerEmail });
           } else {
             logStep('EMAIL_PAYMENT_SENT', { orderId, email: customerEmail });
           }
