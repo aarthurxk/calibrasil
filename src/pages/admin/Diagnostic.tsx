@@ -12,12 +12,13 @@ import {
   ShoppingCart,
   CreditCard,
   Mail,
-  Database
+  Database,
+  Truck,
+  Webhook
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -51,6 +52,9 @@ const Diagnostic = () => {
     { name: 'Verificar itens do pedido', status: 'pending' },
     { name: 'Atualizar status do pedido', status: 'pending' },
     { name: 'Verificar reflexo no total', status: 'pending' },
+    { name: 'Testar cálculo de frete', status: 'pending' },
+    { name: 'Testar envio de email', status: 'pending' },
+    { name: 'Simular webhook de pagamento', status: 'pending' },
   ]);
 
   const updateTest = (index: number, update: Partial<TestResult>) => {
@@ -277,8 +281,167 @@ const Diagnostic = () => {
         duration: Date.now() - startTime
       });
 
+      // Test 7: Testar cálculo de frete
+      updateTest(6, { status: 'running' });
+      startTime = Date.now();
+
+      try {
+        const { data: shippingData, error: shippingError } = await supabase.functions.invoke('calculate-shipping', {
+          body: { 
+            zipCode: '01310100', // CEP Av. Paulista
+            weight: 0.5,
+            length: 20,
+            width: 15,
+            height: 10
+          }
+        });
+
+        if (shippingError) {
+          updateTest(6, { 
+            status: 'error', 
+            endpoint: 'calculate-shipping',
+            statusCode: 500,
+            message: shippingError.message,
+            duration: Date.now() - startTime
+          });
+        } else if (shippingData?.options?.length > 0) {
+          const options = shippingData.options
+            .map((opt: any) => `${opt.name}: R$ ${opt.price?.toFixed(2) || '?'} (${opt.deliveryTime || '?'} dias)`)
+            .join(' | ');
+          updateTest(6, { 
+            status: 'ok', 
+            endpoint: 'calculate-shipping',
+            statusCode: 200,
+            message: options,
+            duration: Date.now() - startTime
+          });
+        } else {
+          updateTest(6, { 
+            status: 'ok', 
+            endpoint: 'calculate-shipping',
+            statusCode: 200,
+            message: shippingData?.message || 'Frete fixo configurado',
+            duration: Date.now() - startTime
+          });
+        }
+      } catch (shippingErr: any) {
+        updateTest(6, { 
+          status: 'error', 
+          endpoint: 'calculate-shipping',
+          statusCode: 500,
+          message: shippingErr.message || 'Erro ao calcular frete',
+          duration: Date.now() - startTime
+        });
+      }
+
+      // Test 8: Testar envio de email
+      updateTest(7, { status: 'running' });
+      startTime = Date.now();
+
+      try {
+        const { data: emailData, error: emailError } = await supabase.functions.invoke('test-order-email', {
+          body: { orderId: data.orderId }
+        });
+
+        if (emailError) {
+          updateTest(7, { 
+            status: 'error', 
+            endpoint: 'test-order-email',
+            statusCode: 500,
+            message: emailError.message,
+            duration: Date.now() - startTime
+          });
+        } else if (emailData?.success) {
+          updateTest(7, { 
+            status: 'ok', 
+            endpoint: 'test-order-email',
+            statusCode: 200,
+            message: `Email enviado para: ${emailData.email || 'teste-diag@cali.com.br'}`,
+            duration: Date.now() - startTime
+          });
+        } else {
+          updateTest(7, { 
+            status: 'error', 
+            endpoint: 'test-order-email',
+            statusCode: 400,
+            message: emailData?.error || 'Falha no envio',
+            duration: Date.now() - startTime
+          });
+        }
+      } catch (emailErr: any) {
+        updateTest(7, { 
+          status: 'error', 
+          endpoint: 'test-order-email',
+          statusCode: 500,
+          message: emailErr.message || 'Erro ao enviar email',
+          duration: Date.now() - startTime
+        });
+      }
+
+      // Test 9: Simular webhook de pagamento
+      updateTest(8, { status: 'running' });
+      startTime = Date.now();
+
+      try {
+        // Simulate payment webhook by updating order and checking status change
+        const { error: webhookUpdateError } = await supabase
+          .from('orders')
+          .update({ 
+            payment_status: 'approved',
+            mercadopago_payment_id: `DIAG-${Date.now()}`
+          })
+          .eq('id', data.orderId);
+
+        if (webhookUpdateError) {
+          updateTest(8, { 
+            status: 'error', 
+            endpoint: 'orders.update (webhook simulation)',
+            statusCode: 400,
+            message: webhookUpdateError.message,
+            duration: Date.now() - startTime
+          });
+        } else {
+          // Verify the update
+          const { data: webhookOrder } = await supabase
+            .from('orders')
+            .select('payment_status, mercadopago_payment_id')
+            .eq('id', data.orderId)
+            .single();
+
+          if (webhookOrder?.payment_status === 'approved') {
+            updateTest(8, { 
+              status: 'ok', 
+              endpoint: 'orders.update (webhook simulation)',
+              statusCode: 200,
+              message: `Status: paid → approved | ID: ${webhookOrder.mercadopago_payment_id?.slice(0, 15)}`,
+              duration: Date.now() - startTime
+            });
+          } else {
+            updateTest(8, { 
+              status: 'error', 
+              endpoint: 'orders.update (webhook simulation)',
+              statusCode: 500,
+              message: 'Status não foi atualizado',
+              duration: Date.now() - startTime
+            });
+          }
+        }
+      } catch (webhookErr: any) {
+        updateTest(8, { 
+          status: 'error', 
+          endpoint: 'orders.update (webhook simulation)',
+          statusCode: 500,
+          message: webhookErr.message || 'Erro na simulação do webhook',
+          duration: Date.now() - startTime
+        });
+      }
+
       setTestData(data);
-      toast.success('Todos os testes passaram!');
+      
+      const allPassed = tests.filter(t => t.status === 'error').length === 0;
+      if (allPassed) {
+        toast.success('Todos os testes passaram!');
+      }
 
     } catch (error: any) {
       console.error('Erro nos testes:', error);
@@ -346,7 +509,7 @@ const Diagnostic = () => {
   };
 
   const getTestIcon = (index: number) => {
-    const icons = [Package, Database, ShoppingCart, Package, RefreshCw, CreditCard];
+    const icons = [Package, Database, ShoppingCart, Package, RefreshCw, CreditCard, Truck, Mail, Webhook];
     const Icon = icons[index] || Package;
     return <Icon className="w-4 h-4" />;
   };

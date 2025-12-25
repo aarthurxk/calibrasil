@@ -11,13 +11,16 @@ import {
   Menu,
   UserCircle,
   Store,
-  Map,
   Ticket,
   Layers,
   Mail,
   UserCheck,
   Activity,
   Bug,
+  ChevronDown,
+  Megaphone,
+  Wallet,
+  Cog,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -33,12 +36,37 @@ import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import caliLogo from '@/assets/cali-logo.jpeg';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
+
+interface SidebarSubItem {
+  name: string;
+  icon: React.ComponentType<{ className?: string }>;
+  path: string;
+  badge?: number;
+  badgeType?: 'error' | 'warning';
+}
+
+interface SidebarItem {
+  name: string;
+  icon: React.ComponentType<{ className?: string }>;
+  path?: string;
+  showFor: ('admin' | 'manager')[];
+  badge?: number;
+  badgeType?: 'error' | 'warning';
+  subItems?: SidebarSubItem[];
+}
 
 const AdminLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user, role, signOut, isAdmin, canManageRoles } = useAuth();
+  const [openMenus, setOpenMenus] = useState<string[]>(['Pedidos', 'Sistema']);
+  const { user, role, signOut, isAdmin } = useAuth();
 
   // Fetch order monitor stats for badge
   const { data: monitorStats } = useQuery({
@@ -65,30 +93,102 @@ const AdminLayout = () => {
       
       return { errors, pending };
     },
-    refetchInterval: 60000, // Refetch every minute
+    refetchInterval: 60000,
   });
 
-  // Define menu items based on role
-  const sidebarItems = [
-    { name: 'Painel', icon: LayoutDashboard, path: '/admin', showFor: ['admin', 'manager'] },
-    { name: 'Produtos', icon: Package, path: '/admin/products', showFor: ['admin', 'manager'] },
-    { name: 'Pedidos', icon: ShoppingCart, path: '/admin/orders', showFor: ['admin', 'manager'] },
-    { name: 'Monitor', icon: Activity, path: '/admin/monitor', showFor: ['admin'], badge: monitorStats?.errors || 0, badgeType: monitorStats?.errors ? 'error' : monitorStats?.pending ? 'warning' : undefined },
-    { name: 'Clientes', icon: Users, path: '/admin/customers', showFor: ['admin', 'manager'] },
-    { name: 'Pagamentos', icon: CreditCard, path: '/admin/payments', showFor: ['admin', 'manager'] },
-    { name: 'Relatórios', icon: BarChart3, path: '/admin/reports', showFor: ['admin', 'manager'] },
-    { name: 'Cupons', icon: Ticket, path: '/admin/coupons', showFor: ['admin', 'manager'] },
-    { name: 'Vendedores', icon: UserCheck, path: '/admin/sellers', showFor: ['admin', 'manager'] },
-    { name: 'Categorias', icon: Layers, path: '/admin/categories', showFor: ['admin'] },
-    { name: 'Templates de Email', icon: Mail, path: '/admin/email-templates', showFor: ['admin'] },
-    { name: 'Roadmap', icon: Map, path: '/admin/roadmap', showFor: ['admin'] },
-    { name: 'Diagnóstico', icon: Bug, path: '/admin/diagnostic', showFor: ['admin'] },
-    { name: 'Configurações', icon: Settings, path: '/admin/settings', showFor: ['admin'] },
+  const toggleMenu = (name: string) => {
+    setOpenMenus(prev => 
+      prev.includes(name) ? prev.filter(m => m !== name) : [...prev, name]
+    );
+  };
+
+  // Simplified sidebar structure with grouped items
+  const sidebarItems: SidebarItem[] = [
+    { 
+      name: 'Painel', 
+      icon: LayoutDashboard, 
+      path: '/admin', 
+      showFor: ['admin', 'manager'] 
+    },
+    { 
+      name: 'Catálogo', 
+      icon: Package, 
+      showFor: ['admin', 'manager'],
+      subItems: [
+        { name: 'Produtos', icon: Package, path: '/admin/products' },
+        { name: 'Categorias', icon: Layers, path: '/admin/categories' },
+      ]
+    },
+    { 
+      name: 'Pedidos', 
+      icon: ShoppingCart, 
+      showFor: ['admin', 'manager'],
+      subItems: [
+        { name: 'Todos', icon: ShoppingCart, path: '/admin/orders' },
+        { 
+          name: 'Monitor', 
+          icon: Activity, 
+          path: '/admin/monitor',
+          badge: monitorStats?.errors || 0,
+          badgeType: monitorStats?.errors ? 'error' : 'warning'
+        },
+      ]
+    },
+    { 
+      name: 'Clientes', 
+      icon: Users, 
+      path: '/admin/customers', 
+      showFor: ['admin', 'manager'] 
+    },
+    { 
+      name: 'Marketing', 
+      icon: Megaphone, 
+      showFor: ['admin', 'manager'],
+      subItems: [
+        { name: 'Cupons', icon: Ticket, path: '/admin/coupons' },
+        { name: 'Vendedores', icon: UserCheck, path: '/admin/sellers' },
+      ]
+    },
+    { 
+      name: 'Financeiro', 
+      icon: Wallet, 
+      showFor: ['admin', 'manager'],
+      subItems: [
+        { name: 'Pagamentos', icon: CreditCard, path: '/admin/payments' },
+        { name: 'Relatórios', icon: BarChart3, path: '/admin/reports' },
+      ]
+    },
+    { 
+      name: 'Comunicação', 
+      icon: Mail, 
+      path: '/admin/email-templates', 
+      showFor: ['admin'] 
+    },
+    { 
+      name: 'Sistema', 
+      icon: Cog, 
+      showFor: ['admin'],
+      subItems: [
+        { name: 'Configurações', icon: Settings, path: '/admin/settings' },
+        { name: 'Diagnóstico', icon: Bug, path: '/admin/diagnostic' },
+      ]
+    },
   ];
 
-  const visibleItems = sidebarItems.filter(item => 
-    role && item.showFor.includes(role as 'admin' | 'manager')
-  );
+  const visibleItems = sidebarItems.filter(item => {
+    if (!role || !item.showFor.includes(role as 'admin' | 'manager')) return false;
+    // Filter subItems for managers (no categories, monitor, etc.)
+    if (item.subItems && role === 'manager') {
+      const adminOnlyPaths = ['/admin/categories', '/admin/monitor'];
+      item.subItems = item.subItems.filter(sub => !adminOnlyPaths.includes(sub.path));
+      if (item.subItems.length === 0) return false;
+    }
+    return true;
+  });
+
+  const isPathActive = (path?: string) => path && location.pathname === path;
+  const isGroupActive = (item: SidebarItem) => 
+    item.subItems?.some(sub => location.pathname === sub.path);
 
   const handleLogout = async () => {
     await signOut();
@@ -100,6 +200,110 @@ const AdminLayout = () => {
       return <Badge variant="default" className="bg-primary">Admin</Badge>;
     }
     return <Badge variant="secondary">Manager</Badge>;
+  };
+
+  const renderMenuItem = (item: SidebarItem, index: number) => {
+    const hasSubItems = item.subItems && item.subItems.length > 0;
+    const isOpen = openMenus.includes(item.name);
+    const isActive = isPathActive(item.path) || isGroupActive(item);
+
+    if (hasSubItems) {
+      return (
+        <Collapsible 
+          key={item.name} 
+          open={isOpen} 
+          onOpenChange={() => toggleMenu(item.name)}
+        >
+          <CollapsibleTrigger asChild>
+            <button
+              className={cn(
+                "w-full group flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200",
+                isActive 
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <item.icon className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
+              <span className="font-medium flex-1 text-left">{item.name}</span>
+              <ChevronDown className={cn(
+                "h-4 w-4 transition-transform duration-200",
+                isOpen && "rotate-180"
+              )} />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pl-4 pt-1 space-y-1">
+            {item.subItems?.map((subItem) => {
+              const subIsActive = isPathActive(subItem.path);
+              return (
+                <Link
+                  key={subItem.path}
+                  to={subItem.path}
+                  className={cn(
+                    "group flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200",
+                    subIsActive
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
+                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:translate-x-1"
+                  )}
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <subItem.icon className="h-4 w-4" />
+                  <span className="text-sm flex-1">{subItem.name}</span>
+                  {subItem.badge !== undefined && subItem.badge > 0 && (
+                    <Badge 
+                      variant="outline" 
+                      className={cn(
+                        "text-xs px-1.5 py-0 animate-bounce-subtle",
+                        subItem.badgeType === 'error' 
+                          ? "bg-destructive text-destructive-foreground border-destructive" 
+                          : "bg-yellow-500 text-white border-yellow-500"
+                      )}
+                    >
+                      {subItem.badge}
+                    </Badge>
+                  )}
+                </Link>
+              );
+            })}
+          </CollapsibleContent>
+        </Collapsible>
+      );
+    }
+
+    // Regular menu item without subItems
+    return (
+      <Link
+        key={item.name}
+        to={item.path!}
+        className={cn(
+          "group flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 animate-fade-in",
+          isActive
+            ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-lg"
+            : "text-sidebar-foreground hover:bg-sidebar-accent hover:translate-x-1"
+        )}
+        style={{ animationDelay: `${index * 50}ms` }}
+        onClick={() => setSidebarOpen(false)}
+      >
+        <item.icon className={cn(
+          "h-5 w-5 transition-transform duration-200",
+          !isActive && "group-hover:scale-110"
+        )} />
+        <span className="font-medium flex-1">{item.name}</span>
+        {item.badge !== undefined && item.badge > 0 && (
+          <Badge 
+            variant="outline" 
+            className={cn(
+              "animate-bounce-subtle text-xs px-1.5 py-0",
+              item.badgeType === 'error' 
+                ? "bg-destructive text-destructive-foreground border-destructive" 
+                : "bg-yellow-500 text-white border-yellow-500"
+            )}
+          >
+            {item.badge}
+          </Badge>
+        )}
+      </Link>
+    );
   };
 
   return (
@@ -129,39 +333,8 @@ const AdminLayout = () => {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1">
-            {visibleItems.map((item, index) => {
-              const isActive = location.pathname === item.path;
-              const itemWithBadge = item as typeof item & { badge?: number; badgeType?: 'error' | 'warning' };
-              return (
-                <Link
-                  key={item.name}
-                  to={item.path}
-                  className={`group flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 animate-fade-in ${
-                    isActive
-                      ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-lg'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:translate-x-1'
-                  }`}
-                  style={{ animationDelay: `${index * 50}ms` }}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <item.icon className={`h-5 w-5 transition-transform duration-200 ${isActive ? '' : 'group-hover:scale-110'}`} />
-                  <span className="font-medium flex-1">{item.name}</span>
-                  {itemWithBadge.badge !== undefined && itemWithBadge.badge > 0 && (
-                    <Badge 
-                      variant="outline" 
-                      className={`animate-bounce-subtle ${
-                        itemWithBadge.badgeType === 'error' 
-                          ? 'bg-red-500 text-white border-red-500 text-xs px-1.5 py-0' 
-                          : 'bg-yellow-500 text-white border-yellow-500 text-xs px-1.5 py-0'
-                      }`}
-                    >
-                      {itemWithBadge.badge}
-                    </Badge>
-                  )}
-                </Link>
-              );
-            })}
+          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+            {visibleItems.map((item, index) => renderMenuItem(item, index))}
           </nav>
 
           {/* Footer */}
@@ -170,7 +343,7 @@ const AdminLayout = () => {
               to="/"
               className="group flex items-center gap-3 px-4 py-3 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-200 hover:translate-x-1"
             >
-              <Package className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
+              <Store className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
               <span className="font-medium">Ver Loja</span>
             </Link>
             <button
