@@ -541,6 +541,9 @@ const Orders = () => {
           queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
           setIsDetailsOpen(false);
         }}
+        onOrderDeleted={() => {
+          queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+        }}
       />
     </div>
   );
