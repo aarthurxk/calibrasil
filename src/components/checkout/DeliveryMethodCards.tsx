@@ -35,9 +35,10 @@ const DeliveryMethodCards = ({
   const [cep, setCep] = useState(initialCep);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
+  const [calculatedOptions, setCalculatedOptions] = useState<ShippingOption[]>([]);
   const [hasCalculated, setHasCalculated] = useState(false);
 
+  // Static options
   const pickupOption: ShippingOption = {
     service: "pickup",
     name: "Retirar na Loja",
@@ -62,9 +63,45 @@ const DeliveryMethodCards = ({
     delivery_range: `${settings.delivery_min_days} a ${settings.delivery_max_days} dias úteis`,
   };
 
+  // Placeholder options for PAC/SEDEX before calculation
+  const pacPlaceholder: ShippingOption = {
+    service: "pac",
+    name: "PAC",
+    price: 0,
+    delivery_days: 0,
+    delivery_range: "Informe o CEP para calcular",
+  };
+
+  const sedexPlaceholder: ShippingOption = {
+    service: "sedex",
+    name: "SEDEX",
+    price: 0,
+    delivery_days: 0,
+    delivery_range: "Informe o CEP para calcular",
+  };
+
   const isEligibleForFreeShipping = itemsTotal >= settings.free_shipping_threshold;
   const isPickupSelected = selectedOption?.service === "pickup";
   const isCorreiosMode = settings.shipping_mode === "correios";
+
+  // Get PAC option (calculated or placeholder)
+  const getPacOption = () => {
+    if (hasCalculated) {
+      return calculatedOptions.find(opt => opt.service.toLowerCase().includes("pac") || opt.name.toLowerCase().includes("pac"));
+    }
+    return null;
+  };
+
+  // Get SEDEX option (calculated or placeholder)  
+  const getSedexOption = () => {
+    if (hasCalculated) {
+      return calculatedOptions.find(opt => opt.service.toLowerCase().includes("sedex") || opt.name.toLowerCase().includes("sedex"));
+    }
+    return null;
+  };
+
+  const pacOption = getPacOption();
+  const sedexOption = getSedexOption();
 
   // Auto-select pickup by default if available
   useEffect(() => {
@@ -134,19 +171,18 @@ const DeliveryMethodCards = ({
         }));
       }
 
-      setShippingOptions(opts);
+      setCalculatedOptions(opts);
       setHasCalculated(true);
       onCepValid?.(true);
 
-      // Auto-select first shipping option
-      if (opts.length > 0) {
-        onSelectOption(opts[0]);
+      // Auto-select PAC if currently not pickup
+      if (!isPickupSelected && opts.length > 0) {
+        const pac = opts.find(o => o.service.toLowerCase().includes("pac") || o.name.toLowerCase().includes("pac"));
+        if (pac) onSelectOption(pac);
+        else onSelectOption(opts[0]);
       }
     } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error
-          ? "Não foi possível calcular o frete. Verifique o CEP e tente novamente."
-          : "Erro ao calcular frete. Tente novamente.";
+      const errorMessage = "Não foi possível calcular o frete. Verifique o CEP e tente novamente.";
       setError(errorMessage);
       onCepValid?.(false);
     } finally {
@@ -165,16 +201,31 @@ const DeliveryMethodCards = ({
     onCepValid?.(true);
   };
 
+  const handleSelectPac = () => {
+    if (pacOption) {
+      onSelectOption(pacOption);
+    }
+  };
+
+  const handleSelectSedex = () => {
+    if (sedexOption) {
+      onSelectOption(sedexOption);
+    }
+  };
+
   const handleSelectDelivery = (option: ShippingOption) => {
     onSelectOption(option);
   };
+
+  const isPacSelected = selectedOption?.service?.toLowerCase().includes("pac") || selectedOption?.name?.toLowerCase().includes("pac");
+  const isSedexSelected = selectedOption?.service?.toLowerCase().includes("sedex") || selectedOption?.name?.toLowerCase().includes("sedex");
 
   return (
     <section className="space-y-4">
       <h2 className="text-lg font-semibold">Entrega</h2>
 
       <div className="space-y-3">
-        {/* Pickup Card */}
+        {/* Pickup Card - Always visible if enabled */}
         {settings.store_pickup_enabled && (
           <button
             type="button"
@@ -225,7 +276,109 @@ const DeliveryMethodCards = ({
           </button>
         )}
 
-        {/* Delivery options based on shipping mode */}
+        {/* PAC Card - Always visible in correios mode */}
+        {isCorreiosMode && (
+          <button
+            type="button"
+            data-testid="delivery-card-pac"
+            onClick={handleSelectPac}
+            disabled={!hasCalculated}
+            className={`w-full p-4 border-2 rounded-xl text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+              isPacSelected
+                ? "border-primary bg-primary/5 shadow-sm"
+                : !hasCalculated
+                ? "border-border opacity-60 cursor-not-allowed"
+                : "border-border hover:border-primary/50"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    isPacSelected ? "bg-primary text-primary-foreground" : "bg-muted"
+                  }`}
+                >
+                  <Truck className="h-5 w-5" />
+                </div>
+                <div>
+                  <span className="font-semibold">{pacOption?.name || "PAC"}</span>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    {pacOption?.delivery_range || "Informe o CEP para calcular"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {hasCalculated && pacOption ? (
+                  <>
+                    <span className={`font-bold ${pacOption.price === 0 ? "text-primary" : ""}`}>
+                      {formatPrice(pacOption.price)}
+                    </span>
+                    {isPacSelected && (
+                      <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                        <Check className="h-3 w-3 text-primary-foreground" />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )}
+              </div>
+            </div>
+          </button>
+        )}
+
+        {/* SEDEX Card - Always visible in correios mode */}
+        {isCorreiosMode && (
+          <button
+            type="button"
+            data-testid="delivery-card-sedex"
+            onClick={handleSelectSedex}
+            disabled={!hasCalculated}
+            className={`w-full p-4 border-2 rounded-xl text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+              isSedexSelected
+                ? "border-primary bg-primary/5 shadow-sm"
+                : !hasCalculated
+                ? "border-border opacity-60 cursor-not-allowed"
+                : "border-border hover:border-primary/50"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    isSedexSelected ? "bg-primary text-primary-foreground" : "bg-muted"
+                  }`}
+                >
+                  <Zap className="h-5 w-5" />
+                </div>
+                <div>
+                  <span className="font-semibold">{sedexOption?.name || "SEDEX"}</span>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    {sedexOption?.delivery_range || "Informe o CEP para calcular"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {hasCalculated && sedexOption ? (
+                  <>
+                    <span className={`font-bold ${sedexOption.price === 0 ? "text-primary" : ""}`}>
+                      {formatPrice(sedexOption.price)}
+                    </span>
+                    {isSedexSelected && (
+                      <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                        <Check className="h-3 w-3 text-primary-foreground" />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )}
+              </div>
+            </div>
+          </button>
+        )}
+
+        {/* Free shipping mode - single delivery option */}
         {settings.shipping_mode === "free" && (
           <button
             type="button"
@@ -265,6 +418,7 @@ const DeliveryMethodCards = ({
           </button>
         )}
 
+        {/* Fixed shipping mode - single delivery option */}
         {settings.shipping_mode === "fixed" && (
           <button
             type="button"
@@ -310,154 +464,48 @@ const DeliveryMethodCards = ({
           </button>
         )}
 
-        {/* Correios mode - CEP calculation needed */}
+        {/* CEP input block - Only show if NOT pickup and in correios mode */}
         {isCorreiosMode && !isPickupSelected && (
-          <div className="space-y-3">
-            {/* PAC Card placeholder when no options calculated */}
-            {!hasCalculated && (
-              <>
-                <button
-                  type="button"
-                  data-testid="delivery-card-pac"
-                  disabled
-                  className="w-full p-4 border-2 rounded-xl text-left border-border opacity-60"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-muted">
-                        <Truck className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <span className="font-semibold">PAC</span>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                          Calcule o frete para ver o prazo
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-sm text-muted-foreground">—</span>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  data-testid="delivery-card-sedex"
-                  disabled
-                  className="w-full p-4 border-2 rounded-xl text-left border-border opacity-60"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-muted">
-                        <Zap className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <span className="font-semibold">SEDEX</span>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                          Calcule o frete para ver o prazo
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-sm text-muted-foreground">—</span>
-                  </div>
-                </button>
-              </>
-            )}
-
-            {/* Calculated shipping options */}
-            {hasCalculated &&
-              shippingOptions.map((option) => (
-                <button
-                  key={option.service}
-                  type="button"
-                  data-testid={
-                    option.service.toLowerCase().includes("pac")
-                      ? "delivery-card-pac"
-                      : option.service.toLowerCase().includes("sedex")
-                      ? "delivery-card-sedex"
-                      : `delivery-card-${option.service}`
-                  }
-                  onClick={() => handleSelectDelivery(option)}
-                  className={`w-full p-4 border-2 rounded-xl text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                    selectedOption?.service === option.service
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "border-border hover:border-primary/50"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          selectedOption?.service === option.service
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted"
-                        }`}
-                      >
-                        {option.service.toLowerCase().includes("sedex") ? (
-                          <Zap className="h-5 w-5" />
-                        ) : (
-                          <Truck className="h-5 w-5" />
-                        )}
-                      </div>
-                      <div>
-                        <span className="font-semibold">{option.name}</span>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                          {option.delivery_range}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`font-bold ${option.price === 0 ? "text-primary" : ""}`}>
-                        {formatPrice(option.price)}
-                      </span>
-                      {selectedOption?.service === option.service && (
-                        <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                          <Check className="h-3 w-3 text-primary-foreground" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              ))}
-
-            {/* CEP input for correios mode when not pickup */}
-            <div className="bg-muted/50 rounded-xl p-4 space-y-3">
-              <div className="flex gap-2">
-                <div className="flex-1 space-y-1.5">
-                  <Input
-                    data-testid="cep-input"
-                    placeholder="00000-000"
-                    value={cep}
-                    onChange={handleCepInputChange}
-                    onBlur={handleCepBlur}
-                    inputMode="numeric"
-                    maxLength={9}
-                    className={`h-11 bg-background ${error ? "border-destructive" : ""}`}
-                  />
-                  {error && (
-                    <p className="text-sm text-destructive flex items-center gap-1.5">
-                      <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                      {error}
-                    </p>
-                  )}
-                </div>
-                <Button
-                  type="button"
-                  data-testid="cep-calc-btn"
-                  onClick={calculateShipping}
-                  disabled={isLoading || cep.replace(/\D/g, "").length < 8}
-                  className="h-11 px-6"
-                >
-                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Calcular"}
-                </Button>
+          <div className="bg-muted/50 rounded-xl p-4 space-y-3">
+            <p className="text-sm font-medium text-foreground">Calcular frete</p>
+            <div className="flex gap-2">
+              <div className="flex-1 space-y-1.5">
+                <Input
+                  data-testid="cep-input"
+                  placeholder="00000-000"
+                  value={cep}
+                  onChange={handleCepInputChange}
+                  onBlur={handleCepBlur}
+                  inputMode="numeric"
+                  maxLength={9}
+                  className={`h-11 bg-background ${error ? "border-destructive" : ""}`}
+                />
+                {error && (
+                  <p className="text-sm text-destructive flex items-center gap-1.5">
+                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                    {error}
+                  </p>
+                )}
               </div>
-              <a
-                href="https://buscacepinter.correios.com.br/app/endereco/index.php"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline flex items-center gap-1"
+              <Button
+                type="button"
+                data-testid="cep-calc-btn"
+                onClick={calculateShipping}
+                disabled={isLoading || cep.replace(/\D/g, "").length < 8}
+                className="h-11 px-6"
               >
-                <MapPin className="h-3 w-3" />
-                Não sei meu CEP
-              </a>
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Calcular"}
+              </Button>
             </div>
+            <a
+              href="https://buscacepinter.correios.com.br/app/endereco/index.php"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+            >
+              <MapPin className="h-3 w-3" />
+              Não sei meu CEP
+            </a>
           </div>
         )}
       </div>
