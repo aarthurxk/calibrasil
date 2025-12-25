@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, AlertCircle, Search, Filter } from 'lucide-react';
+import { Loader2, AlertCircle, Search, Filter, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { OrderMonitorCard } from '@/components/admin/OrderMonitorCard';
 import { OrderDiagnosticPanel } from '@/components/admin/OrderDiagnosticPanel';
 import { useOrderFlowChecker } from '@/hooks/useOrderFlowChecker';
+import { OrderCardSkeleton } from '@/components/admin/TableSkeleton';
+import { cn } from '@/lib/utils';
 
 const OrderMonitor = () => {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -84,8 +86,30 @@ const OrderMonitor = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="space-y-6 animate-fade-in">
+        <div>
+          <h1 className="text-3xl font-bold">Monitor de Pedidos</h1>
+          <p className="text-muted-foreground">Carregando pedidos...</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <Card key={i} className="animate-shimmer">
+              <CardHeader className="pb-2">
+                <div className="h-4 w-24 bg-muted rounded" />
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 w-12 bg-muted rounded" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-5 space-y-2">
+            {[1, 2, 3, 4, 5].map(i => (
+              <OrderCardSkeleton key={i} />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -102,7 +126,7 @@ const OrderMonitor = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="animate-fade-in" style={{ animationDelay: '0ms' }}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Total Monitorados
@@ -113,7 +137,11 @@ const OrderMonitor = () => {
           </CardContent>
         </Card>
         <Card 
-          className={`cursor-pointer transition-all ${statusFilter === 'ok' ? 'ring-2 ring-green-500' : ''}`}
+          className={cn(
+            "cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 animate-fade-in",
+            statusFilter === 'ok' && 'ring-2 ring-green-500 shadow-lg'
+          )}
+          style={{ animationDelay: '100ms' }}
           onClick={() => setStatusFilter(statusFilter === 'ok' ? 'all' : 'ok')}
         >
           <CardHeader className="pb-2">
@@ -126,7 +154,11 @@ const OrderMonitor = () => {
           </CardContent>
         </Card>
         <Card 
-          className={`cursor-pointer transition-all ${statusFilter === 'pending' ? 'ring-2 ring-yellow-500' : ''}`}
+          className={cn(
+            "cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 animate-fade-in",
+            statusFilter === 'pending' && 'ring-2 ring-yellow-500 shadow-lg'
+          )}
+          style={{ animationDelay: '200ms' }}
           onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')}
         >
           <CardHeader className="pb-2">
@@ -139,7 +171,11 @@ const OrderMonitor = () => {
           </CardContent>
         </Card>
         <Card 
-          className={`cursor-pointer transition-all ${statusFilter === 'error' ? 'ring-2 ring-red-500' : ''}`}
+          className={cn(
+            "cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 animate-fade-in",
+            statusFilter === 'error' && 'ring-2 ring-red-500 shadow-lg'
+          )}
+          style={{ animationDelay: '300ms' }}
           onClick={() => setStatusFilter(statusFilter === 'error' ? 'all' : 'error')}
         >
           <CardHeader className="pb-2">

@@ -295,18 +295,24 @@ const Dashboard = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat) => (
-          <Card key={stat.title}>
+        {stats.map((stat, index) => (
+          <Card 
+            key={stat.title}
+            className="animate-fade-in transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
+            style={{ animationDelay: `${index * 100}ms` }}
+          >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {stat.title}
               </CardTitle>
-              <stat.icon className="h-5 w-5 text-primary" />
+              <div className="p-2 rounded-lg bg-primary/10">
+                <stat.icon className="h-5 w-5 text-primary" />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
               <div
-                className={`flex items-center text-sm ${
+                className={`flex items-center text-sm transition-colors ${
                   stat.trend === 'up' ? 'text-green-600' : 'text-red-600'
                 }`}
               >
@@ -323,28 +329,32 @@ const Dashboard = () => {
       </div>
 
       {/* Order Status Table */}
-      <Card>
+      <Card className="animate-fade-in" style={{ animationDelay: '400ms' }}>
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-3">
             <CardTitle>Status dos Pedidos</CardTitle>
             {isRealtimeConnected && (
               <div className="flex items-center gap-1.5 text-xs text-green-600">
-                <Radio className="h-3 w-3 animate-pulse" />
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
                 <span>Ao vivo</span>
               </div>
             )}
           </div>
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" asChild className="hover:scale-105 transition-transform">
             <Link to="/admin/orders">Ver todos</Link>
           </Button>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {statusCounts.map((status) => (
+            {statusCounts.map((status, index) => (
               <Link
                 key={status.key}
                 to={`/admin/orders?status=${status.key}`}
-                className={`p-4 rounded-lg border ${status.bgClass} ${status.borderClass} hover:opacity-80 transition-opacity cursor-pointer`}
+                className={`p-4 rounded-lg border ${status.bgClass} ${status.borderClass} transition-all duration-200 cursor-pointer hover:scale-105 hover:shadow-md animate-fade-in`}
+                style={{ animationDelay: `${500 + index * 50}ms` }}
               >
                 <div className="flex items-center gap-2 mb-2">
                   <status.icon className={`h-4 w-4 ${status.textClass}`} />
@@ -439,10 +449,10 @@ const Dashboard = () => {
       </div>
 
       {/* Recent Orders */}
-      <Card>
+      <Card className="animate-fade-in" style={{ animationDelay: '800ms' }}>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Pedidos Recentes</CardTitle>
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" asChild className="hover:scale-105 transition-transform">
             <Link to="/admin/orders">Ver todos</Link>
           </Button>
         </CardHeader>
@@ -459,8 +469,12 @@ const Dashboard = () => {
               </thead>
               <tbody>
                 {recentOrders.length > 0 ? (
-                  recentOrders.map((order) => (
-                    <tr key={order.id} className="border-b border-border last:border-0">
+                  recentOrders.map((order, index) => (
+                    <tr 
+                      key={order.id} 
+                      className="border-b border-border last:border-0 transition-colors hover:bg-muted/50 animate-fade-in"
+                      style={{ animationDelay: `${900 + index * 50}ms` }}
+                    >
                       <td className="py-3 px-4 font-medium">#{order.id.slice(0, 8)}</td>
                       <td className="py-3 px-4">{formatPrice(Number(order.total))}</td>
                       <td className="py-3 px-4">
