@@ -91,20 +91,81 @@ export default {
           to: { height: "0" },
         },
         "wave": {
-          "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(-10px)" },
+          "0%, 100%": { transform: "translateY(0) rotate(0deg)" },
+          "25%": { transform: "translateY(-5px) rotate(5deg)" },
+          "50%": { transform: "translateY(-10px) rotate(0deg)" },
+          "75%": { transform: "translateY(-5px) rotate(-5deg)" },
         },
         "fade-in": {
           from: { opacity: "0", transform: "translateY(10px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "fade-in-up": {
+          from: { opacity: "0", transform: "translateY(20px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
         "slide-in": {
           from: { opacity: "0", transform: "translateX(-20px)" },
           to: { opacity: "1", transform: "translateX(0)" },
         },
+        "slide-in-right": {
+          from: { opacity: "0", transform: "translateX(100%)" },
+          to: { opacity: "1", transform: "translateX(0)" },
+        },
+        "slide-out-right": {
+          from: { opacity: "1", transform: "translateX(0)" },
+          to: { opacity: "0", transform: "translateX(100%)" },
+        },
         "pulse-glow": {
           "0%, 100%": { boxShadow: "0 0 20px hsl(var(--cali-teal) / 0.3)" },
           "50%": { boxShadow: "0 0 40px hsl(var(--cali-teal) / 0.5)" },
+        },
+        "bounce-subtle": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-5px)" },
+        },
+        "shake": {
+          "0%, 100%": { transform: "translateX(0)" },
+          "10%, 30%, 50%, 70%, 90%": { transform: "translateX(-4px)" },
+          "20%, 40%, 60%, 80%": { transform: "translateX(4px)" },
+        },
+        "scale-in": {
+          from: { opacity: "0", transform: "scale(0.9)" },
+          to: { opacity: "1", transform: "scale(1)" },
+        },
+        "scale-out": {
+          from: { opacity: "1", transform: "scale(1)" },
+          to: { opacity: "0", transform: "scale(0.9)" },
+        },
+        "float": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-20px)" },
+        },
+        "heartbeat": {
+          "0%, 100%": { transform: "scale(1)" },
+          "25%": { transform: "scale(1.1)" },
+          "50%": { transform: "scale(1)" },
+          "75%": { transform: "scale(1.1)" },
+        },
+        "badge-pulse": {
+          "0%, 100%": { transform: "scale(1)", opacity: "1" },
+          "50%": { transform: "scale(1.15)", opacity: "0.9" },
+        },
+        "count-up": {
+          from: { opacity: "0", transform: "translateY(10px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "glow": {
+          "0%, 100%": { boxShadow: "0 0 5px hsl(var(--primary) / 0.5)" },
+          "50%": { boxShadow: "0 0 20px hsl(var(--primary) / 0.8)" },
+        },
+        "shimmer": {
+          from: { backgroundPosition: "-200% 0" },
+          to: { backgroundPosition: "200% 0" },
+        },
+        "spin-slow": {
+          from: { transform: "rotate(0deg)" },
+          to: { transform: "rotate(360deg)" },
         },
       },
       animation: {
@@ -112,8 +173,22 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
         "wave": "wave 3s ease-in-out infinite",
         "fade-in": "fade-in 0.5s ease-out forwards",
+        "fade-in-up": "fade-in-up 0.6s ease-out forwards",
         "slide-in": "slide-in 0.4s ease-out forwards",
+        "slide-in-right": "slide-in-right 0.3s ease-out forwards",
+        "slide-out-right": "slide-out-right 0.3s ease-out forwards",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
+        "bounce-subtle": "bounce-subtle 2s ease-in-out infinite",
+        "shake": "shake 0.5s ease-in-out",
+        "scale-in": "scale-in 0.2s ease-out forwards",
+        "scale-out": "scale-out 0.2s ease-out forwards",
+        "float": "float 6s ease-in-out infinite",
+        "heartbeat": "heartbeat 1s ease-in-out",
+        "badge-pulse": "badge-pulse 2s ease-in-out infinite",
+        "count-up": "count-up 0.5s ease-out forwards",
+        "glow": "glow 2s ease-in-out infinite",
+        "shimmer": "shimmer 2s linear infinite",
+        "spin-slow": "spin-slow 3s linear infinite",
       },
     },
   },

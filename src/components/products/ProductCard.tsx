@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Star } from "lucide-react";
+import { Star, Heart } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
@@ -13,6 +13,7 @@ interface ProductCardProps {
 
 const ProductCard = ({ product }: ProductCardProps) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
 
   const discount = product.original_price
     ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
@@ -51,18 +52,23 @@ const ProductCard = ({ product }: ProductCardProps) => {
   const colorsText = displayColors();
 
   return (
-    <Link to={`/product/${product.id}`} className="group block">
-      <div className="relative overflow-hidden rounded-xl bg-card border border-border shadow-soft transition-all duration-300 hover:shadow-glow hover:-translate-y-1">
+    <Link
+      to={`/product/${product.id}`}
+      className="group block"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div className="relative overflow-hidden rounded-xl bg-card border border-border shadow-soft transition-all duration-500 hover:shadow-glow hover:-translate-y-2 hover:border-primary/30">
         {/* Image Carousel Container */}
         <div className="relative aspect-square overflow-hidden bg-muted">
           <div ref={emblaRef} className="overflow-hidden h-full">
             <div className="flex h-full">
               {images.map((img, index) => (
-                <div key={index} className="flex-[0_0_100%] min-w-0 h-full">
+                <div key={index} className="flex-[0_0_100%] min-w-0 h-full overflow-hidden">
                   <img
                     src={img}
                     alt={`${product.name} - Imagem ${index + 1}`}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
                     loading="lazy"
                     width={400}
                     height={400}
@@ -78,25 +84,41 @@ const ProductCard = ({ product }: ProductCardProps) => {
               {images.map((_, index) => (
                 <span
                   key={index}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    index === selectedIndex ? "bg-primary w-4" : "bg-background/60"
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    index === selectedIndex ? "bg-primary w-4" : "bg-background/60 w-2"
                   }`}
                 />
               ))}
             </div>
           )}
 
+          {/* Discount Badge with Pulse */}
           {discount > 0 && (
-            <Badge className="absolute top-3 left-3 bg-accent text-accent-foreground z-10">-{discount}%</Badge>
+            <Badge className="absolute top-3 left-3 bg-accent text-accent-foreground z-10 animate-badge-pulse">
+              -{discount}%
+            </Badge>
           )}
           {product.featured && !discount && (
-            <Badge className="absolute top-3 left-3 bg-primary text-primary-foreground z-10">Destaque</Badge>
+            <Badge className="absolute top-3 left-3 bg-primary text-primary-foreground z-10 animate-badge-pulse">
+              Destaque
+            </Badge>
           )}
 
-          {/* Wishlist Button */}
-          <div className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Wishlist Button with Slide-in Animation */}
+          <div
+            className={`absolute top-3 right-3 z-10 transition-all duration-300 ${
+              isHovered ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4"
+            }`}
+          >
             <WishlistButton productId={product.id} />
           </div>
+
+          {/* Quick View Overlay */}
+          <div
+            className={`absolute inset-0 bg-gradient-to-t from-cali-ocean-dark/60 via-transparent to-transparent transition-opacity duration-300 ${
+              isHovered ? "opacity-100" : "opacity-0"
+            }`}
+          />
         </div>
 
         {/* Content */}
@@ -105,20 +127,40 @@ const ProductCard = ({ product }: ProductCardProps) => {
             <p className="text-xs text-muted-foreground uppercase tracking-wide">{product.category}</p>
             {colorsText && <p className="text-xs text-muted-foreground">{colorsText}</p>}
           </div>
-          <h3 className="font-semibold text-card-foreground line-clamp-1 group-hover:text-primary transition-colors">
+          <h3 className="font-semibold text-card-foreground line-clamp-1 group-hover:text-primary transition-colors duration-300">
             {product.name}
           </h3>
-          {product.description && <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>}
+          {product.description && (
+            <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
+          )}
           {product.rating !== null && product.rating !== undefined && product.rating > 0 && (
             <div className="flex items-center gap-1">
-              <Star className="h-4 w-4 fill-accent text-accent" />
-              <span className="text-sm font-medium">{product.rating}</span>
+              {[...Array(5)].map((_, i) => (
+                <Star
+                  key={i}
+                  className={`h-4 w-4 transition-all duration-300 ${
+                    i < Math.round(product.rating || 0)
+                      ? "fill-accent text-accent"
+                      : "fill-transparent text-muted-foreground/30"
+                  }`}
+                  style={{ transitionDelay: `${i * 50}ms` }}
+                />
+              ))}
+              <span className="text-sm font-medium ml-1">{product.rating}</span>
             </div>
           )}
           <div className="flex items-center gap-2">
-            <span className="font-bold text-lg text-primary">{formatPrice(product.price)}</span>
+            <span
+              className={`font-bold text-lg text-primary transition-all duration-300 ${
+                isHovered ? "scale-110" : "scale-100"
+              }`}
+            >
+              {formatPrice(product.price)}
+            </span>
             {product.original_price && (
-              <span className="text-sm text-muted-foreground line-through">{formatPrice(product.original_price)}</span>
+              <span className="text-sm text-muted-foreground line-through">
+                {formatPrice(product.original_price)}
+              </span>
             )}
           </div>
           {!product.in_stock && (
