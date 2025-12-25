@@ -4,9 +4,12 @@ import { ArrowRight, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import ProductCard from '@/components/products/ProductCard';
 import { Button } from '@/components/ui/button';
+import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import type { Product } from '@/types/product';
 
 const FeaturedProducts = () => {
+  const { ref, isVisible } = useScrollAnimation({ threshold: 0.1 });
+
   const { data: featuredProducts = [], isLoading } = useQuery({
     queryKey: ['featured-products'],
     queryFn: async () => {
@@ -22,9 +25,13 @@ const FeaturedProducts = () => {
   });
 
   return (
-    <section className="py-20 bg-background">
+    <section className="py-20 bg-background" ref={ref as React.RefObject<HTMLElement>}>
       <div className="container">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-12">
+        <div
+          className={`flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-12 transition-all duration-700 ${
+            isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
           <div>
             <p className="text-sm font-medium text-accent uppercase tracking-widest mb-2">
               Seleção Especial
@@ -34,9 +41,12 @@ const FeaturedProducts = () => {
             </h2>
           </div>
           <Link to="/shop">
-            <Button variant="ghost" className="text-primary hover:text-primary/80">
+            <Button
+              variant="ghost"
+              className="text-primary hover:text-primary/80 group transition-all hover:translate-x-1"
+            >
               Ver Tudo
-              <ArrowRight className="ml-2 h-4 w-4" />
+              <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Button>
           </Link>
         </div>
@@ -54,8 +64,12 @@ const FeaturedProducts = () => {
             {featuredProducts.map((product, index) => (
               <div
                 key={product.id}
-                className="animate-fade-in"
-                style={{ animationDelay: `${index * 100}ms` }}
+                className={`transition-all duration-700 ${
+                  isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+                }`}
+                style={{
+                  transitionDelay: isVisible ? `${300 + index * 100}ms` : '0ms',
+                }}
               >
                 <ProductCard product={product} />
               </div>
