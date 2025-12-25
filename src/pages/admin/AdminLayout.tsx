@@ -17,6 +17,7 @@ import {
   Mail,
   UserCheck,
   Activity,
+  Bug,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -81,6 +82,7 @@ const AdminLayout = () => {
     { name: 'Categorias', icon: Layers, path: '/admin/categories', showFor: ['admin'] },
     { name: 'Templates de Email', icon: Mail, path: '/admin/email-templates', showFor: ['admin'] },
     { name: 'Roadmap', icon: Map, path: '/admin/roadmap', showFor: ['admin'] },
+    { name: 'Diagnóstico', icon: Bug, path: '/admin/diagnostic', showFor: ['admin'] },
     { name: 'Configurações', icon: Settings, path: '/admin/settings', showFor: ['admin'] },
   ];
 
