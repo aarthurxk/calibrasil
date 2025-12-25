@@ -14,7 +14,10 @@ import {
   Mail,
   Database,
   Truck,
-  Webhook
+  Webhook,
+  Tag,
+  Users,
+  BarChart3
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,6 +40,9 @@ interface TestData {
   productId?: string;
   orderId?: string;
   orderItemId?: string;
+  couponId?: string;
+  sellerId?: string;
+  variantId?: string;
 }
 
 const TEST_PREFIX = '[TESTE-DIAG]';
@@ -55,6 +61,9 @@ const Diagnostic = () => {
     { name: 'Testar cálculo de frete', status: 'pending' },
     { name: 'Testar envio de email', status: 'pending' },
     { name: 'Simular webhook de pagamento', status: 'pending' },
+    { name: 'Verificar estoque de variante', status: 'pending' },
+    { name: 'Validar cupom de desconto', status: 'pending' },
+    { name: 'Validar código de vendedor', status: 'pending' },
   ]);
 
   const updateTest = (index: number, update: Partial<TestResult>) => {
@@ -433,6 +442,225 @@ const Diagnostic = () => {
         });
       }
 
+      // Test 10: Verificar estoque de variante
+      updateTest(9, { status: 'running' });
+      startTime = Date.now();
+
+      try {
+        // Create a test variant for the product
+        const { data: variant, error: variantError } = await supabase
+          .from('product_variants')
+          .insert({
+            product_id: data.productId,
+            color: 'Teste',
+            model: 'Diagnóstico',
+            stock_quantity: 10
+          })
+          .select()
+          .single();
+
+        if (variantError) {
+          updateTest(9, { 
+            status: 'error', 
+            endpoint: 'product_variants.insert()',
+            statusCode: 400,
+            message: variantError.message,
+            duration: Date.now() - startTime
+          });
+        } else {
+          data.variantId = variant.id;
+          
+          // Decrement stock
+          const { error: decrementError } = await supabase
+            .from('product_variants')
+            .update({ stock_quantity: 9 })
+            .eq('id', variant.id);
+
+          if (decrementError) {
+            updateTest(9, { 
+              status: 'error', 
+              endpoint: 'product_variants.update()',
+              statusCode: 400,
+              message: decrementError.message,
+              duration: Date.now() - startTime
+            });
+          } else {
+            // Verify decrement
+            const { data: verifyVariant } = await supabase
+              .from('product_variants')
+              .select('stock_quantity')
+              .eq('id', variant.id)
+              .single();
+
+            // Restore stock
+            await supabase
+              .from('product_variants')
+              .update({ stock_quantity: 10 })
+              .eq('id', variant.id);
+
+            updateTest(9, { 
+              status: 'ok', 
+              endpoint: 'product_variants CRUD',
+              statusCode: 200,
+              message: `Estoque: 10 → ${verifyVariant?.stock_quantity} → 10 (restaurado)`,
+              duration: Date.now() - startTime
+            });
+          }
+        }
+      } catch (stockErr: any) {
+        updateTest(9, { 
+          status: 'error', 
+          endpoint: 'product_variants',
+          statusCode: 500,
+          message: stockErr.message || 'Erro na verificação de estoque',
+          duration: Date.now() - startTime
+        });
+      }
+
+      // Test 11: Validar cupom de desconto
+      updateTest(10, { status: 'running' });
+      startTime = Date.now();
+
+      try {
+        const couponCode = `DIAG-${Date.now()}`;
+        
+        // Create test coupon
+        const { data: coupon, error: couponError } = await supabase
+          .from('coupons')
+          .insert({
+            code: couponCode,
+            discount_percent: 15,
+            min_purchase: 50,
+            is_active: true,
+            max_uses: 100,
+            used_count: 0
+          })
+          .select()
+          .single();
+
+        if (couponError) {
+          updateTest(10, { 
+            status: 'error', 
+            endpoint: 'coupons.insert()',
+            statusCode: 400,
+            message: couponError.message,
+            duration: Date.now() - startTime
+          });
+        } else {
+          data.couponId = coupon.id;
+          
+          // Validate coupon exists and calculate discount
+          const { data: verifyCoupon } = await supabase
+            .from('coupons')
+            .select('*')
+            .eq('id', coupon.id)
+            .single();
+
+          if (verifyCoupon && verifyCoupon.is_active) {
+            const testTotal = 100;
+            const discount = (testTotal * verifyCoupon.discount_percent) / 100;
+            
+            updateTest(10, { 
+              status: 'ok', 
+              endpoint: 'coupons CRUD',
+              statusCode: 200,
+              message: `Cupom ${couponCode.slice(0, 10)}... | ${verifyCoupon.discount_percent}% de R$ ${testTotal} = R$ ${discount.toFixed(2)}`,
+              duration: Date.now() - startTime
+            });
+          } else {
+            updateTest(10, { 
+              status: 'error', 
+              endpoint: 'coupons.select()',
+              statusCode: 404,
+              message: 'Cupom não encontrado ou inativo',
+              duration: Date.now() - startTime
+            });
+          }
+        }
+      } catch (couponErr: any) {
+        updateTest(10, { 
+          status: 'error', 
+          endpoint: 'coupons',
+          statusCode: 500,
+          message: couponErr.message || 'Erro na validação do cupom',
+          duration: Date.now() - startTime
+        });
+      }
+
+      // Test 12: Validar código de vendedor
+      updateTest(11, { status: 'running' });
+      startTime = Date.now();
+
+      try {
+        const sellerCode = `DIAG${Date.now().toString().slice(-6)}`;
+        
+        // Create test seller
+        const { data: seller, error: sellerError } = await supabase
+          .from('sellers')
+          .insert({
+            name: `${TEST_PREFIX} Vendedor`,
+            code: sellerCode,
+            discount_percent: 10,
+            commission_percent: 5,
+            is_active: true
+          })
+          .select()
+          .single();
+
+        if (sellerError) {
+          updateTest(11, { 
+            status: 'error', 
+            endpoint: 'sellers.insert()',
+            statusCode: 400,
+            message: sellerError.message,
+            duration: Date.now() - startTime
+          });
+        } else {
+          data.sellerId = seller.id;
+          
+          // Validate using RPC function
+          const { data: validatedSeller, error: rpcError } = await supabase
+            .rpc('validate_seller_code', { seller_code: sellerCode });
+
+          if (rpcError) {
+            updateTest(11, { 
+              status: 'error', 
+              endpoint: 'validate_seller_code RPC',
+              statusCode: 400,
+              message: rpcError.message,
+              duration: Date.now() - startTime
+            });
+          } else if (validatedSeller && validatedSeller.length > 0) {
+            const testTotal = 100;
+            const discount = (testTotal * validatedSeller[0].discount_percent) / 100;
+            
+            updateTest(11, { 
+              status: 'ok', 
+              endpoint: 'validate_seller_code RPC',
+              statusCode: 200,
+              message: `Vendedor ${validatedSeller[0].name.replace(TEST_PREFIX, '').trim()} | ${validatedSeller[0].discount_percent}% de R$ ${testTotal} = R$ ${discount.toFixed(2)}`,
+              duration: Date.now() - startTime
+            });
+          } else {
+            updateTest(11, { 
+              status: 'error', 
+              endpoint: 'validate_seller_code RPC',
+              statusCode: 404,
+              message: 'Vendedor não encontrado pelo RPC',
+              duration: Date.now() - startTime
+            });
+          }
+        }
+      } catch (sellerErr: any) {
+        updateTest(11, { 
+          status: 'error', 
+          endpoint: 'sellers',
+          statusCode: 500,
+          message: sellerErr.message || 'Erro na validação do vendedor',
+          duration: Date.now() - startTime
+        });
+      }
+
       setTestData(data);
       
       const allPassed = tests.filter(t => t.status === 'error').length === 0;
@@ -472,6 +700,24 @@ const Diagnostic = () => {
         console.error('Erro ao limpar pedidos:', ordersError);
       }
 
+      // Limpar product_variants de teste (by product name pattern)
+      const { data: testProducts } = await supabase
+        .from('products')
+        .select('id')
+        .like('name', `${TEST_PREFIX}%`);
+
+      if (testProducts && testProducts.length > 0) {
+        const productIds = testProducts.map(p => p.id);
+        const { error: variantsError } = await supabase
+          .from('product_variants')
+          .delete()
+          .in('product_id', productIds);
+
+        if (variantsError) {
+          console.error('Erro ao limpar variantes:', variantsError);
+        }
+      }
+
       // Limpar products de teste
       const { error: productsError } = await supabase
         .from('products')
@@ -480,6 +726,26 @@ const Diagnostic = () => {
 
       if (productsError) {
         console.error('Erro ao limpar produtos:', productsError);
+      }
+
+      // Limpar coupons de teste
+      const { error: couponsError } = await supabase
+        .from('coupons')
+        .delete()
+        .like('code', 'DIAG-%');
+
+      if (couponsError) {
+        console.error('Erro ao limpar cupons:', couponsError);
+      }
+
+      // Limpar sellers de teste
+      const { error: sellersError } = await supabase
+        .from('sellers')
+        .delete()
+        .like('name', `${TEST_PREFIX}%`);
+
+      if (sellersError) {
+        console.error('Erro ao limpar vendedores:', sellersError);
       }
 
       toast.success('Dados de teste limpos!');
@@ -506,7 +772,7 @@ const Diagnostic = () => {
   };
 
   const getTestIcon = (index: number) => {
-    const icons = [Package, Database, ShoppingCart, Package, RefreshCw, CreditCard, Truck, Mail, Webhook];
+    const icons = [Package, Database, ShoppingCart, Package, RefreshCw, CreditCard, Truck, Mail, Webhook, BarChart3, Tag, Users];
     const Icon = icons[index] || Package;
     return <Icon className="w-4 h-4" />;
   };
@@ -723,6 +989,24 @@ const Diagnostic = () => {
                 <div className="p-3 bg-muted/50 rounded-lg">
                   <p className="text-muted-foreground">Item ID</p>
                   <code className="font-mono">{testData.orderItemId.slice(0, 8)}...</code>
+                </div>
+              )}
+              {testData.variantId && (
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-muted-foreground">Variante ID</p>
+                  <code className="font-mono">{testData.variantId.slice(0, 8)}...</code>
+                </div>
+              )}
+              {testData.couponId && (
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-muted-foreground">Cupom ID</p>
+                  <code className="font-mono">{testData.couponId.slice(0, 8)}...</code>
+                </div>
+              )}
+              {testData.sellerId && (
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-muted-foreground">Vendedor ID</p>
+                  <code className="font-mono">{testData.sellerId.slice(0, 8)}...</code>
                 </div>
               )}
             </div>
