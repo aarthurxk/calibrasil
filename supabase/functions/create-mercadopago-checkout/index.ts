@@ -21,14 +21,15 @@ const CartItemSchema = z.object({
   image: z.string().url().optional().or(z.literal("")),
 });
 
+// Flexible shipping address schema that allows empty values for pickup
 const ShippingAddressSchema = z.object({
-  street: z.string().min(1, "Rua é obrigatória").max(200, "Nome da rua muito longo"),
-  houseNumber: z.string().min(1, "Número é obrigatório").max(20),
+  street: z.string().max(200).optional().or(z.literal("")),
+  houseNumber: z.string().max(20).optional().or(z.literal("")),
   complement: z.string().max(100).optional().or(z.literal("")),
-  neighborhood: z.string().min(1, "Bairro é obrigatório").max(100),
-  city: z.string().min(1, "Cidade é obrigatória").max(100),
-  state: z.string().length(2, "Estado deve ter 2 caracteres"),
-  zip: z.string().regex(cepRegex, "CEP inválido (formato: 00000-000)"),
+  neighborhood: z.string().max(100).optional().or(z.literal("")),
+  city: z.string().max(100).optional().or(z.literal("")),
+  state: z.string().max(2).optional().or(z.literal("")),
+  zip: z.string().max(10).optional().or(z.literal("")),
 }).nullable();
 
 const CheckoutRequestSchema = z.object({
@@ -39,8 +40,8 @@ const CheckoutRequestSchema = z.object({
   shippingAddress: ShippingAddressSchema,
   shippingCost: z.number().min(0),
   shippingMethod: z.string().max(50).optional(),
-  couponCode: z.string().max(50).optional().or(z.literal("")),
-  sellerCode: z.string().max(50).optional().or(z.literal("")),
+  couponCode: z.string().max(50).optional().nullable(),
+  sellerCode: z.string().max(50).optional().nullable(),
   success_url: z.string().url("URL de sucesso inválida"),
   cancel_url: z.string().url("URL de cancelamento inválida"),
   user_id: z.string().uuid().optional().nullable(),
@@ -452,8 +453,8 @@ serve(async (req) => {
       expiration_date_to: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
     };
 
-    // Only add shipping address if not pickup
-    if (shippingAddress && !isPickup) {
+    // Only add shipping address if not pickup and address fields are present
+    if (shippingAddress && !isPickup && shippingAddress.street && shippingAddress.houseNumber && shippingAddress.zip) {
       preferencePayload.payer.address = {
         street_name: shippingAddress.street,
         street_number: parseInt(shippingAddress.houseNumber) || 1,
@@ -464,8 +465,8 @@ serve(async (req) => {
           street_name: shippingAddress.street,
           street_number: parseInt(shippingAddress.houseNumber) || 1,
           zip_code: shippingAddress.zip.replace(/\D/g, ''),
-          city_name: shippingAddress.city,
-          state_name: shippingAddress.state
+          city_name: shippingAddress.city || '',
+          state_name: shippingAddress.state || ''
         }
       };
     }
