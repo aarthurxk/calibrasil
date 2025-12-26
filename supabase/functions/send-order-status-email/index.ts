@@ -386,9 +386,9 @@ serve(async (req) => {
       );
     }
 
-    // Using verified domain mail.calibrasil.com for transactional emails
+    // Using verified domain calibrasil.com for transactional emails
     const emailResult = await resend.emails.send({
-      from: "Cali Brasil <pedidos@mail.calibrasil.com>",
+      from: "Cali Brasil <pedidos@calibrasil.com>",
       to: [data.customerEmail],
       subject: emailContent.subject,
       html: emailContent.html,
