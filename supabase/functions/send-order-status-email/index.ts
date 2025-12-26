@@ -150,8 +150,8 @@ async function generateFallbackEmail(supabase: any, data: OrderStatusEmailReques
   
   const confirmationToken = await generateConfirmationToken(supabase, data.orderId);
   // NOVA URL: aponta para o domínio do site, não para edge function
-  const confirmationUrl = `${storeUrl}/confirmar-recebimento?orderId=${data.orderId}&token=${confirmationToken}`;
-  const reviewUrl = `${storeUrl}/orders`;
+  const confirmationUrl = `${storeUrl}/confirmar-recebimento?orderId=${encodeURIComponent(data.orderId)}&token=${encodeURIComponent(confirmationToken)}`;
+  const reviewUrl = `${storeUrl}/avaliar?orderId=${encodeURIComponent(data.orderId)}&token=${encodeURIComponent(confirmationToken)}`;
   
   const subject = `${statusInfo.emoji} Seu pedido foi ${statusInfo.label.toLowerCase()}! #${data.orderId.substring(0, 8).toUpperCase()}`;
   
@@ -287,7 +287,7 @@ serve(async (req) => {
     if (data.newStatus === 'shipped' && data.trackingCode) {
       const storeUrl = Deno.env.get('FRONTEND_URL') || 'https://calibrasil.com';
       const confirmationToken = await generateConfirmationToken(supabaseAdmin, data.orderId);
-      const confirmationUrl = `${storeUrl}/confirmar-recebimento?orderId=${data.orderId}&token=${confirmationToken}`;
+      const confirmationUrl = `${storeUrl}/confirmar-recebimento?orderId=${encodeURIComponent(data.orderId)}&token=${encodeURIComponent(confirmationToken)}`;
       const trackingUrl = 'https://www.linkcorreios.com.br/';
       
       const variables: Record<string, string> = {
@@ -308,12 +308,14 @@ serve(async (req) => {
       // For delivered status, use the new order_delivered template with confirm + review buttons
       const storeUrl = Deno.env.get('FRONTEND_URL') || 'https://calibrasil.com';
       const confirmationToken = await generateConfirmationToken(supabaseAdmin, data.orderId);
+      const confirmationUrl = `${storeUrl}/confirmar-recebimento?orderId=${encodeURIComponent(data.orderId)}&token=${encodeURIComponent(confirmationToken)}`;
+      const reviewUrl = `${storeUrl}/avaliar?orderId=${encodeURIComponent(data.orderId)}&token=${encodeURIComponent(confirmationToken)}`;
       
       const variables: Record<string, string> = {
         customer_name: data.customerName,
         order_id: data.orderId.substring(0, 8).toUpperCase(),
-        orderId: data.orderId,
-        token: confirmationToken
+        confirmation_url: confirmationUrl,
+        review_url: reviewUrl
       };
       
       emailContent = await generateEmailFromTemplate(
@@ -327,8 +329,8 @@ serve(async (req) => {
       const statusInfo = getStatusInfo(data.newStatus);
       const storeUrl = Deno.env.get('FRONTEND_URL') || 'https://calibrasil.com';
       const confirmationToken = await generateConfirmationToken(supabaseAdmin, data.orderId);
-      const confirmationUrl = `${storeUrl}/confirmar-recebimento?orderId=${data.orderId}&token=${confirmationToken}`;
-      const reviewUrl = `${storeUrl}/orders`;
+      const confirmationUrl = `${storeUrl}/confirmar-recebimento?orderId=${encodeURIComponent(data.orderId)}&token=${encodeURIComponent(confirmationToken)}`;
+      const reviewUrl = `${storeUrl}/avaliar?orderId=${encodeURIComponent(data.orderId)}&token=${encodeURIComponent(confirmationToken)}`;
       const trackingUrl = 'https://www.linkcorreios.com.br/';
       
       // Generate dynamic sections based on status

@@ -32,8 +32,10 @@ const ConfirmarRecebimento = () => {
   const [message, setMessage] = useState("Confirmando recebimento...");
   const [hasAttempted, setHasAttempted] = useState(false);
 
-  const orderId = searchParams.get("orderId");
-  const token = searchParams.get("token");
+  const rawOrderId = searchParams.get("orderId");
+  const rawToken = searchParams.get("token");
+  const orderId = rawOrderId ? decodeURIComponent(rawOrderId) : null;
+  const token = rawToken ? decodeURIComponent(rawToken) : null;
 
   const confirmReceipt = useCallback(async () => {
     // Evitar chamadas duplicadas
