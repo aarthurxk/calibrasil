@@ -311,9 +311,13 @@ serve(async (req) => {
     });
 
     // Send email to buyer
+    // NOTE: Using Resend's test domain until calibrasil.com is verified
+    const fromEmail = "Cali Brasil <onboarding@resend.dev>";
+    
     console.log("[SEND-ORDER-EMAILS] Sending buyer confirmation to:", emailData.customerEmail);
+    console.log("[SEND-ORDER-EMAILS] Using from:", fromEmail);
     const buyerEmailResult = await resend.emails.send({
-      from: "Cali Brasil <pedidos@calibrasil.com>",
+      from: fromEmail,
       to: [emailData.customerEmail],
       subject: `Pedido confirmado! 🎉 #${emailData.orderId.substring(0, 8).toUpperCase()}`,
       html: generateBuyerEmail(emailData),
@@ -327,7 +331,7 @@ serve(async (req) => {
     // Send email to seller
     console.log("[SEND-ORDER-EMAILS] Sending seller notification to: arthur@calibrasil.com");
     const sellerEmailResult = await resend.emails.send({
-      from: "Cali Brasil <pedidos@calibrasil.com>",
+      from: fromEmail,
       to: ["arthur@calibrasil.com"],
       subject: `Nova venda! 💰 ${formatPrice(emailData.total)}`,
       html: generateSellerEmail(emailData),
