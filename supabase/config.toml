@@ -1,7 +1,7 @@
 project_id = "vbnazlnwudhewjgftxce"
 
-[functions.create-user]
-verify_jwt = true
+[functions.confirm-order-received]
+verify_jwt = false
 
 [functions.create-order]
 verify_jwt = false
@@ -30,9 +30,6 @@ verify_jwt = false
 [functions.get-order-confirmation]
 verify_jwt = false
 
-[functions.confirm-order-received]
-verify_jwt = false
-
 [functions.delete-user]
 verify_jwt = true
 
@@ -54,5 +51,11 @@ verify_jwt = false
 [functions.admin-trigger-emails]
 verify_jwt = false
 
-[functions.confirm-order-received-v2]
-verify_jwt = false
+[functions.create-user]
+verify_jwt = true
+
+[functions.update-user]
+verify_jwt = true
+
+[functions.get-user-email]
+verify_jwt = true
