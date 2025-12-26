@@ -54,6 +54,8 @@ const Diagnostic = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [isCleaning, setIsCleaning] = useState(false);
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [isRunningAbandonedCart, setIsRunningAbandonedCart] = useState(false);
+  const [isRunningReviewRequest, setIsRunningReviewRequest] = useState(false);
   const [testData, setTestData] = useState<TestData>({});
   const [tests, setTests] = useState<TestResult[]>([
     { name: 'Criar produto de teste', status: 'pending' },
@@ -1175,6 +1177,110 @@ const Diagnostic = () => {
             <>
               <MailCheck className="h-4 w-4" />
               Testar Email Manual
+            </>
+          )}
+        </Button>
+
+        <Button 
+          variant="outline" 
+          onClick={async () => {
+            setIsRunningAbandonedCart(true);
+            try {
+              const { data: { session } } = await supabase.auth.getSession();
+              if (!session) {
+                toast.error('Você precisa estar logado');
+                return;
+              }
+              
+              const { data, error } = await supabase.functions.invoke('admin-trigger-emails', {
+                body: { action: 'abandoned-cart' }
+              });
+              
+              if (error) throw error;
+              
+              if (data?.success) {
+                const result = data.result;
+                if (result?.processed !== undefined) {
+                  toast.success(`Carrinhos abandonados processados: ${result.processed}`);
+                } else if (result?.message) {
+                  toast.info(result.message);
+                } else {
+                  toast.success('Endpoint executado com sucesso');
+                }
+              } else {
+                toast.error(`Erro: ${data?.result?.message || data?.result?.error || 'Erro desconhecido'}`);
+              }
+            } catch (err: any) {
+              console.error('Abandoned cart error:', err);
+              toast.error(`Erro: ${err.message}`);
+            } finally {
+              setIsRunningAbandonedCart(false);
+            }
+          }}
+          disabled={isRunning || isCleaning || isRunningAbandonedCart}
+          className="gap-2"
+        >
+          {isRunningAbandonedCart ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Executando...
+            </>
+          ) : (
+            <>
+              <ShoppingCart className="h-4 w-4" />
+              Executar Carrinho Abandonado
+            </>
+          )}
+        </Button>
+
+        <Button 
+          variant="outline" 
+          onClick={async () => {
+            setIsRunningReviewRequest(true);
+            try {
+              const { data: { session } } = await supabase.auth.getSession();
+              if (!session) {
+                toast.error('Você precisa estar logado');
+                return;
+              }
+              
+              const { data, error } = await supabase.functions.invoke('admin-trigger-emails', {
+                body: { action: 'review-request' }
+              });
+              
+              if (error) throw error;
+              
+              if (data?.success) {
+                const result = data.result;
+                if (result?.processed !== undefined) {
+                  toast.success(`Pedidos processados para avaliação: ${result.processed}`);
+                } else if (result?.message) {
+                  toast.info(result.message);
+                } else {
+                  toast.success('Endpoint executado com sucesso');
+                }
+              } else {
+                toast.error(`Erro: ${data?.result?.message || data?.result?.error || 'Erro desconhecido'}`);
+              }
+            } catch (err: any) {
+              console.error('Review request error:', err);
+              toast.error(`Erro: ${err.message}`);
+            } finally {
+              setIsRunningReviewRequest(false);
+            }
+          }}
+          disabled={isRunning || isCleaning || isRunningReviewRequest}
+          className="gap-2"
+        >
+          {isRunningReviewRequest ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Executando...
+            </>
+          ) : (
+            <>
+              <Star className="h-4 w-4" />
+              Executar Solicitação Avaliação
             </>
           )}
         </Button>

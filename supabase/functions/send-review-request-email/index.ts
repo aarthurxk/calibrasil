@@ -70,12 +70,22 @@ serve(async (req) => {
 
   try {
     // Verify internal secret
+    // Header: x-internal-secret
+    // ENV: INTERNAL_API_SECRET
     const internalSecret = req.headers.get("x-internal-secret");
     const expectedSecret = Deno.env.get("INTERNAL_API_SECRET");
 
-    if (!internalSecret || internalSecret !== expectedSecret) {
-      console.error("[REVIEW-REQUEST] Invalid internal secret");
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+    if (!internalSecret) {
+      console.error("[REVIEW-REQUEST] Faltou header x-internal-secret");
+      return new Response(JSON.stringify({ error: "Unauthorized", message: "Faltou header x-internal-secret" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    if (internalSecret !== expectedSecret) {
+      console.error("[REVIEW-REQUEST] Header x-internal-secret inválido");
+      return new Response(JSON.stringify({ error: "Unauthorized", message: "Header x-internal-secret inválido" }), {
         status: 401,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
