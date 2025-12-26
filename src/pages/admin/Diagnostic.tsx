@@ -13,12 +13,14 @@ import {
   ShoppingCart,
   CreditCard,
   Mail,
+  MailCheck,
   Database,
   Truck,
   Webhook,
   Tag,
   Users,
-  BarChart3
+  BarChart3,
+  Star
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -65,6 +67,10 @@ const Diagnostic = () => {
     { name: 'Verificar estoque de variante', status: 'pending' },
     { name: 'Validar cupom de desconto', status: 'pending' },
     { name: 'Validar código de vendedor', status: 'pending' },
+    { name: 'Email de atualização de status', status: 'pending' },
+    { name: 'Email de estoque baixo', status: 'pending' },
+    { name: 'Endpoint carrinho abandonado', status: 'pending' },
+    { name: 'Endpoint solicitação de avaliação', status: 'pending' },
   ]);
 
   // Fetch configured test email from store settings
@@ -679,6 +685,205 @@ const Diagnostic = () => {
         });
       }
 
+      // Test 13: Email de atualização de status
+      updateTest(12, { status: 'running' });
+      startTime = Date.now();
+
+      try {
+        const { data: statusEmailData, error: statusEmailError } = await supabase.functions.invoke('send-order-status-email', {
+          body: {
+            orderId: data.orderId,
+            customerEmail: testEmail,
+            customerName: `${TEST_PREFIX} Cliente`,
+            oldStatus: 'pending',
+            newStatus: 'processing',
+            trackingCode: null
+          }
+        });
+
+        if (statusEmailError) {
+          updateTest(12, { 
+            status: 'error', 
+            endpoint: 'send-order-status-email',
+            statusCode: 500,
+            message: statusEmailError.message,
+            duration: Date.now() - startTime
+          });
+        } else if (statusEmailData?.success) {
+          updateTest(12, { 
+            status: 'ok', 
+            endpoint: 'send-order-status-email',
+            statusCode: 200,
+            message: `Email de status 'processing' enviado para: ${testEmail}`,
+            duration: Date.now() - startTime
+          });
+        } else {
+          updateTest(12, { 
+            status: 'error', 
+            endpoint: 'send-order-status-email',
+            statusCode: 400,
+            message: statusEmailData?.error || 'Falha no envio',
+            duration: Date.now() - startTime
+          });
+        }
+      } catch (statusEmailErr: any) {
+        updateTest(12, { 
+          status: 'error', 
+          endpoint: 'send-order-status-email',
+          statusCode: 500,
+          message: statusEmailErr.message || 'Erro ao enviar email de status',
+          duration: Date.now() - startTime
+        });
+      }
+
+      // Test 14: Email de estoque baixo
+      updateTest(13, { status: 'running' });
+      startTime = Date.now();
+
+      try {
+        const { data: lowStockData, error: lowStockError } = await supabase.functions.invoke('send-low-stock-email', {
+          body: {
+            items: [{
+              productName: `${TEST_PREFIX} Produto Diagnóstico`,
+              productId: data.productId,
+              color: 'Teste',
+              model: 'Diagnóstico',
+              currentStock: 2
+            }]
+          }
+        });
+
+        if (lowStockError) {
+          updateTest(13, { 
+            status: 'error', 
+            endpoint: 'send-low-stock-email',
+            statusCode: 500,
+            message: lowStockError.message,
+            duration: Date.now() - startTime
+          });
+        } else if (lowStockData?.success) {
+          updateTest(13, { 
+            status: 'ok', 
+            endpoint: 'send-low-stock-email',
+            statusCode: 200,
+            message: `Alerta de estoque baixo enviado`,
+            duration: Date.now() - startTime
+          });
+        } else {
+          updateTest(13, { 
+            status: 'error', 
+            endpoint: 'send-low-stock-email',
+            statusCode: 400,
+            message: lowStockData?.error || 'Falha no envio',
+            duration: Date.now() - startTime
+          });
+        }
+      } catch (lowStockErr: any) {
+        updateTest(13, { 
+          status: 'error', 
+          endpoint: 'send-low-stock-email',
+          statusCode: 500,
+          message: lowStockErr.message || 'Erro ao enviar email de estoque baixo',
+          duration: Date.now() - startTime
+        });
+      }
+
+      // Test 15: Endpoint carrinho abandonado
+      updateTest(14, { status: 'running' });
+      startTime = Date.now();
+
+      try {
+        const { error: abandonedError } = await supabase.functions.invoke('send-abandoned-cart-email', {
+          body: {}
+        });
+
+        // Este endpoint requer INTERNAL_API_SECRET, então esperamos um erro 401
+        if (abandonedError) {
+          const errorMsg = abandonedError.message || '';
+          if (errorMsg.includes('401') || errorMsg.includes('Unauthorized') || errorMsg.includes('Missing') || errorMsg.includes('Invalid')) {
+            updateTest(14, { 
+              status: 'ok', 
+              endpoint: 'send-abandoned-cart-email',
+              statusCode: 401,
+              message: 'Endpoint acessível (requer autorização interna)',
+              duration: Date.now() - startTime
+            });
+          } else {
+            updateTest(14, { 
+              status: 'error', 
+              endpoint: 'send-abandoned-cart-email',
+              statusCode: 500,
+              message: abandonedError.message,
+              duration: Date.now() - startTime
+            });
+          }
+        } else {
+          updateTest(14, { 
+            status: 'ok', 
+            endpoint: 'send-abandoned-cart-email',
+            statusCode: 200,
+            message: 'Endpoint acessível e respondeu com sucesso',
+            duration: Date.now() - startTime
+          });
+        }
+      } catch (abandonedErr: any) {
+        updateTest(14, { 
+          status: 'error', 
+          endpoint: 'send-abandoned-cart-email',
+          statusCode: 500,
+          message: abandonedErr.message || 'Erro ao acessar endpoint',
+          duration: Date.now() - startTime
+        });
+      }
+
+      // Test 16: Endpoint solicitação de avaliação
+      updateTest(15, { status: 'running' });
+      startTime = Date.now();
+
+      try {
+        const { error: reviewError } = await supabase.functions.invoke('send-review-request-email', {
+          body: {}
+        });
+
+        // Este endpoint também requer INTERNAL_API_SECRET
+        if (reviewError) {
+          const errorMsg = reviewError.message || '';
+          if (errorMsg.includes('401') || errorMsg.includes('Unauthorized') || errorMsg.includes('Missing') || errorMsg.includes('Invalid')) {
+            updateTest(15, { 
+              status: 'ok', 
+              endpoint: 'send-review-request-email',
+              statusCode: 401,
+              message: 'Endpoint acessível (requer autorização interna)',
+              duration: Date.now() - startTime
+            });
+          } else {
+            updateTest(15, { 
+              status: 'error', 
+              endpoint: 'send-review-request-email',
+              statusCode: 500,
+              message: reviewError.message,
+              duration: Date.now() - startTime
+            });
+          }
+        } else {
+          updateTest(15, { 
+            status: 'ok', 
+            endpoint: 'send-review-request-email',
+            statusCode: 200,
+            message: 'Endpoint acessível e respondeu com sucesso',
+            duration: Date.now() - startTime
+          });
+        }
+      } catch (reviewErr: any) {
+        updateTest(15, { 
+          status: 'error', 
+          endpoint: 'send-review-request-email',
+          statusCode: 500,
+          message: reviewErr.message || 'Erro ao acessar endpoint',
+          duration: Date.now() - startTime
+        });
+      }
+
       setTestData(data);
       
       const allPassed = tests.filter(t => t.status === 'error').length === 0;
@@ -790,7 +995,7 @@ const Diagnostic = () => {
   };
 
   const getTestIcon = (index: number) => {
-    const icons = [Package, Database, ShoppingCart, Package, RefreshCw, CreditCard, Truck, Mail, Webhook, BarChart3, Tag, Users];
+    const icons = [Package, Database, ShoppingCart, Package, RefreshCw, CreditCard, Truck, Mail, Webhook, BarChart3, Tag, Users, MailCheck, AlertTriangle, ShoppingCart, Star];
     const Icon = icons[index] || Package;
     return <Icon className="w-4 h-4" />;
   };
