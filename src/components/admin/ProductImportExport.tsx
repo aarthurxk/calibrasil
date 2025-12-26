@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { Upload, Download, FileSpreadsheet, AlertCircle, AlertTriangle, CheckCircle, X, History, RotateCcw, Eye, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -14,6 +15,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+type FileFormat = 'xlsx' | 'csv';
 
 // Tipos de template
 type TemplateType = 'simples' | 'variacoes' | 'completo';
@@ -176,6 +179,9 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
   const [importComplete, setImportComplete] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>('completo');
   const [uploadedFileName, setUploadedFileName] = useState<string>('');
+  const [templateFormat, setTemplateFormat] = useState<FileFormat>('xlsx');
+  const [exportFormat, setExportFormat] = useState<FileFormat>('xlsx');
+  const [uploadedFileType, setUploadedFileType] = useState<FileFormat>('csv');
   
   // Histórico
   const [importJobs, setImportJobs] = useState<ImportJob[]>([]);
@@ -236,134 +242,164 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
     }
   }, [activeTab, open, loadHistory]);
 
+  const processRowsData = useCallback((data: Record<string, string>[]) => {
+    const rows: ParsedRow[] = data.map((rawRow: any, index: number) => {
+      const row = normalizeRow(rawRow);
+      const warnings: string[] = [];
+      const errors: string[] = [];
+
+      // Campos obrigatórios
+      const productName = (row.product_name || '').trim();
+      const category = (row.category || '').trim();
+
+      if (!productName) errors.push('Coluna obrigatória ausente: nome_produto');
+      if (!category) errors.push('Coluna obrigatória ausente: categoria');
+
+      // Status com fallback
+      let status = (row.status || '').trim().toLowerCase();
+      if (!status) {
+        status = 'em_estoque';
+        warnings.push('Status vazio: usando "em_estoque"');
+      }
+      const inStock = status === 'em_estoque' || status === 'true' || status === '1';
+
+      // Destaque com fallback
+      let featured = false;
+      const featuredRaw = (row.featured || '').trim().toLowerCase();
+      if (featuredRaw === 'true' || featuredRaw === '1' || featuredRaw === 'sim') {
+        featured = true;
+      }
+
+      // Validação de preço
+      let price = 0;
+      const priceRaw = (row.price || '').trim();
+      if (priceRaw) {
+        const parsedPrice = parseFloat(priceRaw.replace(',', '.'));
+        if (isNaN(parsedPrice)) {
+          errors.push(`Preço inválido na linha ${index + 2}: "${priceRaw}"`);
+        } else {
+          price = parsedPrice;
+        }
+      }
+
+      // Campos de variação
+      const variantModel = (row.variant_model || '').trim() || undefined;
+      const variantColor = (row.variant_color || '').trim() || undefined;
+      let variantSku = (row.variant_sku || '').trim() || undefined;
+      const variantStockRaw = (row.variant_stock || '').trim();
+      const variantPriceRaw = (row.variant_price || '').trim();
+
+      // Determinar se tem variação
+      const hasVariant = Boolean(variantModel || variantColor || variantSku);
+
+      // Preço da variação com fallback
+      let variantPrice = price;
+      if (variantPriceRaw) {
+        const parsedVP = parseFloat(variantPriceRaw.replace(',', '.'));
+        if (isNaN(parsedVP)) {
+          errors.push(`Preço da variação inválido na linha ${index + 2}: "${variantPriceRaw}"`);
+        } else {
+          variantPrice = parsedVP;
+        }
+      } else if (hasVariant) {
+        warnings.push(`Preço da variação vazio: usando preço do produto (R$ ${price.toFixed(2)})`);
+      }
+
+      // Estoque da variação
+      let variantStock = 0;
+      if (variantStockRaw) {
+        const parsedVS = parseInt(variantStockRaw, 10);
+        if (isNaN(parsedVS)) {
+          errors.push(`Estoque da variação inválido na linha ${index + 2}: "${variantStockRaw}"`);
+        } else {
+          variantStock = parsedVS;
+        }
+      }
+
+      // Gerar SKU se variação existe mas SKU está vazio
+      if (hasVariant && !variantSku && productName && (variantModel || variantColor)) {
+        variantSku = generateSku(productName, variantModel, variantColor);
+        warnings.push(`SKU gerado automaticamente: "${variantSku}"`);
+      }
+
+      // Aviso de preço ausente
+      if (!priceRaw && !variantPriceRaw) {
+        warnings.push('Preço ausente: definido como R$ 0,00');
+      }
+
+      return {
+        original: row,
+        productId: (row.product_id || '').trim() || undefined,
+        productName,
+        category,
+        status: inStock ? 'em_estoque' : 'esgotado',
+        price,
+        featured,
+        imageUrl: (row.image_url || '').trim() || undefined,
+        hasVariant,
+        variantModel,
+        variantColor,
+        variantSku,
+        variantPrice,
+        variantStock,
+        warnings,
+        errors,
+        rowIndex: index + 2,
+      };
+    });
+
+    setParsedRows(rows);
+  }, []);
+
   const parseFile = useCallback((file: File) => {
     setParsedRows([]);
     setImportComplete(false);
     setUploadedFileName(file.name);
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const rows: ParsedRow[] = results.data.map((rawRow: any, index: number) => {
-          const row = normalizeRow(rawRow);
-          const warnings: string[] = [];
-          const errors: string[] = [];
-
-          // Campos obrigatórios
-          const productName = (row.product_name || '').trim();
-          const category = (row.category || '').trim();
-
-          if (!productName) errors.push('Coluna obrigatória ausente: nome_produto');
-          if (!category) errors.push('Coluna obrigatória ausente: categoria');
-
-          // Status com fallback
-          let status = (row.status || '').trim().toLowerCase();
-          if (!status) {
-            status = 'em_estoque';
-            warnings.push('Status vazio: usando "em_estoque"');
-          }
-          const inStock = status === 'em_estoque' || status === 'true' || status === '1';
-
-          // Destaque com fallback
-          let featured = false;
-          const featuredRaw = (row.featured || '').trim().toLowerCase();
-          if (featuredRaw === 'true' || featuredRaw === '1' || featuredRaw === 'sim') {
-            featured = true;
-          }
-
-          // Validação de preço
-          let price = 0;
-          const priceRaw = (row.price || '').trim();
-          if (priceRaw) {
-            const parsedPrice = parseFloat(priceRaw.replace(',', '.'));
-            if (isNaN(parsedPrice)) {
-              errors.push(`Preço inválido na linha ${index + 2}: "${priceRaw}"`);
-            } else {
-              price = parsedPrice;
-            }
-          }
-
-          // Campos de variação
-          const variantModel = (row.variant_model || '').trim() || undefined;
-          const variantColor = (row.variant_color || '').trim() || undefined;
-          let variantSku = (row.variant_sku || '').trim() || undefined;
-          const variantStockRaw = (row.variant_stock || '').trim();
-          const variantPriceRaw = (row.variant_price || '').trim();
-
-          // Determinar se tem variação
-          const hasVariant = Boolean(variantModel || variantColor || variantSku);
-
-          // Preço da variação com fallback
-          let variantPrice = price;
-          if (variantPriceRaw) {
-            const parsedVP = parseFloat(variantPriceRaw.replace(',', '.'));
-            if (isNaN(parsedVP)) {
-              errors.push(`Preço da variação inválido na linha ${index + 2}: "${variantPriceRaw}"`);
-            } else {
-              variantPrice = parsedVP;
-            }
-          } else if (hasVariant) {
-            warnings.push(`Preço da variação vazio: usando preço do produto (R$ ${price.toFixed(2)})`);
-          }
-
-          // Estoque da variação
-          let variantStock = 0;
-          if (variantStockRaw) {
-            const parsedVS = parseInt(variantStockRaw, 10);
-            if (isNaN(parsedVS)) {
-              errors.push(`Estoque da variação inválido na linha ${index + 2}: "${variantStockRaw}"`);
-            } else {
-              variantStock = parsedVS;
-            }
-          }
-
-          // Gerar SKU se variação existe mas SKU está vazio
-          if (hasVariant && !variantSku && productName && (variantModel || variantColor)) {
-            variantSku = generateSku(productName, variantModel, variantColor);
-            warnings.push(`SKU gerado automaticamente: "${variantSku}"`);
-          }
-
-          // Aviso de preço ausente
-          if (!priceRaw && !variantPriceRaw) {
-            warnings.push('Preço ausente: definido como R$ 0,00');
-          }
-
-          return {
-            original: row,
-            productId: (row.product_id || '').trim() || undefined,
-            productName,
-            category,
-            status: inStock ? 'em_estoque' : 'esgotado',
-            price,
-            featured,
-            imageUrl: (row.image_url || '').trim() || undefined,
-            hasVariant,
-            variantModel,
-            variantColor,
-            variantSku,
-            variantPrice,
-            variantStock,
-            warnings,
-            errors,
-            rowIndex: index + 2,
-          };
-        });
-
-        setParsedRows(rows);
-      },
-      error: (error) => {
-        toast.error(`Erro ao ler arquivo: ${error.message}`);
-      },
-    });
-  }, []);
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    
+    if (ext === 'xlsx' || ext === 'xls') {
+      setUploadedFileType('xlsx');
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result;
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(worksheet, { defval: '' });
+          processRowsData(jsonData);
+        } catch (error: any) {
+          toast.error(`Erro ao ler arquivo Excel: ${error.message}`);
+        }
+      };
+      reader.onerror = () => {
+        toast.error('Erro ao ler arquivo. Verifique se o arquivo está correto.');
+      };
+      reader.readAsArrayBuffer(file);
+    } else if (ext === 'csv') {
+      setUploadedFileType('csv');
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          processRowsData(results.data as Record<string, string>[]);
+        },
+        error: (error) => {
+          toast.error(`Erro ao ler arquivo CSV: ${error.message}`);
+        },
+      });
+    } else {
+      toast.error('Arquivo inválido. Envie um arquivo CSV ou XLSX.');
+    }
+  }, [processRowsData]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const ext = file.name.split('.').pop()?.toLowerCase();
-      if (ext !== 'csv') {
-        toast.error('Arquivo inválido. Envie um arquivo CSV.');
+      if (ext !== 'csv' && ext !== 'xlsx' && ext !== 'xls') {
+        toast.error('Arquivo inválido. Envie um arquivo CSV ou XLSX.');
         return;
       }
       parseFile(file);
@@ -375,8 +411,8 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
     const file = e.dataTransfer.files[0];
     if (file) {
       const ext = file.name.split('.').pop()?.toLowerCase();
-      if (ext !== 'csv') {
-        toast.error('Arquivo inválido. Envie um arquivo CSV.');
+      if (ext !== 'csv' && ext !== 'xlsx' && ext !== 'xls') {
+        toast.error('Arquivo inválido. Envie um arquivo CSV ou XLSX.');
         return;
       }
       parseFile(file);
@@ -555,7 +591,7 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
         .insert({
           created_by: user?.id,
           file_name: uploadedFileName,
-          file_type: 'csv',
+          file_type: uploadedFileType,
           template_type: selectedTemplate,
           total_rows: rowsToImport.length,
           created_count: productsCreated + variantsCreated,
@@ -657,14 +693,23 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
         }
       }
 
-      const csv = Papa.unparse(exportRows, { columns });
-      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `produtos_${new Date().toISOString().split('T')[0]}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const dateStr = new Date().toISOString().split('T')[0];
+
+      if (exportFormat === 'xlsx') {
+        const worksheet = XLSX.utils.json_to_sheet(exportRows, { header: columns });
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Produtos');
+        XLSX.writeFile(workbook, `produtos_${dateStr}.xlsx`);
+      } else {
+        const csv = Papa.unparse(exportRows, { columns });
+        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `produtos_${dateStr}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
 
       toast.success('Exportação concluída!');
     } catch (error: any) {
@@ -676,15 +721,21 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
     const columns = TEMPLATE_COLUMNS[selectedTemplate];
     const exampleRow = EXAMPLE_ROWS[selectedTemplate];
     
-    // Criar CSV com cabeçalho e linha de exemplo
-    const csv = Papa.unparse([exampleRow], { columns });
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `template_${selectedTemplate}_produtos.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (templateFormat === 'xlsx') {
+      const worksheet = XLSX.utils.json_to_sheet([exampleRow], { header: columns });
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Template');
+      XLSX.writeFile(workbook, `template_${selectedTemplate}_produtos.xlsx`);
+    } else {
+      const csv = Papa.unparse([exampleRow], { columns });
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `template_${selectedTemplate}_produtos.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
     toast.success('Template baixado com sucesso!');
   };
 
@@ -953,6 +1004,18 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label>Formato</Label>
+                  <Select value={templateFormat} onValueChange={(v) => setTemplateFormat(v as FileFormat)}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="xlsx">XLSX (Excel)</SelectItem>
+                      <SelectItem value="csv">CSV</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Button variant="outline" onClick={downloadTemplate}>
                   <Download className="h-4 w-4 mr-2" />
                   Baixar Modelo
@@ -968,11 +1031,11 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
                 >
                   <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
                   <p className="text-muted-foreground mb-2">
-                    Arraste um arquivo CSV ou clique para selecionar
+                    Arraste um arquivo CSV ou XLSX aqui, ou clique para selecionar
                   </p>
                   <input
                     type="file"
-                    accept=".csv"
+                    accept=".csv,.xlsx,.xls"
                     onChange={handleFileChange}
                     className="hidden"
                     id="csv-upload"
@@ -1048,12 +1111,26 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
                 <Download className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium mb-2">Exportar Produtos</h3>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  Exporte todos os produtos cadastrados em formato CSV. Produtos com variações terão uma linha por variação.
+                  Exporte todos os produtos cadastrados. Produtos com variações terão uma linha por variação.
                 </p>
-                <Button onClick={handleExport} className="bg-gradient-ocean">
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar Produtos
-                </Button>
+                <div className="flex items-center justify-center gap-4">
+                  <div className="space-y-2">
+                    <Label>Formato</Label>
+                    <Select value={exportFormat} onValueChange={(v) => setExportFormat(v as FileFormat)}>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="xlsx">XLSX (Excel)</SelectItem>
+                        <SelectItem value="csv">CSV</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button onClick={handleExport} className="bg-gradient-ocean self-end">
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar Produtos
+                  </Button>
+                </div>
               </div>
             </TabsContent>
 
