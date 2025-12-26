@@ -32,6 +32,7 @@ const MyOrders = lazy(() => import("./pages/MyOrders"));
 const OrderReceived = lazy(() => import("./pages/OrderReceived"));
 const ConfirmarRecebimento = lazy(() => import("./pages/ConfirmarRecebimento"));
 const Review = lazy(() => import("./pages/Review"));
+const Avaliar = lazy(() => import("./pages/Avaliar"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Lazy load Admin Pages
@@ -82,6 +83,7 @@ const App = () => (
                   <Route path="/order-received" element={<OrderReceived />} />
                   <Route path="/confirmar-recebimento" element={<ConfirmarRecebimento />} />
                   <Route path="/review/:productId" element={<Review />} />
+                  <Route path="/avaliar" element={<Avaliar />} />
                   <Route path="/wishlist" element={<Wishlist />} />
                   <Route
                     path="/profile"
