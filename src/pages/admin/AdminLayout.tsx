@@ -21,6 +21,7 @@ import {
   Megaphone,
   Wallet,
   Cog,
+  MailCheck,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -170,6 +171,7 @@ const AdminLayout = () => {
       showFor: ['admin'],
       subItems: [
         { name: 'Configurações', icon: Settings, path: '/admin/settings' },
+        { name: 'Testes de Email', icon: MailCheck, path: '/admin/email-tests' },
         { name: 'Diagnóstico', icon: Bug, path: '/admin/diagnostic' },
       ]
     },

@@ -48,6 +48,7 @@ const EmailTemplates = lazy(() => import("./pages/admin/EmailTemplates"));
 const Sellers = lazy(() => import("./pages/admin/Sellers"));
 const OrderMonitor = lazy(() => import("./pages/admin/OrderMonitor"));
 const Diagnostic = lazy(() => import("./pages/admin/Diagnostic"));
+const EmailTests = lazy(() => import("./pages/admin/EmailTests"));
 
 const queryClient = new QueryClient();
 
@@ -125,6 +126,7 @@ const App = () => (
                   <Route path="settings" element={<Settings />} />
                   <Route path="roadmap" element={<Roadmap />} />
                   <Route path="diagnostic" element={<Diagnostic />} />
+                  <Route path="email-tests" element={<EmailTests />} />
                 </Route>
                 
                   {/* Catch-all */}
