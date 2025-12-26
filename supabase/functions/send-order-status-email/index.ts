@@ -34,15 +34,18 @@ const escapeHtml = (str: string): string => {
     .replace(/'/g, '&#039;');
 };
 
-async function generateConfirmationToken(orderId: string): Promise<string> {
-  const secret = Deno.env.get('INTERNAL_API_SECRET');
-  if (!secret) {
-    throw new Error('INTERNAL_API_SECRET not configured');
+// Generate secure token via database function (returns raw token, stores hash)
+async function generateConfirmationToken(supabase: any, orderId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('create_order_confirm_token', {
+    p_order_id: orderId
+  });
+
+  if (error) {
+    console.error('[ORDER-STATUS] Error creating confirmation token:', error);
+    throw new Error('Failed to create confirmation token');
   }
-  const data = new TextEncoder().encode(orderId + secret);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  return data;
 }
 
 const getStatusInfo = (status: string): { label: string; emoji: string; color: string; message: string } => {
@@ -137,16 +140,16 @@ async function generateEmailFromTemplate(
   }
   
   console.log(`[ORDER-STATUS] Template ${templateKey} not found, using fallback`);
-  return generateFallbackEmail(data);
+  return generateFallbackEmail(supabase, data);
 }
 
 // Fallback hardcoded email for when template is not found
-async function generateFallbackEmail(data: OrderStatusEmailRequest): Promise<{ subject: string; html: string }> {
+async function generateFallbackEmail(supabase: any, data: OrderStatusEmailRequest): Promise<{ subject: string; html: string }> {
   const statusInfo = getStatusInfo(data.newStatus);
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const storeUrl = 'https://calibrasil.com';
   
-  const confirmationToken = await generateConfirmationToken(data.orderId);
+  const confirmationToken = await generateConfirmationToken(supabase, data.orderId);
   const confirmationUrl = `${supabaseUrl}/functions/v1/confirm-order-received?orderId=${data.orderId}&token=${confirmationToken}`;
   const reviewUrl = `${storeUrl}/orders`;
   
@@ -246,7 +249,7 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    // Client for template fetch (service role to bypass RLS)
+    // Client for template fetch and token creation (service role to bypass RLS)
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
@@ -282,7 +285,7 @@ serve(async (req) => {
     
     // For shipped status with tracking code, use tracking_code_notification template
     if (data.newStatus === 'shipped' && data.trackingCode) {
-      const confirmationToken = await generateConfirmationToken(data.orderId);
+      const confirmationToken = await generateConfirmationToken(supabaseAdmin, data.orderId);
       const confirmationUrl = `${supabaseUrl}/functions/v1/confirm-order-received?orderId=${data.orderId}&token=${confirmationToken}`;
       const trackingUrl = 'https://www.linkcorreios.com.br/';
       
@@ -303,7 +306,7 @@ serve(async (req) => {
     } else {
       // For other status updates, use order_status_update template
       const statusInfo = getStatusInfo(data.newStatus);
-      const confirmationToken = await generateConfirmationToken(data.orderId);
+      const confirmationToken = await generateConfirmationToken(supabaseAdmin, data.orderId);
       const confirmationUrl = `${supabaseUrl}/functions/v1/confirm-order-received?orderId=${data.orderId}&token=${confirmationToken}`;
       const reviewUrl = 'https://calibrasil.lovable.app/orders';
       const trackingUrl = 'https://www.linkcorreios.com.br/';
@@ -324,7 +327,7 @@ serve(async (req) => {
         `;
       }
       
-      // Confirmation section - show for shipped/delivered status
+      // Confirmation section - show for shipped status
       if (data.newStatus === 'shipped') {
         confirmationSection = `
           <div style="text-align: center; margin: 20px 0;">
