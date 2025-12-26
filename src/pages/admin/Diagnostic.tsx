@@ -793,14 +793,21 @@ const Diagnostic = () => {
       startTime = Date.now();
 
       try {
-        const { error: abandonedError } = await supabase.functions.invoke('send-abandoned-cart-email', {
+        const { data: abandonedData, error: abandonedError } = await supabase.functions.invoke('send-abandoned-cart-email', {
           body: {}
         });
 
         // Este endpoint requer INTERNAL_API_SECRET, então esperamos um erro 401
-        if (abandonedError) {
-          const errorMsg = abandonedError.message || '';
-          if (errorMsg.includes('401') || errorMsg.includes('Unauthorized') || errorMsg.includes('Missing') || errorMsg.includes('Invalid')) {
+        // O erro pode vir no objeto error ou no data.error
+        const errorMsg = abandonedError?.message || JSON.stringify(abandonedData) || '';
+        const isAuthError = errorMsg.includes('401') || 
+                           errorMsg.includes('Unauthorized') || 
+                           errorMsg.includes('Missing') || 
+                           errorMsg.includes('Invalid') ||
+                           (abandonedData?.error && abandonedData.error.includes('Unauthorized'));
+
+        if (abandonedError || (abandonedData?.error)) {
+          if (isAuthError) {
             updateTest(14, { 
               status: 'ok', 
               endpoint: 'send-abandoned-cart-email',
@@ -813,7 +820,7 @@ const Diagnostic = () => {
               status: 'error', 
               endpoint: 'send-abandoned-cart-email',
               statusCode: 500,
-              message: abandonedError.message,
+              message: abandonedError?.message || abandonedData?.error || 'Erro desconhecido',
               duration: Date.now() - startTime
             });
           }
@@ -827,13 +834,25 @@ const Diagnostic = () => {
           });
         }
       } catch (abandonedErr: any) {
-        updateTest(14, { 
-          status: 'error', 
-          endpoint: 'send-abandoned-cart-email',
-          statusCode: 500,
-          message: abandonedErr.message || 'Erro ao acessar endpoint',
-          duration: Date.now() - startTime
-        });
+        // Mesmo exceptions podem indicar endpoint acessível com auth requerida
+        const errMsg = abandonedErr.message || '';
+        if (errMsg.includes('401') || errMsg.includes('Unauthorized')) {
+          updateTest(14, { 
+            status: 'ok', 
+            endpoint: 'send-abandoned-cart-email',
+            statusCode: 401,
+            message: 'Endpoint acessível (requer autorização interna)',
+            duration: Date.now() - startTime
+          });
+        } else {
+          updateTest(14, { 
+            status: 'error', 
+            endpoint: 'send-abandoned-cart-email',
+            statusCode: 500,
+            message: abandonedErr.message || 'Erro ao acessar endpoint',
+            duration: Date.now() - startTime
+          });
+        }
       }
 
       // Test 16: Endpoint solicitação de avaliação
@@ -841,14 +860,20 @@ const Diagnostic = () => {
       startTime = Date.now();
 
       try {
-        const { error: reviewError } = await supabase.functions.invoke('send-review-request-email', {
+        const { data: reviewData, error: reviewError } = await supabase.functions.invoke('send-review-request-email', {
           body: {}
         });
 
         // Este endpoint também requer INTERNAL_API_SECRET
-        if (reviewError) {
-          const errorMsg = reviewError.message || '';
-          if (errorMsg.includes('401') || errorMsg.includes('Unauthorized') || errorMsg.includes('Missing') || errorMsg.includes('Invalid')) {
+        const errorMsg = reviewError?.message || JSON.stringify(reviewData) || '';
+        const isAuthError = errorMsg.includes('401') || 
+                           errorMsg.includes('Unauthorized') || 
+                           errorMsg.includes('Missing') || 
+                           errorMsg.includes('Invalid') ||
+                           (reviewData?.error && reviewData.error.includes('Unauthorized'));
+
+        if (reviewError || (reviewData?.error)) {
+          if (isAuthError) {
             updateTest(15, { 
               status: 'ok', 
               endpoint: 'send-review-request-email',
@@ -861,7 +886,7 @@ const Diagnostic = () => {
               status: 'error', 
               endpoint: 'send-review-request-email',
               statusCode: 500,
-              message: reviewError.message,
+              message: reviewError?.message || reviewData?.error || 'Erro desconhecido',
               duration: Date.now() - startTime
             });
           }
@@ -875,13 +900,24 @@ const Diagnostic = () => {
           });
         }
       } catch (reviewErr: any) {
-        updateTest(15, { 
-          status: 'error', 
-          endpoint: 'send-review-request-email',
-          statusCode: 500,
-          message: reviewErr.message || 'Erro ao acessar endpoint',
-          duration: Date.now() - startTime
-        });
+        const errMsg = reviewErr.message || '';
+        if (errMsg.includes('401') || errMsg.includes('Unauthorized')) {
+          updateTest(15, { 
+            status: 'ok', 
+            endpoint: 'send-review-request-email',
+            statusCode: 401,
+            message: 'Endpoint acessível (requer autorização interna)',
+            duration: Date.now() - startTime
+          });
+        } else {
+          updateTest(15, { 
+            status: 'error', 
+            endpoint: 'send-review-request-email',
+            statusCode: 500,
+            message: reviewErr.message || 'Erro ao acessar endpoint',
+            duration: Date.now() - startTime
+          });
+        }
       }
 
       setTestData(data);
