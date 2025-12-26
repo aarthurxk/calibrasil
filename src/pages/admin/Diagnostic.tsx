@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { 
   Play, 
   CheckCircle2, 
@@ -65,6 +66,23 @@ const Diagnostic = () => {
     { name: 'Validar cupom de desconto', status: 'pending' },
     { name: 'Validar código de vendedor', status: 'pending' },
   ]);
+
+  // Fetch configured test email from store settings
+  const { data: storeSettings } = useQuery({
+    queryKey: ['store-settings-diagnostic'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('store_settings')
+        .select('diagnostic_test_email')
+        .limit(1)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const testEmail = storeSettings?.diagnostic_test_email || 'teste-diag@cali.com.br';
 
   const updateTest = (index: number, update: Partial<TestResult>) => {
     setTests(prev => prev.map((t, i) => i === index ? { ...t, ...update } : t));
@@ -157,7 +175,7 @@ const Diagnostic = () => {
           total: 99.99,
           status: 'pending',
           payment_status: 'pending',
-          guest_email: 'teste-diag@cali.com.br',
+          guest_email: testEmail,
           shipping_address: {
             name: `${TEST_PREFIX} Cliente`,
             street: 'Rua Teste',
@@ -362,7 +380,7 @@ const Diagnostic = () => {
             status: 'ok', 
             endpoint: 'test-order-email',
             statusCode: 200,
-            message: `Email enviado para: ${emailData.email || 'teste-diag@cali.com.br'}`,
+            message: `Email enviado para: ${emailData.email || testEmail}`,
             duration: Date.now() - startTime
           });
         } else {
@@ -806,6 +824,18 @@ const Diagnostic = () => {
           e podem ser limpos a qualquer momento.
         </AlertDescription>
       </Alert>
+
+      {/* Test Email Info */}
+      <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border">
+        <Mail className="h-4 w-4 text-primary" />
+        <span className="text-sm">
+          <span className="text-muted-foreground">Email para testes:</span>{' '}
+          <code className="bg-background px-2 py-0.5 rounded font-medium">{testEmail}</code>
+        </span>
+        <span className="text-xs text-muted-foreground ml-auto">
+          Configurável em Configurações → Sistema
+        </span>
+      </div>
 
       {/* Actions */}
       <div className="flex items-center gap-4">

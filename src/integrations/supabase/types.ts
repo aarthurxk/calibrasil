@@ -535,6 +535,7 @@ export type Database = {
           currency: string | null
           delivery_max_days: number | null
           delivery_min_days: number | null
+          diagnostic_test_email: string | null
           free_shipping_threshold: number | null
           id: string
           notify_abandoned_cart: boolean | null
@@ -556,6 +557,7 @@ export type Database = {
           currency?: string | null
           delivery_max_days?: number | null
           delivery_min_days?: number | null
+          diagnostic_test_email?: string | null
           free_shipping_threshold?: number | null
           id?: string
           notify_abandoned_cart?: boolean | null
@@ -577,6 +579,7 @@ export type Database = {
           currency?: string | null
           delivery_max_days?: number | null
           delivery_min_days?: number | null
+          diagnostic_test_email?: string | null
           free_shipping_threshold?: number | null
           id?: string
           notify_abandoned_cart?: boolean | null
