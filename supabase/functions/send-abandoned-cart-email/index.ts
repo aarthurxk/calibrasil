@@ -123,13 +123,23 @@ serve(async (req) => {
 
   try {
     // Verify internal secret to prevent unauthorized access
+    // Header: x-internal-secret
+    // ENV: INTERNAL_API_SECRET
     const internalSecret = req.headers.get("x-internal-secret");
     const expectedSecret = Deno.env.get("INTERNAL_API_SECRET");
     
-    if (!internalSecret || internalSecret !== expectedSecret) {
-      console.error("[ABANDONED-CART] Unauthorized: Invalid or missing internal secret");
+    if (!internalSecret) {
+      console.error("[ABANDONED-CART] Faltou header x-internal-secret");
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Unauthorized", message: "Faltou header x-internal-secret" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+    
+    if (internalSecret !== expectedSecret) {
+      console.error("[ABANDONED-CART] Header x-internal-secret inválido");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized", message: "Header x-internal-secret inválido" }),
         { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }

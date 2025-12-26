@@ -311,8 +311,8 @@ serve(async (req) => {
     });
 
     // Send email to buyer
-    // NOTE: Using Resend's test domain until calibrasil.com is verified
-    const fromEmail = "Cali Brasil <onboarding@resend.dev>";
+    // Domain calibrasil.com is verified in Resend
+    const fromEmail = "Cali Brasil <pedidos@calibrasil.com>";
     
     console.log("[SEND-ORDER-EMAILS] Sending buyer confirmation to:", emailData.customerEmail);
     console.log("[SEND-ORDER-EMAILS] Using from:", fromEmail);
