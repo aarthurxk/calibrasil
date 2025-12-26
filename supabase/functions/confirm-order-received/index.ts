@@ -6,201 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// HTML template for success
-function successHTML(orderId: string, frontendUrl: string): string {
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Recebimento Confirmado - Cali</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .card {
-      background: white;
-      border-radius: 16px;
-      padding: 40px;
-      max-width: 400px;
-      width: 100%;
-      text-align: center;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-    }
-    .icon { font-size: 64px; margin-bottom: 20px; }
-    h1 { color: #22c55e; font-size: 24px; margin-bottom: 12px; }
-    p { color: #64748b; font-size: 16px; line-height: 1.5; margin-bottom: 24px; }
-    .btn {
-      display: inline-block;
-      background: #0ea5e9;
-      color: white;
-      padding: 14px 28px;
-      border-radius: 8px;
-      text-decoration: none;
-      font-weight: 600;
-      transition: background 0.2s;
-    }
-    .btn:hover { background: #0284c7; }
-    .secondary { 
-      display: block;
-      margin-top: 16px;
-      color: #64748b;
-      text-decoration: none;
-      font-size: 14px;
-    }
-    .secondary:hover { color: #0ea5e9; }
-  </style>
-  <meta http-equiv="refresh" content="5;url=${frontendUrl}/meus-pedidos">
-</head>
-<body>
-  <div class="card">
-    <div class="icon">✅</div>
-    <h1>Recebimento Confirmado!</h1>
-    <p>Obrigado por confirmar o recebimento do seu pedido. Esperamos que você aproveite seus produtos!</p>
-    <a href="${frontendUrl}/meus-pedidos" class="btn">Ver Meus Pedidos</a>
-    <a href="${frontendUrl}" class="secondary">Voltar para a loja</a>
-    <p style="font-size: 12px; color: #94a3b8; margin-top: 20px;">
-      Redirecionando automaticamente em 5 segundos...
-    </p>
-  </div>
-</body>
-</html>`;
-}
-
-// HTML template for errors
-function errorHTML(message: string, frontendUrl: string): string {
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Erro - Cali</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .card {
-      background: white;
-      border-radius: 16px;
-      padding: 40px;
-      max-width: 400px;
-      width: 100%;
-      text-align: center;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-    }
-    .icon { font-size: 64px; margin-bottom: 20px; }
-    h1 { color: #ef4444; font-size: 24px; margin-bottom: 12px; }
-    p { color: #64748b; font-size: 16px; line-height: 1.5; margin-bottom: 24px; }
-    .message { 
-      background: #fef2f2; 
-      border: 1px solid #fecaca;
-      border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 24px;
-      color: #dc2626;
-    }
-    .btn {
-      display: inline-block;
-      background: #0ea5e9;
-      color: white;
-      padding: 14px 28px;
-      border-radius: 8px;
-      text-decoration: none;
-      font-weight: 600;
-      transition: background 0.2s;
-    }
-    .btn:hover { background: #0284c7; }
-    .help {
-      margin-top: 20px;
-      font-size: 14px;
-      color: #64748b;
-    }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="icon">❌</div>
-    <h1>Ops! Algo deu errado</h1>
-    <div class="message">${message}</div>
-    <p>Se você acredita que isso é um erro, entre em contato com nosso suporte.</p>
-    <a href="${frontendUrl}" class="btn">Voltar para a loja</a>
-    <p class="help">
-      Precisa de ajuda? <a href="${frontendUrl}/contato" style="color: #0ea5e9;">Fale conosco</a>
-    </p>
-  </div>
-</body>
-</html>`;
-}
-
-// HTML for already confirmed
-function alreadyConfirmedHTML(frontendUrl: string): string {
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Já Confirmado - Cali</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #fefce8 0%, #fef08a 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .card {
-      background: white;
-      border-radius: 16px;
-      padding: 40px;
-      max-width: 400px;
-      width: 100%;
-      text-align: center;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-    }
-    .icon { font-size: 64px; margin-bottom: 20px; }
-    h1 { color: #ca8a04; font-size: 24px; margin-bottom: 12px; }
-    p { color: #64748b; font-size: 16px; line-height: 1.5; margin-bottom: 24px; }
-    .btn {
-      display: inline-block;
-      background: #0ea5e9;
-      color: white;
-      padding: 14px 28px;
-      border-radius: 8px;
-      text-decoration: none;
-      font-weight: 600;
-      transition: background 0.2s;
-    }
-    .btn:hover { background: #0284c7; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="icon">ℹ️</div>
-    <h1>Recebimento Já Confirmado</h1>
-    <p>Este pedido já teve o recebimento confirmado anteriormente. Obrigado!</p>
-    <a href="${frontendUrl}/meus-pedidos" class="btn">Ver Meus Pedidos</a>
-  </div>
-</body>
-</html>`;
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -216,9 +21,10 @@ serve(async (req) => {
 
     let orderId: string | null = null;
     let token: string | null = null;
+    const isGetRequest = req.method === "GET";
 
     // Handle both GET (from email link) and POST (from frontend)
-    if (req.method === "GET") {
+    if (isGetRequest) {
       const url = new URL(req.url);
       orderId = url.searchParams.get('orderId');
       token = url.searchParams.get('token');
@@ -230,33 +36,46 @@ serve(async (req) => {
 
     console.log(`[CONFIRM-RECEIVED] Processing order: ${orderId}, method: ${req.method}`);
 
+    // Helper function for 302 redirect (GET) or JSON response (POST)
+    const respond = (success: boolean, reason?: string) => {
+      if (isGetRequest) {
+        const redirectUrl = success 
+          ? `${frontendUrl}/meus-pedidos?confirmado=1`
+          : `${frontendUrl}/meus-pedidos?confirmado=0&motivo=${encodeURIComponent(reason || 'erro')}`;
+        
+        console.log(`[CONFIRM-RECEIVED] Redirecting to: ${redirectUrl}`);
+        return new Response(null, {
+          status: 302,
+          headers: {
+            ...corsHeaders,
+            'Location': redirectUrl
+          }
+        });
+      } else {
+        // POST request - return JSON
+        if (success) {
+          return new Response(
+            JSON.stringify({ success: true }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        } else {
+          return new Response(
+            JSON.stringify({ error: reason, success: false }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+    };
+
     // Validate parameters
     if (!orderId) {
       console.error('[CONFIRM-RECEIVED] Missing orderId');
-      if (req.method === "GET") {
-        return new Response(errorHTML('Pedido não especificado. Verifique o link do email.', frontendUrl), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" }
-        });
-      }
-      return new Response(
-        JSON.stringify({ error: 'Pedido não especificado.' }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return respond(false, 'pedido_nao_especificado');
     }
 
     if (!token) {
       console.error('[CONFIRM-RECEIVED] Missing token');
-      if (req.method === "GET") {
-        return new Response(errorHTML('Token de confirmação não encontrado. Verifique o link do email.', frontendUrl), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" }
-        });
-      }
-      return new Response(
-        JSON.stringify({ error: 'Token de confirmação não encontrado.' }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return respond(false, 'token_ausente');
     }
 
     // Check if order exists
@@ -268,16 +87,7 @@ serve(async (req) => {
 
     if (orderError || !order) {
       console.error('[CONFIRM-RECEIVED] Order not found:', orderError);
-      if (req.method === "GET") {
-        return new Response(errorHTML('Pedido não encontrado. Verifique se o link está correto.', frontendUrl), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" }
-        });
-      }
-      return new Response(
-        JSON.stringify({ error: 'Pedido não encontrado.' }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return respond(false, 'pedido_nao_encontrado');
     }
 
     // Validate and use the token via database function
@@ -289,79 +99,60 @@ serve(async (req) => {
 
     if (validationError) {
       console.error('[CONFIRM-RECEIVED] Validation error:', validationError);
-      if (req.method === "GET") {
-        return new Response(errorHTML('Erro ao validar token. Tente novamente mais tarde.', frontendUrl), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" }
-        });
-      }
-      return new Response(
-        JSON.stringify({ error: 'Erro ao validar token.' }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return respond(false, 'erro_validacao');
     }
 
     // Handle validation result
     if (!validationResult?.valid) {
-      const errorMessages: Record<string, string> = {
-        'token_not_found': 'Link de confirmação não encontrado. Solicite um novo email.',
-        'token_already_used': 'Este link já foi utilizado anteriormente.',
-        'token_expired': 'Este link expirou. Solicite um novo email de confirmação.',
-        'token_invalid': 'Link de confirmação inválido. Verifique se copiou corretamente.'
+      const errorReasons: Record<string, string> = {
+        'token_not_found': 'token_nao_encontrado',
+        'token_already_used': 'ja_confirmado',
+        'token_expired': 'token_expirado',
+        'token_invalid': 'token_invalido'
       };
       
-      const errorMsg = errorMessages[validationResult?.error] || 'Erro de validação desconhecido.';
+      const reason = errorReasons[validationResult?.error] || 'erro_desconhecido';
       console.error(`[CONFIRM-RECEIVED] Token validation failed: ${validationResult?.error}`);
       
-      // Special case: already used means already confirmed
+      // Special case: already used - still redirect to success page since it was confirmed before
       if (validationResult?.error === 'token_already_used') {
-        if (req.method === "GET") {
-          return new Response(alreadyConfirmedHTML(frontendUrl), {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" }
+        console.log(`[CONFIRM-RECEIVED] Order ${orderId} was already confirmed`);
+        if (isGetRequest) {
+          return new Response(null, {
+            status: 302,
+            headers: {
+              ...corsHeaders,
+              'Location': `${frontendUrl}/meus-pedidos?confirmado=1&ja_confirmado=1`
+            }
           });
         }
         return new Response(
-          JSON.stringify({ alreadyConfirmed: true }),
+          JSON.stringify({ alreadyConfirmed: true, success: true }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      if (req.method === "GET") {
-        return new Response(errorHTML(errorMsg, frontendUrl), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" }
-        });
-      }
-      return new Response(
-        JSON.stringify({ error: errorMsg }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return respond(false, reason);
     }
 
     console.log(`[CONFIRM-RECEIVED] Order ${orderId} marked as delivered successfully`);
-
-    // Success response
-    if (req.method === "GET") {
-      return new Response(successHTML(orderId, frontendUrl), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" }
-      });
-    }
-    
-    return new Response(
-      JSON.stringify({ success: true }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return respond(true);
 
   } catch (error: any) {
     console.error("[CONFIRM-RECEIVED] Unexpected error:", error);
+    
+    const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://calibrasil.com';
+    
     if (req.method === "GET") {
-      return new Response(errorHTML('Ocorreu um erro inesperado. Tente novamente mais tarde.', frontendUrl), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" }
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...corsHeaders,
+          'Location': `${frontendUrl}/meus-pedidos?confirmado=0&motivo=erro_inesperado`
+        }
       });
     }
+    
     return new Response(
       JSON.stringify({ error: 'Ocorreu um erro inesperado.' }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
