@@ -164,6 +164,101 @@ export type Database = {
         }
         Relationships: []
       }
+      import_job_items: {
+        Row: {
+          action: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          import_job_id: string
+          new_state: Json | null
+          previous_state: Json | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          import_job_id: string
+          new_state?: Json | null
+          previous_state?: Json | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          import_job_id?: string
+          new_state?: Json | null
+          previous_state?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_job_items_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_jobs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          created_count: number
+          error_count: number
+          file_name: string
+          file_type: string
+          id: string
+          ignored_count: number
+          rolled_back_at: string | null
+          rolled_back_by: string | null
+          status: string
+          template_type: string
+          total_rows: number
+          updated_count: number
+          warning_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          created_count?: number
+          error_count?: number
+          file_name: string
+          file_type?: string
+          id?: string
+          ignored_count?: number
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
+          status?: string
+          template_type?: string
+          total_rows?: number
+          updated_count?: number
+          warning_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          created_count?: number
+          error_count?: number
+          file_name?: string
+          file_type?: string
+          id?: string
+          ignored_count?: number
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
+          status?: string
+          template_type?: string
+          total_rows?: number
+          updated_count?: number
+          warning_count?: number
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           id: string
