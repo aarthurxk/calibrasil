@@ -37,11 +37,16 @@ serve(async (req) => {
     console.log(`[CONFIRM-RECEIVED] Processing order: ${orderId}, method: ${req.method}`);
 
     // Helper function for 302 redirect (GET) or JSON response (POST)
-    const respond = (success: boolean, reason?: string) => {
+    const respond = (status: 'ok' | 'already' | 'error', reason?: string) => {
       if (isGetRequest) {
-        const redirectUrl = success 
-          ? `${frontendUrl}/meus-pedidos?confirmado=1`
-          : `${frontendUrl}/meus-pedidos?confirmado=0&motivo=${encodeURIComponent(reason || 'erro')}`;
+        let redirectUrl: string;
+        if (status === 'ok') {
+          redirectUrl = `${frontendUrl}/confirmacao-recebimento?status=ok`;
+        } else if (status === 'already') {
+          redirectUrl = `${frontendUrl}/confirmacao-recebimento?status=already`;
+        } else {
+          redirectUrl = `${frontendUrl}/confirmacao-recebimento?status=error&reason=${encodeURIComponent(reason || 'unknown')}`;
+        }
         
         console.log(`[CONFIRM-RECEIVED] Redirecting to: ${redirectUrl}`);
         return new Response(null, {
@@ -53,29 +58,31 @@ serve(async (req) => {
         });
       } else {
         // POST request - return JSON
-        if (success) {
-          return new Response(
-            JSON.stringify({ success: true }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        } else {
-          return new Response(
-            JSON.stringify({ error: reason, success: false }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
+        const success = status === 'ok' || status === 'already';
+        return new Response(
+          JSON.stringify({ 
+            success, 
+            status,
+            ...(reason && { reason }),
+            ...(status === 'already' && { alreadyConfirmed: true })
+          }),
+          { 
+            status: success ? 200 : 400, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          }
+        );
       }
     };
 
     // Validate parameters
     if (!orderId) {
       console.error('[CONFIRM-RECEIVED] Missing orderId');
-      return respond(false, 'pedido_nao_especificado');
+      return respond('error', 'order');
     }
 
     if (!token) {
       console.error('[CONFIRM-RECEIVED] Missing token');
-      return respond(false, 'token_ausente');
+      return respond('error', 'token');
     }
 
     // Check if order exists
@@ -87,7 +94,13 @@ serve(async (req) => {
 
     if (orderError || !order) {
       console.error('[CONFIRM-RECEIVED] Order not found:', orderError);
-      return respond(false, 'pedido_nao_encontrado');
+      return respond('error', 'order');
+    }
+
+    // Idempotency: if already confirmed, return success
+    if (order.status === 'delivered' && order.received_at) {
+      console.log(`[CONFIRM-RECEIVED] Order ${orderId} already confirmed at ${order.received_at}`);
+      return respond('already');
     }
 
     // Validate and use the token via database function
@@ -99,44 +112,25 @@ serve(async (req) => {
 
     if (validationError) {
       console.error('[CONFIRM-RECEIVED] Validation error:', validationError);
-      return respond(false, 'erro_validacao');
+      return respond('error', 'token');
     }
 
     // Handle validation result
     if (!validationResult?.valid) {
-      const errorReasons: Record<string, string> = {
-        'token_not_found': 'token_nao_encontrado',
-        'token_already_used': 'ja_confirmado',
-        'token_expired': 'token_expirado',
-        'token_invalid': 'token_invalido'
-      };
+      const validationErr = validationResult?.error;
+      console.error(`[CONFIRM-RECEIVED] Token validation failed: ${validationErr}`);
       
-      const reason = errorReasons[validationResult?.error] || 'erro_desconhecido';
-      console.error(`[CONFIRM-RECEIVED] Token validation failed: ${validationResult?.error}`);
-      
-      // Special case: already used - still redirect to success page since it was confirmed before
-      if (validationResult?.error === 'token_already_used') {
-        console.log(`[CONFIRM-RECEIVED] Order ${orderId} was already confirmed`);
-        if (isGetRequest) {
-          return new Response(null, {
-            status: 302,
-            headers: {
-              ...corsHeaders,
-              'Location': `${frontendUrl}/meus-pedidos?confirmado=1&ja_confirmado=1`
-            }
-          });
-        }
-        return new Response(
-          JSON.stringify({ alreadyConfirmed: true, success: true }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      // Special case: already used - redirect to already confirmed
+      if (validationErr === 'token_already_used') {
+        console.log(`[CONFIRM-RECEIVED] Order ${orderId} was already confirmed via token`);
+        return respond('already');
       }
 
-      return respond(false, reason);
+      return respond('error', 'token');
     }
 
     console.log(`[CONFIRM-RECEIVED] Order ${orderId} marked as delivered successfully`);
-    return respond(true);
+    return respond('ok');
 
   } catch (error: any) {
     console.error("[CONFIRM-RECEIVED] Unexpected error:", error);
@@ -148,13 +142,13 @@ serve(async (req) => {
         status: 302,
         headers: {
           ...corsHeaders,
-          'Location': `${frontendUrl}/meus-pedidos?confirmado=0&motivo=erro_inesperado`
+          'Location': `${frontendUrl}/confirmacao-recebimento?status=error&reason=unexpected`
         }
       });
     }
     
     return new Response(
-      JSON.stringify({ error: 'Ocorreu um erro inesperado.' }),
+      JSON.stringify({ error: 'Ocorreu um erro inesperado.', success: false, status: 'error' }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
