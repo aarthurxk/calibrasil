@@ -148,8 +148,50 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log("[ABANDONED-CART] Starting check for abandoned carts...");
+    // Parse request body for test mode
+    let testMode = false;
+    let testEmail: string | null = null;
+    try {
+      const body = await req.json();
+      testMode = body.testMode === true;
+      testEmail = body.testEmail || null;
+    } catch {
+      // No body or invalid JSON, continue with production mode
+    }
 
+    console.log("[ABANDONED-CART] Starting check. testMode:", testMode, "testEmail:", testEmail);
+
+    // TEST MODE: Send mock data to test email immediately
+    if (testMode && testEmail) {
+      console.log("[ABANDONED-CART] TEST MODE - Sending mock email to:", testEmail);
+      
+      const mockItems: CartItem[] = [
+        { id: "mock-1", name: "Boné Cali Classic", price: 89.90, quantity: 1, image: "https://calibrasil.com/images/bone-mock.jpg" },
+        { id: "mock-2", name: "Camiseta Sunset", price: 129.90, quantity: 2 }
+      ];
+      const mockTotal = 349.70;
+
+      const emailResult = await resend.emails.send({
+        from: "Cali Brasil <pedidos@calibrasil.com>",
+        to: [testEmail],
+        subject: `🛒 [TESTE] Ei Testador, você esqueceu algo!`,
+        html: generateAbandonedCartEmail(mockItems, mockTotal),
+      });
+
+      console.log("[ABANDONED-CART] TEST email sent:", emailResult);
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          testMode: true, 
+          message: `Email de teste enviado para ${testEmail}`,
+          emailResult 
+        }),
+        { headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // PRODUCTION MODE: Normal logic
     // Find abandoned carts older than 2 hours that haven't been emailed
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     
@@ -169,7 +211,7 @@ serve(async (req) => {
 
     if (!abandonedCarts || abandonedCarts.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, message: "No abandoned carts to process" }),
+        JSON.stringify({ success: true, message: "No abandoned carts to process", processed: 0 }),
         { headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }

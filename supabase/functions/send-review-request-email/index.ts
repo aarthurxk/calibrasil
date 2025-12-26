@@ -95,6 +95,69 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Parse request body for test mode
+    let testMode = false;
+    let testEmail: string | null = null;
+    try {
+      const body = await req.json();
+      testMode = body.testMode === true;
+      testEmail = body.testEmail || null;
+    } catch {
+      // No body or invalid JSON, continue with production mode
+    }
+
+    console.log("[REVIEW-REQUEST] Starting. testMode:", testMode, "testEmail:", testEmail);
+
+    const baseUrl = Deno.env.get("FRONTEND_URL") || "https://calibrasil.com";
+
+    // TEST MODE: Send mock data to test email immediately
+    if (testMode && testEmail) {
+      console.log("[REVIEW-REQUEST] TEST MODE - Sending mock email to:", testEmail);
+
+      const mockItems: OrderItem[] = [
+        { product_id: "mock-prod-1", product_name: "Boné Cali Classic", price: 89.90, quantity: 1 },
+        { product_id: "mock-prod-2", product_name: "Camiseta Sunset", price: 129.90, quantity: 2 }
+      ];
+
+      // Generate simple test HTML since we may not have template
+      const productsHtml = generateProductsHtml(mockItems, baseUrl);
+      const testHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #16a34a;">🌟 [TESTE] Avalie seus produtos!</h1>
+          <p>Olá Testador!</p>
+          <p>Seu pedido <strong>#MOCKTEST</strong> foi entregue. Que tal avaliar?</p>
+          <div style="margin: 20px 0;">
+            ${productsHtml}
+          </div>
+          <p style="color: #666; font-size: 12px;">Este é um email de teste. Nenhum pedido real foi processado.</p>
+        </body>
+        </html>
+      `;
+
+      const emailResult = await resend.emails.send({
+        from: "Cali Brasil <pedidos@calibrasil.com>",
+        to: [testEmail],
+        subject: "🌟 [TESTE] Avalie seus produtos da Cali Brasil!",
+        html: testHtml,
+      });
+
+      console.log("[REVIEW-REQUEST] TEST email sent:", emailResult);
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          testMode: true, 
+          message: `Email de teste enviado para ${testEmail}`,
+          emailResult 
+        }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // PRODUCTION MODE: Normal logic
     // Calculate 1 day ago
     const oneDayAgo = new Date();
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
@@ -137,7 +200,6 @@ serve(async (req) => {
       throw new Error("Template not found");
     }
 
-    const baseUrl = Deno.env.get("FRONTEND_URL") || "https://calibrasil.com";
     const processedOrders: string[] = [];
 
     for (const order of orders) {

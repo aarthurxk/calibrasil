@@ -54,8 +54,8 @@ serve(async (req) => {
     }
 
     // Parse request body
-    const { action } = await req.json();
-    console.log("[ADMIN-TRIGGER] Admin", user.email, "executing action:", action);
+    const { action, testMode, testEmail } = await req.json();
+    console.log("[ADMIN-TRIGGER] Admin", user.email, "executing action:", action, "testMode:", testMode);
 
     const internalSecret = Deno.env.get("INTERNAL_API_SECRET");
     if (!internalSecret) {
@@ -90,7 +90,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
         "x-internal-secret": internalSecret,
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ testMode: testMode === true, testEmail: testEmail || null }),
     });
 
     const result = await response.json();
