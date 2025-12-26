@@ -311,24 +311,32 @@ serve(async (req) => {
     });
 
     // Send email to buyer
-    console.log("[SEND-ORDER-EMAILS] Sending buyer confirmation...");
+    console.log("[SEND-ORDER-EMAILS] Sending buyer confirmation to:", emailData.customerEmail);
     const buyerEmailResult = await resend.emails.send({
       from: "Cali Brasil <pedidos@calibrasil.com>",
       to: [emailData.customerEmail],
       subject: `Pedido confirmado! 🎉 #${emailData.orderId.substring(0, 8).toUpperCase()}`,
       html: generateBuyerEmail(emailData),
     });
-    console.log("[SEND-ORDER-EMAILS] Buyer email sent");
+    console.log("[SEND-ORDER-EMAILS] Buyer email result:", JSON.stringify(buyerEmailResult));
+    
+    if (buyerEmailResult.error) {
+      console.error("[SEND-ORDER-EMAILS] Resend error for buyer:", JSON.stringify(buyerEmailResult.error));
+    }
 
     // Send email to seller
-    console.log("[SEND-ORDER-EMAILS] Sending seller notification...");
+    console.log("[SEND-ORDER-EMAILS] Sending seller notification to: arthur@calibrasil.com");
     const sellerEmailResult = await resend.emails.send({
       from: "Cali Brasil <pedidos@calibrasil.com>",
       to: ["arthur@calibrasil.com"],
       subject: `Nova venda! 💰 ${formatPrice(emailData.total)}`,
       html: generateSellerEmail(emailData),
     });
-    console.log("[SEND-ORDER-EMAILS] Seller email sent");
+    console.log("[SEND-ORDER-EMAILS] Seller email result:", JSON.stringify(sellerEmailResult));
+    
+    if (sellerEmailResult.error) {
+      console.error("[SEND-ORDER-EMAILS] Resend error for seller:", JSON.stringify(sellerEmailResult.error));
+    }
 
     return new Response(
       JSON.stringify({ 

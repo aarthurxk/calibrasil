@@ -53,6 +53,7 @@ const TEST_PREFIX = '[TESTE-DIAG]';
 const Diagnostic = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [isCleaning, setIsCleaning] = useState(false);
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
   const [testData, setTestData] = useState<TestData>({});
   const [tests, setTests] = useState<TestResult[]>([
     { name: 'Criar produto de teste', status: 'pending' },
@@ -1073,10 +1074,10 @@ const Diagnostic = () => {
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <Button 
           onClick={runTests} 
-          disabled={isRunning || isCleaning}
+          disabled={isRunning || isCleaning || isSendingTestEmail}
           size="lg"
           className="gap-2"
         >
@@ -1096,7 +1097,7 @@ const Diagnostic = () => {
         <Button 
           variant="outline" 
           onClick={cleanTestData}
-          disabled={isRunning || isCleaning}
+          disabled={isRunning || isCleaning || isSendingTestEmail}
           className="gap-2"
         >
           {isCleaning ? (
@@ -1108,6 +1109,72 @@ const Diagnostic = () => {
             <>
               <Trash2 className="h-4 w-4" />
               Limpar Dados de Teste
+            </>
+          )}
+        </Button>
+
+        <Button 
+          variant="secondary" 
+          onClick={async () => {
+            setIsSendingTestEmail(true);
+            try {
+              // Try with custom domain first
+              const { data, error } = await supabase.functions.invoke('test-resend-email', {
+                body: { 
+                  to: testEmail,
+                  useResendDomain: false  
+                },
+                headers: {
+                  'x-internal-secret': 'test-from-diagnostic'
+                }
+              });
+              
+              if (error) {
+                // If custom domain fails, try with Resend domain
+                toast.error('Erro ao enviar email. Tentando com domínio Resend...');
+                const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('test-resend-email', {
+                  body: { 
+                    to: testEmail,
+                    useResendDomain: true  
+                  },
+                  headers: {
+                    'x-internal-secret': 'test-from-diagnostic'
+                  }
+                });
+                
+                if (fallbackError) {
+                  throw fallbackError;
+                }
+                
+                if (fallbackData?.success) {
+                  toast.success(`Email enviado via Resend! ID: ${fallbackData.emailId}. Verifique sua caixa de entrada.`);
+                } else {
+                  toast.error(`Erro Resend: ${fallbackData?.error?.message || JSON.stringify(fallbackData?.error)}`);
+                }
+              } else if (data?.success) {
+                toast.success(`Email enviado! ID: ${data.emailId}. Verifique sua caixa de entrada.`);
+              } else {
+                toast.error(`Erro: ${data?.error?.message || JSON.stringify(data?.error)}`);
+              }
+            } catch (err: any) {
+              console.error('Test email error:', err);
+              toast.error(`Erro: ${err.message}`);
+            } finally {
+              setIsSendingTestEmail(false);
+            }
+          }}
+          disabled={isRunning || isCleaning || isSendingTestEmail}
+          className="gap-2"
+        >
+          {isSendingTestEmail ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Enviando...
+            </>
+          ) : (
+            <>
+              <MailCheck className="h-4 w-4" />
+              Testar Email Manual
             </>
           )}
         </Button>
