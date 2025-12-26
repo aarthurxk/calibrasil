@@ -311,8 +311,8 @@ serve(async (req) => {
     });
 
     // Send email to buyer
-    // Using verified domain mail.calibrasil.com for transactional emails
-    const fromEmail = "Cali Brasil <pedidos@mail.calibrasil.com>";
+    // Using verified domain calibrasil.com for transactional emails
+    const fromEmail = "Cali Brasil <pedidos@calibrasil.com>";
     
     console.log("[SEND-ORDER-EMAILS] Sending buyer confirmation to:", emailData.customerEmail);
     console.log("[SEND-ORDER-EMAILS] Using from:", fromEmail);
