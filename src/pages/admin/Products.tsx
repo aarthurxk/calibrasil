@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Loader2, Upload, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +19,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import ProductForm from '@/components/admin/ProductForm';
+import ProductImportExport from '@/components/admin/ProductImportExport';
 
 type Product = Tables<'products'>;
 
@@ -31,6 +32,7 @@ const Products = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
+  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Fetch products
@@ -108,10 +110,16 @@ const Products = () => {
           <h1 className="text-3xl font-bold">Produtos</h1>
           <p className="text-muted-foreground">Gerencie seu inventário de produtos</p>
         </div>
-        <Button onClick={openCreateDialog} className="bg-gradient-ocean text-primary-foreground">
-          <Plus className="h-4 w-4 mr-2" />
-          Adicionar Produto
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setIsImportExportOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Importar/Exportar
+          </Button>
+          <Button onClick={openCreateDialog} className="bg-gradient-ocean text-primary-foreground">
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar Produto
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -221,6 +229,9 @@ const Products = () => {
           color_codes: editingProduct.color_codes as Record<string, string> | null,
         } : null}
       />
+
+      {/* Import/Export Dialog */}
+      <ProductImportExport open={isImportExportOpen} onOpenChange={setIsImportExportOpen} />
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteProduct} onOpenChange={() => setDeleteProduct(null)}>
