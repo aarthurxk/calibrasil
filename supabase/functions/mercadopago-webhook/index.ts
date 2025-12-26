@@ -43,6 +43,22 @@ serve(async (req) => {
 
     logStep('Notification received', { type: notificationType, id: dataId, body });
 
+    // IDEMPOTÊNCIA: Verificar se evento já foi processado (usando dataId como event_id)
+    if (dataId) {
+      const { data: alreadyProcessed } = await supabase.rpc('check_webhook_processed', {
+        p_event_id: String(dataId),
+        p_provider: 'mercadopago'
+      });
+
+      if (alreadyProcessed) {
+        logStep('Event already processed, skipping', { id: dataId });
+        return new Response(
+          JSON.stringify({ received: true, duplicate: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
+      }
+    }
+
     // Only process payment notifications
     if (!notificationType || !['payment', 'payment.created', 'payment.updated'].includes(notificationType)) {
       logStep('Ignoring non-payment notification', { type: notificationType });
@@ -343,6 +359,23 @@ serve(async (req) => {
     }
 
     logStep('Webhook processed successfully', { orderId, newStatus: newPaymentStatus });
+
+    // IDEMPOTÊNCIA: Marcar evento como processado
+    await supabase.rpc('mark_webhook_processed', {
+      p_event_id: String(dataId),
+      p_provider: 'mercadopago',
+      p_event_type: notificationType || 'payment',
+      p_payload: { orderId, status: newPaymentStatus }
+    });
+
+    // AUDITORIA: Registrar webhook processado
+    await supabase.rpc('log_audit', {
+      p_user_id: null,
+      p_action: 'webhook_processed',
+      p_entity_type: 'mercadopago_event',
+      p_entity_id: String(dataId),
+      p_metadata: { event_type: notificationType, order_id: orderId }
+    });
 
     return new Response(
       JSON.stringify({ received: true, orderId, status: newPaymentStatus }),

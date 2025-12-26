@@ -47,6 +47,48 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          new_state: Json | null
+          previous_state: Json | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          new_state?: Json | null
+          previous_state?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          new_state?: Json | null
+          previous_state?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -765,6 +807,33 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_events: {
+        Row: {
+          event_id: string
+          event_type: string
+          id: string
+          payload: Json | null
+          processed_at: string
+          provider: string
+        }
+        Insert: {
+          event_id: string
+          event_type: string
+          id?: string
+          payload?: Json | null
+          processed_at?: string
+          provider: string
+        }
+        Update: {
+          event_id?: string
+          event_type?: string
+          id?: string
+          payload?: Json | null
+          processed_at?: string
+          provider?: string
+        }
+        Relationships: []
+      }
       wishlist: {
         Row: {
           created_at: string
@@ -799,6 +868,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_webhook_processed: {
+        Args: { p_event_id: string; p_provider: string }
+        Returns: boolean
+      }
       generate_next_product_code: { Args: never; Returns: string }
       generate_next_variant_code: {
         Args: { p_product_code: string }
@@ -818,6 +891,29 @@ export type Database = {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
+        }
+        Returns: boolean
+      }
+      log_audit: {
+        Args: {
+          p_action: string
+          p_entity_id?: string
+          p_entity_type: string
+          p_ip_address?: string
+          p_metadata?: Json
+          p_new_state?: Json
+          p_previous_state?: Json
+          p_user_agent?: string
+          p_user_id: string
+        }
+        Returns: string
+      }
+      mark_webhook_processed: {
+        Args: {
+          p_event_id: string
+          p_event_type: string
+          p_payload?: Json
+          p_provider: string
         }
         Returns: boolean
       }

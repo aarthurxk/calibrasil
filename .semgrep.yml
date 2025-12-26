@@ -1,0 +1,97 @@
+# Configuração do Semgrep para SAST
+# Regras OWASP, React e TypeScript
+rules:
+  # Prevenir XSS
+  - id: react-dangerously-set-innerhtml
+    pattern: dangerouslySetInnerHTML={{__html: $VAR}}
+    message: "Uso de dangerouslySetInnerHTML pode causar XSS. Sanitize o conteúdo com DOMPurify."
+    severity: WARNING
+    languages: [typescript, javascript]
+    metadata:
+      owasp: A7:2017 Cross-Site Scripting (XSS)
+      category: security
+
+  # Prevenir uso de eval
+  - id: no-eval
+    patterns:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+    message: "eval() e Function() podem executar código malicioso. Evite usar."
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      owasp: A1:2017 Injection
+      category: security
+
+  # Verificar secrets hardcoded
+  - id: hardcoded-api-key
+    patterns:
+      - pattern-regex: (sk_live_|pk_live_|AKIA[A-Z0-9]{16}|AIza[0-9A-Za-z_-]{35})
+    message: "Possível API key hardcoded encontrada."
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+
+  # Prevenir prototype pollution
+  - id: prototype-pollution
+    patterns:
+      - pattern: $OBJ.__proto__ = ...
+      - pattern: Object.assign({}, $X, ...)
+    message: "Possível prototype pollution. Use Object.create(null) ou spread operator com cuidado."
+    severity: WARNING
+    languages: [typescript, javascript]
+    metadata:
+      owasp: A1:2017 Injection
+      category: security
+
+  # Verificar service_role no frontend
+  - id: service-role-in-frontend
+    pattern-regex: SUPABASE_SERVICE_ROLE_KEY|service_role
+    paths:
+      include:
+        - src/
+    message: "CRÍTICO: service_role key não deve ser usada no frontend!"
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+
+  # SQL Injection via template strings
+  - id: sql-injection-template
+    patterns:
+      - pattern: |
+          supabase.rpc($FUNC, { query: `...${$VAR}...` })
+      - pattern: |
+          supabase.from(...).select(`...${$VAR}...`)
+    message: "Possível SQL injection via template string. Use parâmetros tipados."
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      owasp: A1:2017 Injection
+      category: security
+
+  # Verificar redirect open
+  - id: open-redirect
+    patterns:
+      - pattern: window.location.href = $VAR
+      - pattern: window.location = $VAR
+      - pattern: window.open($VAR, ...)
+    message: "Verifique se o redirect não usa input do usuário (Open Redirect)."
+    severity: WARNING
+    languages: [typescript, javascript]
+    metadata:
+      owasp: A10:2017 Unvalidated Redirects
+      category: security
+
+  # Console.log com dados sensíveis
+  - id: sensitive-console-log
+    patterns:
+      - pattern: console.log(..., $PASSWORD, ...)
+      - pattern: console.log(..., $TOKEN, ...)
+      - pattern: console.log(..., $SECRET, ...)
+    message: "Evite logar dados sensíveis no console em produção."
+    severity: WARNING
+    languages: [typescript, javascript]
+    metadata:
+      category: security

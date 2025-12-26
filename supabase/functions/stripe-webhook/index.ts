@@ -62,6 +62,20 @@ serve(async (req) => {
       );
     }
 
+    // IDEMPOTÊNCIA: Verificar se evento já foi processado
+    const { data: alreadyProcessed } = await supabase.rpc('check_webhook_processed', {
+      p_event_id: event.id,
+      p_provider: 'stripe'
+    });
+
+    if (alreadyProcessed) {
+      console.log("Event already processed, skipping:", event.id);
+      return new Response(
+        JSON.stringify({ received: true, duplicate: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
     console.log("Received webhook event:", event.type);
 
     // Helper function to increment coupon usage
@@ -364,6 +378,23 @@ serve(async (req) => {
       default:
         console.log("Unhandled event type:", event.type);
     }
+
+    // IDEMPOTÊNCIA: Marcar evento como processado
+    await supabase.rpc('mark_webhook_processed', {
+      p_event_id: event.id,
+      p_provider: 'stripe',
+      p_event_type: event.type,
+      p_payload: { received: true }
+    });
+
+    // AUDITORIA: Registrar webhook processado
+    await supabase.rpc('log_audit', {
+      p_user_id: null,
+      p_action: 'webhook_processed',
+      p_entity_type: 'stripe_event',
+      p_entity_id: event.id,
+      p_metadata: { event_type: event.type }
+    });
 
     return new Response(
       JSON.stringify({ received: true }),

@@ -1,0 +1,36 @@
+# ZAP Baseline Rules
+# Configuração de alertas para OWASP ZAP
+# Formato: alert_id	action	(IGNORE, WARN, FAIL)
+
+# Informational (ignorar por padrão)
+10021	IGNORE	# X-Content-Type-Options Header Missing (já configurado)
+10038	IGNORE	# Content Security Policy (já configurado)
+10063	IGNORE	# Permissions Policy Header Not Set (já configurado)
+
+# Low risk
+10020	WARN	# X-Frame-Options Header
+10037	WARN	# Server Leaks Version
+
+# Medium risk  
+10010	WARN	# Cookie No HttpOnly Flag
+10011	WARN	# Cookie Without Secure Flag
+10017	WARN	# Cross-Domain JavaScript Source File Inclusion
+10098	WARN	# Cross-Domain Misconfiguration
+
+# High risk - sempre falhar
+10016	FAIL	# Web Browser XSS Protection Not Enabled
+10019	FAIL	# Content-Type Header Missing
+10024	FAIL	# Information Disclosure - Sensitive Information in URL
+10025	FAIL	# Information Disclosure - Sensitive Information in HTTP Referrer Header
+10027	FAIL	# Information Disclosure - Suspicious Comments
+40003	FAIL	# SQL Injection
+40012	FAIL	# Cross Site Scripting (Reflected)
+40014	FAIL	# Cross Site Scripting (Persistent)
+40018	FAIL	# SQL Injection - Oracle
+40019	FAIL	# SQL Injection - PostgreSQL
+40020	FAIL	# SQL Injection - Hypersonic SQL
+40021	FAIL	# SQL Injection - MySQL
+40022	FAIL	# SQL Injection - SQLite
+40024	FAIL	# SQL Injection - MsSQL
+90019	FAIL	# Server Side Code Injection
+90020	FAIL	# Remote OS Command Injection
