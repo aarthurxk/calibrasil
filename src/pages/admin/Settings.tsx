@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Shield, User, UserCog, Plus, Truck, Store } from 'lucide-react';
+import { Loader2, Shield, User, UserCog, Plus, Truck, Store, Bug } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,7 @@ interface StoreSettings {
   notify_low_stock: boolean;
   notify_messages: boolean;
   notify_abandoned_cart: boolean;
+  diagnostic_test_email: string;
 }
 
 const ROLE_CONFIG = {
@@ -234,6 +235,7 @@ const Settings = () => {
       notify_low_stock: settings.notify_low_stock,
       notify_messages: settings.notify_messages,
       notify_abandoned_cart: settings.notify_abandoned_cart,
+      diagnostic_test_email: settings.diagnostic_test_email,
     });
   };
 
@@ -672,6 +674,31 @@ const Settings = () => {
                 </p>
               </div>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* System / Diagnostic Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bug className="h-5 w-5" />
+            Sistema e Diagnóstico
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="diagnosticTestEmail">Email para Testes de Diagnóstico</Label>
+            <Input 
+              id="diagnosticTestEmail" 
+              type="email" 
+              value={settings?.diagnostic_test_email || 'teste-diag@cali.com.br'} 
+              onChange={(e) => updateSetting('diagnostic_test_email', e.target.value)}
+              placeholder="email@exemplo.com"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Os emails de teste do diagnóstico serão enviados para este endereço
+            </p>
           </div>
         </CardContent>
       </Card>
