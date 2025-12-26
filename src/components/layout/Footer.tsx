@@ -73,7 +73,7 @@ const Footer = () => {
         </div>
 
         <div className="mt-12 pt-8 border-t border-sidebar-border text-center text-sm text-sidebar-foreground/50">
-          <p>&copy; {new Date().getFullYear()} Cali. Todos os direitos reservados.</p>
+          <p>&copy; 2022 Cali. Todos os direitos reservados.</p>
         </div>
       </div>
     </footer>;
