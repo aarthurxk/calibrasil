@@ -146,11 +146,11 @@ async function generateEmailFromTemplate(
 // Fallback hardcoded email for when template is not found
 async function generateFallbackEmail(supabase: any, data: OrderStatusEmailRequest): Promise<{ subject: string; html: string }> {
   const statusInfo = getStatusInfo(data.newStatus);
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-  const storeUrl = 'https://calibrasil.com';
+  const storeUrl = Deno.env.get('FRONTEND_URL') || 'https://calibrasil.com';
   
   const confirmationToken = await generateConfirmationToken(supabase, data.orderId);
-  const confirmationUrl = `${supabaseUrl}/functions/v1/confirm-order-received?orderId=${data.orderId}&token=${confirmationToken}`;
+  // NOVA URL: aponta para o domínio do site, não para edge function
+  const confirmationUrl = `${storeUrl}/confirmar-recebimento?orderId=${data.orderId}&token=${confirmationToken}`;
   const reviewUrl = `${storeUrl}/orders`;
   
   const subject = `${statusInfo.emoji} Seu pedido foi ${statusInfo.label.toLowerCase()}! #${data.orderId.substring(0, 8).toUpperCase()}`;
@@ -285,8 +285,10 @@ serve(async (req) => {
     
     // For shipped status with tracking code, use tracking_code_notification template
     if (data.newStatus === 'shipped' && data.trackingCode) {
+      const storeUrl = Deno.env.get('FRONTEND_URL') || 'https://calibrasil.com';
       const confirmationToken = await generateConfirmationToken(supabaseAdmin, data.orderId);
-      const confirmationUrl = `${supabaseUrl}/functions/v1/confirm-order-received?orderId=${data.orderId}&token=${confirmationToken}`;
+      // NOVA URL: aponta para o domínio do site, não para edge function
+      const confirmationUrl = `${storeUrl}/confirmar-recebimento?orderId=${data.orderId}&token=${confirmationToken}`;
       const trackingUrl = 'https://www.linkcorreios.com.br/';
       
       const variables: Record<string, string> = {
@@ -306,9 +308,11 @@ serve(async (req) => {
     } else {
       // For other status updates, use order_status_update template
       const statusInfo = getStatusInfo(data.newStatus);
+      const storeUrl = Deno.env.get('FRONTEND_URL') || 'https://calibrasil.com';
       const confirmationToken = await generateConfirmationToken(supabaseAdmin, data.orderId);
-      const confirmationUrl = `${supabaseUrl}/functions/v1/confirm-order-received?orderId=${data.orderId}&token=${confirmationToken}`;
-      const reviewUrl = 'https://calibrasil.lovable.app/orders';
+      // NOVA URL: aponta para o domínio do site, não para edge function
+      const confirmationUrl = `${storeUrl}/confirmar-recebimento?orderId=${data.orderId}&token=${confirmationToken}`;
+      const reviewUrl = `${storeUrl}/orders`;
       const trackingUrl = 'https://www.linkcorreios.com.br/';
       
       // Generate dynamic sections based on status

@@ -8,6 +8,7 @@ import { CartProvider } from "@/contexts/CartContext";
 import { AuthProvider } from "@/hooks/useAuth";
 import { WishlistProvider } from "@/hooks/useWishlist";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // Eager load Index for fast initial render
 import Index from "./pages/Index";
@@ -30,6 +31,7 @@ const OrderDetail = lazy(() => import("./pages/OrderDetail"));
 const MyOrders = lazy(() => import("./pages/MyOrders"));
 const OrderReceived = lazy(() => import("./pages/OrderReceived"));
 const ConfirmacaoRecebimento = lazy(() => import("./pages/ConfirmacaoRecebimento"));
+const ConfirmarRecebimento = lazy(() => import("./pages/ConfirmarRecebimento"));
 const Review = lazy(() => import("./pages/Review"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -54,14 +56,15 @@ const EmailTests = lazy(() => import("./pages/admin/EmailTests"));
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <WishlistProvider>
-          <CartProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <WishlistProvider>
+            <CartProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
               <Suspense fallback={<div className="flex h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>}>
                 <Routes>
                   {/* Public Routes */}
@@ -79,6 +82,7 @@ const App = () => (
                   <Route path="/returns" element={<Returns />} />
                   <Route path="/order-received" element={<OrderReceived />} />
                   <Route path="/confirmacao-recebimento" element={<ConfirmacaoRecebimento />} />
+                  <Route path="/confirmar-recebimento" element={<ConfirmarRecebimento />} />
                   <Route path="/review/:productId" element={<Review />} />
                   <Route path="/wishlist" element={<Wishlist />} />
                   <Route
@@ -141,6 +145,7 @@ const App = () => (
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
