@@ -6,151 +6,161 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Status codes padronizados
+type ConfirmStatus = "confirmed" | "already" | "invalid" | "expired" | "error";
+
+interface ApiResponse {
+  status: ConfirmStatus;
+  message_pt: string;
+}
+
+const statusMessages: Record<ConfirmStatus, string> = {
+  confirmed: "Recebimento confirmado com sucesso!",
+  already: "Este pedido já havia sido confirmado anteriormente.",
+  invalid: "Link inválido. O token não corresponde ao pedido.",
+  expired: "Este link expirou. Solicite um novo link.",
+  error: "Ocorreu um erro ao processar sua solicitação.",
+};
+
 serve(async (req) => {
+  // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://calibrasil.com';
-  
+  // Apenas POST permitido
+  if (req.method !== "POST") {
+    return new Response(
+      JSON.stringify({ status: "error", message_pt: "Método não permitido. Use POST." }),
+      { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
   try {
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    // Parse body
     let orderId: string | null = null;
     let token: string | null = null;
-    const isGetRequest = req.method === "GET";
 
-    // Handle both GET (from email link) and POST (from frontend)
-    if (isGetRequest) {
-      const url = new URL(req.url);
-      orderId = url.searchParams.get('orderId');
-      token = url.searchParams.get('token');
-    } else if (req.method === "POST") {
+    try {
       const body = await req.json();
       orderId = body.orderId;
       token = body.token;
+    } catch {
+      console.error("[CONFIRM] Failed to parse JSON body");
+      return jsonResponse({ status: "error", message_pt: "Requisição inválida." }, 400);
     }
 
-    console.log(`[CONFIRM-RECEIVED] Processing order: ${orderId}, method: ${req.method}`);
+    console.log(`[CONFIRM] Processing order: ${orderId}`);
 
-    // Helper function for 302 redirect (GET) or JSON response (POST)
-    const respond = (status: 'ok' | 'already' | 'error', reason?: string) => {
-      if (isGetRequest) {
-        let redirectUrl: string;
-        if (status === 'ok') {
-          redirectUrl = `${frontendUrl}/confirmacao-recebimento?status=ok`;
-        } else if (status === 'already') {
-          redirectUrl = `${frontendUrl}/confirmacao-recebimento?status=already`;
-        } else {
-          redirectUrl = `${frontendUrl}/confirmacao-recebimento?status=error&reason=${encodeURIComponent(reason || 'unknown')}`;
-        }
-        
-        console.log(`[CONFIRM-RECEIVED] Redirecting to: ${redirectUrl}`);
-        return new Response(null, {
-          status: 302,
-          headers: {
-            ...corsHeaders,
-            'Location': redirectUrl
-          }
-        });
-      } else {
-        // POST request - return JSON
-        const success = status === 'ok' || status === 'already';
-        return new Response(
-          JSON.stringify({ 
-            success, 
-            status,
-            ...(reason && { reason }),
-            ...(status === 'already' && { alreadyConfirmed: true })
-          }),
-          { 
-            status: success ? 200 : 400, 
-            headers: { ...corsHeaders, "Content-Type": "application/json" } 
-          }
-        );
-      }
-    };
-
-    // Validate parameters
-    if (!orderId) {
-      console.error('[CONFIRM-RECEIVED] Missing orderId');
-      return respond('error', 'order');
+    // Validar parâmetros
+    if (!orderId || typeof orderId !== "string") {
+      console.error("[CONFIRM] Missing orderId");
+      return jsonResponse({ status: "error", message_pt: "ID do pedido não fornecido." }, 400);
     }
 
-    if (!token) {
-      console.error('[CONFIRM-RECEIVED] Missing token');
-      return respond('error', 'token');
+    if (!token || typeof token !== "string") {
+      console.error("[CONFIRM] Missing token");
+      return jsonResponse({ status: "invalid", message_pt: statusMessages.invalid }, 400);
     }
 
-    // Check if order exists
+    // Verificar se pedido existe
     const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .select('id, status, received_at')
-      .eq('id', orderId)
+      .from("orders")
+      .select("id, status, received_at")
+      .eq("id", orderId)
       .maybeSingle();
 
-    if (orderError || !order) {
-      console.error('[CONFIRM-RECEIVED] Order not found:', orderError);
-      return respond('error', 'order');
+    if (orderError) {
+      console.error("[CONFIRM] DB error:", orderError);
+      return jsonResponse({ status: "error", message_pt: statusMessages.error }, 500);
     }
 
-    // Idempotency PRIMEIRO: se já está entregue, retornar sucesso SEM validar token
-    // Isso garante que e-mails antigos funcionem para pedidos já confirmados
-    if (order.status === 'delivered') {
-      console.log(`[CONFIRM-RECEIVED] Order ${orderId} already delivered (received_at: ${order.received_at})`);
-      return respond('already');
+    if (!order) {
+      console.error("[CONFIRM] Order not found:", orderId);
+      return jsonResponse({ status: "error", message_pt: "Pedido não encontrado." }, 404);
     }
 
-    // Só validar token se o pedido ainda precisa ser confirmado
-    const { data: validationResult, error: validationError } = await supabase
-      .rpc('validate_order_confirm_token', {
-        p_order_id: orderId,
-        p_token: token
-      });
+    // IDEMPOTÊNCIA: Se já está confirmado (delivered ou received), retornar sucesso
+    if (order.status === "delivered" || order.status === "received" || order.received_at) {
+      console.log(`[CONFIRM] Order ${orderId} already confirmed (status: ${order.status}, received_at: ${order.received_at})`);
+      
+      // Log da tentativa
+      await logAudit(supabase, orderId, "already", req);
+      
+      return jsonResponse({ status: "already", message_pt: statusMessages.already }, 200);
+    }
+
+    // Validar token via RPC (valida hash, expiração e uso único)
+    const { data: validationResult, error: validationError } = await supabase.rpc(
+      "validate_order_confirm_token",
+      { p_order_id: orderId, p_token: token }
+    );
 
     if (validationError) {
-      console.error('[CONFIRM-RECEIVED] Validation error:', validationError);
-      return respond('error', 'token');
+      console.error("[CONFIRM] Validation RPC error:", validationError);
+      await logAudit(supabase, orderId, "error", req, { error: validationError.message });
+      return jsonResponse({ status: "error", message_pt: statusMessages.error }, 500);
     }
 
-    // Handle validation result
+    console.log("[CONFIRM] Validation result:", validationResult);
+
+    // Processar resultado da validação
     if (!validationResult?.valid) {
-      const validationErr = validationResult?.error;
-      console.error(`[CONFIRM-RECEIVED] Token validation failed: ${validationErr}`);
-      
-      // Special case: already used - redirect to already confirmed
-      if (validationErr === 'token_already_used') {
-        console.log(`[CONFIRM-RECEIVED] Order ${orderId} was already confirmed via token`);
-        return respond('already');
-      }
+      const errorType = validationResult?.error;
+      console.error(`[CONFIRM] Token validation failed: ${errorType}`);
 
-      return respond('error', 'token');
+      // Mapear erros específicos
+      let status: ConfirmStatus = "invalid";
+      if (errorType === "token_expired") status = "expired";
+      if (errorType === "token_already_used") status = "already";
+
+      await logAudit(supabase, orderId, status, req, { error: errorType });
+
+      return jsonResponse({ status, message_pt: statusMessages[status] }, 200);
     }
 
-    console.log(`[CONFIRM-RECEIVED] Order ${orderId} marked as delivered successfully`);
-    return respond('ok');
+    // Sucesso! O RPC já atualizou o pedido e marcou o token como usado
+    console.log(`[CONFIRM] Order ${orderId} confirmed successfully`);
+    await logAudit(supabase, orderId, "confirmed", req);
 
-  } catch (error: any) {
-    console.error("[CONFIRM-RECEIVED] Unexpected error:", error);
-    
-    const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://calibrasil.com';
-    
-    if (req.method === "GET") {
-      return new Response(null, {
-        status: 302,
-        headers: {
-          ...corsHeaders,
-          'Location': `${frontendUrl}/confirmacao-recebimento?status=error&reason=unexpected`
-        }
-      });
-    }
-    
-    return new Response(
-      JSON.stringify({ error: 'Ocorreu um erro inesperado.', success: false, status: 'error' }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ status: "confirmed", message_pt: statusMessages.confirmed }, 200);
+
+  } catch (error) {
+    console.error("[CONFIRM] Unexpected error:", error);
+    return jsonResponse({ status: "error", message_pt: statusMessages.error }, 500);
   }
 });
+
+// Helper: JSON response with CORS
+function jsonResponse(data: ApiResponse, statusCode: number = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status: statusCode,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// Helper: Log para auditoria
+async function logAudit(
+  supabase: any,
+  orderId: string,
+  status: string,
+  req: Request,
+  metadata?: Record<string, any>
+) {
+  try {
+    await supabase.from("audit_logs").insert({
+      action: "confirm_order_received",
+      entity_type: "order",
+      entity_id: orderId,
+      metadata: { status, ...metadata },
+      user_agent: req.headers.get("user-agent"),
+    });
+  } catch (e) {
+    console.error("[CONFIRM] Failed to log audit:", e);
+  }
+}
