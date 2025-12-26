@@ -135,14 +135,25 @@ serve(async (req) => {
     return jsonResponse({ status: "error", message_pt: statusMessages.error }, 500);
   }
 });
-
-// Helper: JSON response with CORS
+// ✅ Helper: JSON response with proper headers and CORS
 function jsonResponse(data: ApiResponse, statusCode: number = 200): Response {
   return new Response(JSON.stringify(data), {
     status: statusCode,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
   });
 }
+// Helper: JSON response with CORS
+//function jsonResponse(data: ApiResponse, statusCode: number = 200): Response {
+//  return new Response(JSON.stringify(data), {
+//    status: statusCode,
+//    headers: { ...corsHeaders, "Content-Type": "application/json" },
+//  });
+/}
 
 // Helper: Log para auditoria
 async function logAudit(
