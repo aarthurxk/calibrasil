@@ -28,6 +28,8 @@ const templateIcons: Record<string, string> = {
   order_confirmation: "🎉",
   seller_notification: "💰",
   order_status_update: "📦",
+  order_delivered: "✅",
+  tracking_code_notification: "🚚",
   abandoned_cart: "🛒",
   low_stock_alert: "⚠️",
   review_request: "⭐",

@@ -287,7 +287,6 @@ serve(async (req) => {
     if (data.newStatus === 'shipped' && data.trackingCode) {
       const storeUrl = Deno.env.get('FRONTEND_URL') || 'https://calibrasil.com';
       const confirmationToken = await generateConfirmationToken(supabaseAdmin, data.orderId);
-      // NOVA URL: aponta para o domínio do site, não para edge function
       const confirmationUrl = `${storeUrl}/confirmar-recebimento?orderId=${data.orderId}&token=${confirmationToken}`;
       const trackingUrl = 'https://www.linkcorreios.com.br/';
       
@@ -305,12 +304,29 @@ serve(async (req) => {
         'tracking_code_notification',
         variables
       );
+    } else if (data.newStatus === 'delivered') {
+      // For delivered status, use the new order_delivered template with confirm + review buttons
+      const storeUrl = Deno.env.get('FRONTEND_URL') || 'https://calibrasil.com';
+      const confirmationToken = await generateConfirmationToken(supabaseAdmin, data.orderId);
+      
+      const variables: Record<string, string> = {
+        customer_name: data.customerName,
+        order_id: data.orderId.substring(0, 8).toUpperCase(),
+        orderId: data.orderId,
+        token: confirmationToken
+      };
+      
+      emailContent = await generateEmailFromTemplate(
+        supabaseAdmin,
+        data,
+        'order_delivered',
+        variables
+      );
     } else {
       // For other status updates, use order_status_update template
       const statusInfo = getStatusInfo(data.newStatus);
       const storeUrl = Deno.env.get('FRONTEND_URL') || 'https://calibrasil.com';
       const confirmationToken = await generateConfirmationToken(supabaseAdmin, data.orderId);
-      // NOVA URL: aponta para o domínio do site, não para edge function
       const confirmationUrl = `${storeUrl}/confirmar-recebimento?orderId=${data.orderId}&token=${confirmationToken}`;
       const reviewUrl = `${storeUrl}/orders`;
       const trackingUrl = 'https://www.linkcorreios.com.br/';
@@ -336,17 +352,7 @@ serve(async (req) => {
         confirmationSection = `
           <div style="text-align: center; margin: 20px 0;">
             <p style="color: #666;">Já recebeu? Confirme para nós:</p>
-            <a href="${confirmationUrl}" style="display: inline-block; background: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">✅ Recebi meu Pedido</a>
-          </div>
-        `;
-      }
-      
-      // Review section - show for delivered status
-      if (data.newStatus === 'delivered') {
-        reviewSection = `
-          <div style="text-align: center; margin: 20px 0;">
-            <p style="color: #666;">Conta pra gente o que achou!</p>
-            <a href="${reviewUrl}" style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">⭐ Avaliar minha Compra</a>
+            <a href="${confirmationUrl}" style="display: inline-block; background: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">✅ Recebi meu Pedido</a>
           </div>
         `;
       }
@@ -380,8 +386,9 @@ serve(async (req) => {
       );
     }
 
+    // Using verified domain mail.calibrasil.com for transactional emails
     const emailResult = await resend.emails.send({
-      from: "Cali Brasil <pedidos@calibrasil.com>",
+      from: "Cali Brasil <pedidos@mail.calibrasil.com>",
       to: [data.customerEmail],
       subject: emailContent.subject,
       html: emailContent.html,
