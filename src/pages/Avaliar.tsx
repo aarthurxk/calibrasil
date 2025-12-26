@@ -1,11 +1,12 @@
 import { useSearchParams, Link } from "react-router-dom";
-import { Star, ArrowRight, Package, Loader2, AlertCircle } from "lucide-react";
+import { Star, ArrowRight, Package, Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import MainLayout from "@/components/layout/MainLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuth } from "@/hooks/useAuth";
 
 interface OrderItem {
   id: string;
@@ -24,6 +25,7 @@ interface Product {
 
 const Avaliar = () => {
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   const rawOrderId = searchParams.get("orderId");
   const rawToken = searchParams.get("token");
   const orderId = rawOrderId ? decodeURIComponent(rawOrderId) : null;
@@ -60,9 +62,30 @@ const Avaliar = () => {
     enabled: productIds.length > 0,
   });
 
+  // Fetch existing reviews by current user
+  const { data: existingReviews } = useQuery({
+    queryKey: ["existing-reviews", productIds, user?.id],
+    queryFn: async () => {
+      if (productIds.length === 0 || !user?.id) return [];
+      const { data, error } = await supabase
+        .from("product_reviews")
+        .select("product_id")
+        .eq("user_id", user.id)
+        .in("product_id", productIds);
+      if (error) throw error;
+      return data?.map((r) => r.product_id) || [];
+    },
+    enabled: productIds.length > 0 && !!user?.id,
+  });
+
   const getProductImage = (productId: string | null) => {
     if (!productId || !products) return null;
     return products.find((p) => p.id === productId)?.image || null;
+  };
+
+  const isProductReviewed = (productId: string | null) => {
+    if (!productId || !existingReviews) return false;
+    return existingReviews.includes(productId);
   };
 
   // Invalid link state
@@ -176,12 +199,19 @@ const Avaliar = () => {
                       </p>
                     </div>
                     {item.product_id && (
-                      <Button asChild size="sm" className="flex-shrink-0">
-                        <Link to={`/review/${item.product_id}`}>
-                          Avaliar
-                          <ArrowRight className="h-4 w-4 ml-1" />
-                        </Link>
-                      </Button>
+                      isProductReviewed(item.product_id) ? (
+                        <div className="flex items-center gap-1.5 text-green-600">
+                          <CheckCircle className="h-5 w-5" />
+                          <span className="text-sm font-medium">Avaliado</span>
+                        </div>
+                      ) : (
+                        <Button asChild size="sm" className="flex-shrink-0">
+                          <Link to={`/review/${item.product_id}`}>
+                            Avaliar
+                            <ArrowRight className="h-4 w-4 ml-1" />
+                          </Link>
+                        </Button>
+                      )
                     )}
                   </div>
                 </CardContent>
