@@ -840,16 +840,23 @@ const Diagnostic = () => {
       // Test 16: Endpoint solicitação de avaliação
       updateTest(15, { status: 'running' });
       startTime = Date.now();
+      console.log('[DIAG] Starting test 16: send-review-request-email');
 
       try {
-        const { data: reviewData, error: reviewError } = await supabase.functions.invoke('send-review-request-email', {
+        console.log('[DIAG] Invoking send-review-request-email...');
+        const result = await supabase.functions.invoke('send-review-request-email', {
           body: {}
         });
+        console.log('[DIAG] send-review-request-email result:', result);
+        
+        const { data: reviewData, error: reviewError } = result;
 
         // Check if the response has an error (either in error object or data.error)
         const hasReviewError = reviewError || reviewData?.error;
         const isReviewAuth = isAuthRelatedError(reviewError) || 
                              (reviewData?.error && String(reviewData.error).toLowerCase().includes('unauthorized'));
+
+        console.log('[DIAG] hasReviewError:', hasReviewError, 'isReviewAuth:', isReviewAuth);
 
         if (isReviewAuth || hasReviewError) {
           updateTest(15, { 
@@ -870,6 +877,7 @@ const Diagnostic = () => {
         }
       } catch (reviewErr: any) {
         // Any error here (including 401 thrown as exception) is still a success for connectivity test
+        console.log('[DIAG] send-review-request-email caught error:', reviewErr);
         updateTest(15, { 
           status: 'ok', 
           endpoint: 'send-review-request-email',
