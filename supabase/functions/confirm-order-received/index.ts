@@ -97,13 +97,14 @@ serve(async (req) => {
       return respond('error', 'order');
     }
 
-    // Idempotency: if already confirmed, return success
-    if (order.status === 'delivered' && order.received_at) {
-      console.log(`[CONFIRM-RECEIVED] Order ${orderId} already confirmed at ${order.received_at}`);
+    // Idempotency PRIMEIRO: se já está entregue, retornar sucesso SEM validar token
+    // Isso garante que e-mails antigos funcionem para pedidos já confirmados
+    if (order.status === 'delivered') {
+      console.log(`[CONFIRM-RECEIVED] Order ${orderId} already delivered (received_at: ${order.received_at})`);
       return respond('already');
     }
 
-    // Validate and use the token via database function
+    // Só validar token se o pedido ainda precisa ser confirmado
     const { data: validationResult, error: validationError } = await supabase
       .rpc('validate_order_confirm_token', {
         p_order_id: orderId,
