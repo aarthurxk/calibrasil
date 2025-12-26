@@ -1004,6 +1004,39 @@ const Diagnostic = () => {
   const failedTests = tests.filter(t => t.status === 'error').length;
   const totalDuration = tests.reduce((sum, t) => sum + (t.duration || 0), 0);
 
+  // Define test categories with their ranges
+  const testCategories = [
+    { 
+      name: 'CRUD & Fluxo', 
+      icon: Database,
+      description: 'Operações de criação, leitura e atualização',
+      startIndex: 0, 
+      endIndex: 5 
+    },
+    { 
+      name: 'Integrações', 
+      icon: Webhook,
+      description: 'Frete, pagamento e serviços externos',
+      startIndex: 6, 
+      endIndex: 11 
+    },
+    { 
+      name: 'Emails', 
+      icon: Mail,
+      description: 'Envio de emails e notificações',
+      startIndex: 12, 
+      endIndex: 15 
+    },
+  ];
+
+  const getCategoryStats = (startIndex: number, endIndex: number) => {
+    const categoryTests = tests.slice(startIndex, endIndex + 1);
+    const completed = categoryTests.filter(t => t.status === 'ok').length;
+    const failed = categoryTests.filter(t => t.status === 'error').length;
+    const total = categoryTests.length;
+    return { completed, failed, total };
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -1130,75 +1163,113 @@ const Diagnostic = () => {
         </div>
       )}
 
-      {/* Tests List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Lista de Testes</CardTitle>
-          <CardDescription>
-            Testes executados sequencialmente nos endpoints existentes
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {tests.map((test, index) => (
-              <div 
-                key={index}
-                className={cn(
-                  "p-4 rounded-lg border transition-all duration-300 animate-fade-in",
-                  test.status === 'running' && "border-primary bg-primary/5",
-                  test.status === 'ok' && "border-green-200 bg-green-50/50",
-                  test.status === 'error' && "border-red-200 bg-red-50/50",
-                  test.status === 'pending' && "border-border"
-                )}
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="mt-0.5">
-                    {getStatusIcon(test.status)}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      {getTestIcon(index)}
-                      <span className="font-medium">{test.name}</span>
-                      {test.duration && (
-                        <Badge variant="outline" className="text-xs">
-                          {test.duration}ms
-                        </Badge>
-                      )}
+      {/* Tests List - Grouped by Category */}
+      <div className="space-y-6">
+        {testCategories.map((category, categoryIndex) => {
+          const CategoryIcon = category.icon;
+          const stats = getCategoryStats(category.startIndex, category.endIndex);
+          const categoryTests = tests.slice(category.startIndex, category.endIndex + 1);
+          
+          return (
+            <Card key={categoryIndex}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <CategoryIcon className="h-5 w-5 text-primary" />
                     </div>
-                    
-                    {test.message && (
-                      <p className={cn(
-                        "text-sm mt-1",
-                        test.status === 'error' ? "text-red-600" : "text-muted-foreground"
-                      )}>
-                        {test.message}
-                      </p>
+                    <div>
+                      <CardTitle className="text-lg">{category.name}</CardTitle>
+                      <CardDescription className="text-xs">
+                        {category.description}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {stats.completed > 0 && (
+                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        {stats.completed}
+                      </Badge>
                     )}
-
-                    {test.endpoint && (
-                      <div className="flex flex-wrap items-center gap-2 mt-2">
-                        <code className="text-xs bg-muted px-2 py-0.5 rounded">
-                          {test.endpoint}
-                        </code>
-                        {test.statusCode && (
-                          <Badge 
-                            variant={test.statusCode >= 200 && test.statusCode < 300 ? "default" : "destructive"}
-                            className="text-xs"
-                          >
-                            {test.statusCode}
-                          </Badge>
-                        )}
-                      </div>
+                    {stats.failed > 0 && (
+                      <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                        <XCircle className="h-3 w-3 mr-1" />
+                        {stats.failed}
+                      </Badge>
                     )}
+                    <Badge variant="secondary" className="text-xs">
+                      {stats.total} testes
+                    </Badge>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="space-y-3">
+                  {categoryTests.map((test, localIndex) => {
+                    const globalIndex = category.startIndex + localIndex;
+                    return (
+                      <div 
+                        key={globalIndex}
+                        className={cn(
+                          "p-3 rounded-lg border transition-all duration-300",
+                          test.status === 'running' && "border-primary bg-primary/5",
+                          test.status === 'ok' && "border-green-200 bg-green-50/50",
+                          test.status === 'error' && "border-red-200 bg-red-50/50",
+                          test.status === 'pending' && "border-border bg-muted/20"
+                        )}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5">
+                            {getStatusIcon(test.status)}
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {getTestIcon(globalIndex)}
+                              <span className="font-medium text-sm">{test.name}</span>
+                              {test.duration && (
+                                <Badge variant="outline" className="text-xs">
+                                  {test.duration}ms
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            {test.message && (
+                              <p className={cn(
+                                "text-sm mt-1",
+                                test.status === 'error' ? "text-red-600" : "text-muted-foreground"
+                              )}>
+                                {test.message}
+                              </p>
+                            )}
+
+                            {test.endpoint && (
+                              <div className="flex flex-wrap items-center gap-2 mt-2">
+                                <code className="text-xs bg-muted px-2 py-0.5 rounded">
+                                  {test.endpoint}
+                                </code>
+                                {test.statusCode && (
+                                  <Badge 
+                                    variant={test.statusCode >= 200 && test.statusCode < 300 ? "default" : "destructive"}
+                                    className="text-xs"
+                                  >
+                                    {test.statusCode}
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
       {/* Test Data Info */}
       {Object.keys(testData).length > 0 && (
