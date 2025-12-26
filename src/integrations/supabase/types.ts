@@ -301,6 +301,41 @@ export type Database = {
         }
         Relationships: []
       }
+      order_confirm_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          order_id: string
+          token_hash: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          order_id: string
+          token_hash: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          order_id?: string
+          token_hash?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_confirm_tokens_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           id: string
@@ -872,6 +907,10 @@ export type Database = {
         Args: { p_event_id: string; p_provider: string }
         Returns: boolean
       }
+      create_order_confirm_token: {
+        Args: { p_order_id: string }
+        Returns: string
+      }
       generate_next_product_code: { Args: never; Returns: string }
       generate_next_variant_code: {
         Args: { p_product_code: string }
@@ -916,6 +955,10 @@ export type Database = {
           p_provider: string
         }
         Returns: boolean
+      }
+      validate_order_confirm_token: {
+        Args: { p_order_id: string; p_token: string }
+        Returns: Json
       }
       validate_product_code: { Args: { code: string }; Returns: boolean }
       validate_seller_code: {
