@@ -147,13 +147,7 @@ function jsonResponse(data: ApiResponse, statusCode: number = 200): Response {
     },
   });
 }
-// Helper: JSON response with CORS
-//function jsonResponse(data: ApiResponse, statusCode: number = 200): Response {
-//  return new Response(JSON.stringify(data), {
-//    status: statusCode,
-//    headers: { ...corsHeaders, "Content-Type": "application/json" },
-//  });
-/}
+// Helper: JSON response with CORS (backup version, now using the enhanced version above)
 
 // Helper: Log para auditoria
 async function logAudit(
