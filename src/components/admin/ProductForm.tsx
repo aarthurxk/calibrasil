@@ -17,6 +17,7 @@ const MAX_IMAGES = 6;
 
 interface ProductFormData {
   id?: string;
+  codigo_produto: string;
   name: string;
   description: string;
   price: number;
@@ -43,6 +44,7 @@ interface ProductFormProps {
   onOpenChange: (open: boolean) => void;
   initialData?: {
     id?: string;
+    codigo_produto?: string | null;
     name?: string;
     description?: string;
     price?: number;
@@ -122,6 +124,7 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
   };
 
   const getInitialFormData = (): ProductFormData => ({
+    codigo_produto: initialData?.codigo_produto || '',
     name: initialData?.name || '',
     description: initialData?.description || '',
     price: initialData?.price || 0,
@@ -380,6 +383,29 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
     ));
   };
 
+  // Validar formato do código do produto
+  const validateCodigoProduto = (code: string): { valid: boolean; error?: string } => {
+    if (!code || code.trim() === '') {
+      return { valid: true }; // Vazio é válido (será gerado automaticamente)
+    }
+    const trimmed = code.trim().toUpperCase();
+    // Aceita C-XXX ou apenas XXX (1-5 dígitos)
+    if (!/^(C-)?[0-9]{1,5}$/.test(trimmed)) {
+      return { valid: false, error: 'Código inválido. Use o formato C-001 ou 001.' };
+    }
+    return { valid: true };
+  };
+
+  // Normalizar código do produto (adiciona prefixo C- se necessário)
+  const normalizeCodigoProduto = (code: string): string => {
+    if (!code || code.trim() === '') return '';
+    const trimmed = code.trim().toUpperCase();
+    if (/^[0-9]{1,5}$/.test(trimmed)) {
+      return 'C-' + trimmed.padStart(3, '0');
+    }
+    return trimmed;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -388,10 +414,52 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
       return;
     }
 
+    // Validar código do produto
+    const codeValidation = validateCodigoProduto(formData.codigo_produto);
+    if (!codeValidation.valid) {
+      toast.error(codeValidation.error);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+      // Gerar ou normalizar código do produto
+      let codigoProduto = normalizeCodigoProduto(formData.codigo_produto);
+      
+      if (!codigoProduto && !initialData?.id) {
+        // Gerar próximo código automaticamente
+        const { data: nextCode, error: codeError } = await supabase
+          .rpc('generate_next_product_code');
+        
+        if (codeError) {
+          console.error('Erro ao gerar código:', codeError);
+          toast.error('Erro ao gerar código do produto');
+          setIsSubmitting(false);
+          return;
+        }
+        codigoProduto = nextCode;
+      }
+
+      // Verificar unicidade do código (exceto para o próprio produto)
+      if (codigoProduto) {
+        const { data: existing, error: checkError } = await supabase
+          .from('products')
+          .select('id, codigo_produto')
+          .eq('codigo_produto', codigoProduto)
+          .maybeSingle();
+
+        if (checkError) throw checkError;
+
+        if (existing && existing.id !== initialData?.id) {
+          toast.error(`Código do produto já existe: ${codigoProduto}`);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const productData = {
+        codigo_produto: codigoProduto || null,
         name: formData.name,
         description: formData.description,
         price: formData.price,
@@ -523,9 +591,9 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
             </div>
           </div>
 
-          {/* Name and Category */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
+          {/* Name, Category and Code */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2 md:col-span-2">
               <Label htmlFor="name">Nome do Produto *</Label>
               <Input
                 id="name"
@@ -536,21 +604,35 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="category">Categoria *</Label>
-              <Select
-                value={formData.category}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="codigo_produto">Código</Label>
+              <Input
+                id="codigo_produto"
+                value={formData.codigo_produto}
+                onChange={(e) => setFormData(prev => ({ ...prev, codigo_produto: e.target.value.toUpperCase() }))}
+                placeholder="C-001 (auto)"
+                maxLength={10}
+              />
+              <p className="text-xs text-muted-foreground">
+                Deixe vazio para gerar automaticamente
+              </p>
             </div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="category">Categoria *</Label>
+            <Select
+              value={formData.category}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORIES.map(cat => (
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Description */}

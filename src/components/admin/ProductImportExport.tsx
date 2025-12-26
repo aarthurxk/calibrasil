@@ -23,14 +23,15 @@ type TemplateType = 'simples' | 'variacoes' | 'completo';
 
 // Colunas por tipo de template
 const TEMPLATE_COLUMNS: Record<TemplateType, string[]> = {
-  simples: ['nome_produto', 'categoria', 'status', 'preco', 'destaque'],
-  variacoes: ['nome_produto', 'categoria', 'status', 'preco', 'destaque', 'modelo_variacao', 'cor_variacao', 'sku_variacao', 'preco_variacao', 'estoque_variacao'],
-  completo: ['id_produto', 'nome_produto', 'categoria', 'status', 'preco', 'destaque', 'url_imagem', 'modelo_variacao', 'cor_variacao', 'sku_variacao', 'preco_variacao', 'estoque_variacao'],
+  simples: ['codigo_produto', 'nome_produto', 'categoria', 'status', 'preco', 'destaque'],
+  variacoes: ['codigo_produto', 'nome_produto', 'categoria', 'status', 'preco', 'destaque', 'modelo_variacao', 'cor_variacao', 'sku_variacao', 'preco_variacao', 'estoque_variacao'],
+  completo: ['id_produto', 'codigo_produto', 'nome_produto', 'categoria', 'status', 'preco', 'destaque', 'url_imagem', 'modelo_variacao', 'cor_variacao', 'sku_variacao', 'preco_variacao', 'estoque_variacao'],
 };
 
 // Mapeamento PT-BR para colunas internas
 const COLUMN_MAP: Record<string, string> = {
   'id_produto': 'product_id',
+  'codigo_produto': 'product_code',
   'nome_produto': 'product_name',
   'categoria': 'category',
   'status': 'status',
@@ -44,6 +45,7 @@ const COLUMN_MAP: Record<string, string> = {
   'estoque_variacao': 'variant_stock',
   // Also support english columns
   'product_id': 'product_id',
+  'product_code': 'product_code',
   'product_name': 'product_name',
   'category': 'category',
   'price': 'price',
@@ -59,6 +61,7 @@ const COLUMN_MAP: Record<string, string> = {
 // Linhas de exemplo para templates
 const EXAMPLE_ROWS: Record<TemplateType, Record<string, string>> = {
   simples: {
+    codigo_produto: '',
     nome_produto: 'Camiseta Básica',
     categoria: 'camisetas',
     status: 'em_estoque',
@@ -66,6 +69,7 @@ const EXAMPLE_ROWS: Record<TemplateType, Record<string, string>> = {
     destaque: 'false',
   },
   variacoes: {
+    codigo_produto: 'C-001',
     nome_produto: 'Camiseta Colorida',
     categoria: 'camisetas',
     status: 'em_estoque',
@@ -79,6 +83,7 @@ const EXAMPLE_ROWS: Record<TemplateType, Record<string, string>> = {
   },
   completo: {
     id_produto: '',
+    codigo_produto: '',
     nome_produto: 'Camiseta Premium',
     categoria: 'camisetas',
     status: 'em_estoque',
@@ -96,6 +101,7 @@ const EXAMPLE_ROWS: Record<TemplateType, Record<string, string>> = {
 interface ParsedRow {
   original: Record<string, string>;
   productId?: string;
+  productCode?: string;
   productName: string;
   category: string;
   status: string;
@@ -159,6 +165,29 @@ const generateSku = (productName: string, model?: string, color?: string): strin
     .replace(/^-|-$/g, '')
     .substring(0, 30);
   return base.toUpperCase();
+};
+
+// Validar formato do código de produto
+const validateProductCode = (code: string): { valid: boolean; error?: string } => {
+  if (!code || code.trim() === '') {
+    return { valid: true }; // Vazio é válido (será gerado automaticamente)
+  }
+  const trimmed = code.trim().toUpperCase();
+  // Aceita C-XXX ou apenas XXX (1-5 dígitos)
+  if (!/^(C-)?[0-9]{1,5}$/.test(trimmed)) {
+    return { valid: false, error: 'Código inválido. Use o formato C-001 ou 001.' };
+  }
+  return { valid: true };
+};
+
+// Normalizar código do produto (adiciona prefixo C- se necessário)
+const normalizeProductCode = (code: string): string => {
+  if (!code || code.trim() === '') return '';
+  const trimmed = code.trim().toUpperCase();
+  if (/^[0-9]{1,5}$/.test(trimmed)) {
+    return 'C-' + trimmed.padStart(3, '0');
+  }
+  return trimmed;
 };
 
 // Normalizar colunas do CSV para formato interno
@@ -255,6 +284,14 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
       if (!productName) errors.push('Coluna obrigatória ausente: nome_produto');
       if (!category) errors.push('Coluna obrigatória ausente: categoria');
 
+      // Código do produto (opcional)
+      const rawProductCode = (row.product_code || '').trim();
+      const codeValidation = validateProductCode(rawProductCode);
+      if (!codeValidation.valid) {
+        errors.push(`Linha ${index + 2}: ${codeValidation.error}`);
+      }
+      const productCode = normalizeProductCode(rawProductCode);
+
       // Status com fallback
       let status = (row.status || '').trim().toLowerCase();
       if (!status) {
@@ -327,9 +364,15 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
         warnings.push('Preço ausente: definido como R$ 0,00');
       }
 
+      // Aviso de código vazio
+      if (!rawProductCode) {
+        warnings.push('Código do produto vazio: será gerado automaticamente');
+      }
+
       return {
         original: row,
         productId: (row.product_id || '').trim() || undefined,
+        productCode: productCode || undefined,
         productName,
         category,
         status: inStock ? 'em_estoque' : 'esgotado',
@@ -436,11 +479,34 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
       // Obter usuário atual
       const { data: { user } } = await supabase.auth.getUser();
 
+      // Verificar unicidade de códigos antes de importar
+      const codesToCheck = rowsToImport
+        .filter(r => r.productCode)
+        .map(r => r.productCode!);
+      
+      if (codesToCheck.length > 0) {
+        const { data: existingCodes, error: checkError } = await supabase
+          .from('products')
+          .select('codigo_produto')
+          .in('codigo_produto', codesToCheck);
+        
+        if (checkError) throw checkError;
+        
+        const existingSet = new Set(existingCodes?.map(p => p.codigo_produto) || []);
+        for (const row of rowsToImport) {
+          if (row.productCode && existingSet.has(row.productCode) && !row.productId) {
+            toast.error(`Código do produto já existe: ${row.productCode}`);
+            setIsImporting(false);
+            return;
+          }
+        }
+      }
+
       // Agrupar linhas por produto
       const productMap = new Map<string, ParsedRow[]>();
       
       for (const row of rowsToImport) {
-        const key = row.productId || row.productName;
+        const key = row.productId || row.productCode || row.productName;
         if (!productMap.has(key)) {
           productMap.set(key, []);
         }
@@ -457,6 +523,32 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
         const firstRow = rows[0];
         let productId = firstRow.productId;
 
+        // Tentar encontrar por código do produto se não tem ID
+        if (!productId && firstRow.productCode) {
+          const { data: existingByCode } = await supabase
+            .from('products')
+            .select('id')
+            .eq('codigo_produto', firstRow.productCode)
+            .maybeSingle();
+          
+          if (existingByCode) {
+            productId = existingByCode.id;
+          }
+        }
+
+        // Gerar código do produto se necessário
+        let codigoProduto = firstRow.productCode;
+        if (!codigoProduto && !productId) {
+          const { data: nextCode, error: codeError } = await supabase
+            .rpc('generate_next_product_code');
+          
+          if (codeError) {
+            console.error('Erro ao gerar código:', codeError);
+            throw new Error('Erro ao gerar código do produto');
+          }
+          codigoProduto = nextCode;
+        }
+
         if (productId) {
           // Buscar estado anterior para rollback
           const { data: existingProduct } = await supabase
@@ -465,17 +557,24 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
             .eq('id', productId)
             .single();
 
-          // Atualizar produto existente
+          // Atualizar produto existente (não altera codigo_produto se já existe)
+          const updateData: Record<string, any> = {
+            name: firstRow.productName,
+            category: firstRow.category,
+            price: firstRow.price,
+            in_stock: firstRow.status === 'em_estoque',
+            featured: firstRow.featured,
+            image: firstRow.imageUrl,
+          };
+          
+          // Só atualiza código se estava vazio
+          if (!existingProduct?.codigo_produto && codigoProduto) {
+            updateData.codigo_produto = codigoProduto;
+          }
+
           const { error } = await supabase
             .from('products')
-            .update({
-              name: firstRow.productName,
-              category: firstRow.category,
-              price: firstRow.price,
-              in_stock: firstRow.status === 'em_estoque',
-              featured: firstRow.featured,
-              image: firstRow.imageUrl,
-            })
+            .update(updateData)
             .eq('id', productId);
 
           if (error) throw error;
@@ -488,14 +587,7 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
               entity_id: productId,
               action: 'updated',
               previous_state: existingProduct,
-              new_state: {
-                name: firstRow.productName,
-                category: firstRow.category,
-                price: firstRow.price,
-                in_stock: firstRow.status === 'em_estoque',
-                featured: firstRow.featured,
-                image: firstRow.imageUrl,
-              },
+              new_state: { ...updateData, id: productId },
             });
           }
         } else {
@@ -503,6 +595,7 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
           const { data, error } = await supabase
             .from('products')
             .insert({
+              codigo_produto: codigoProduto,
               name: firstRow.productName,
               category: firstRow.category,
               price: firstRow.price,
@@ -660,6 +753,7 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
           // Produto simples
           exportRows.push({
             id_produto: product.id,
+            codigo_produto: product.codigo_produto || '',
             nome_produto: product.name,
             categoria: product.category,
             status: product.in_stock ? 'em_estoque' : 'esgotado',
@@ -677,6 +771,7 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
           for (const variant of productVariants) {
             exportRows.push({
               id_produto: product.id,
+              codigo_produto: product.codigo_produto || '',
               nome_produto: product.name,
               categoria: product.category,
               status: product.in_stock ? 'em_estoque' : 'esgotado',
@@ -685,7 +780,7 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
               url_imagem: product.image || '',
               modelo_variacao: variant.model || '',
               cor_variacao: variant.color || '',
-              sku_variacao: generateSku(product.name, variant.model || '', variant.color || ''),
+              sku_variacao: variant.codigo_variacao || generateSku(product.name, variant.model || '', variant.color || ''),
               preco_variacao: String(product.price),
               estoque_variacao: String(variant.stock_quantity),
             });
