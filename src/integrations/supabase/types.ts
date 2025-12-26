@@ -426,6 +426,7 @@ export type Database = {
       }
       product_variants: {
         Row: {
+          codigo_variacao: string | null
           color: string | null
           created_at: string | null
           id: string
@@ -435,6 +436,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          codigo_variacao?: string | null
           color?: string | null
           created_at?: string | null
           id?: string
@@ -444,6 +446,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          codigo_variacao?: string | null
           color?: string | null
           created_at?: string | null
           id?: string
@@ -465,6 +468,7 @@ export type Database = {
       products: {
         Row: {
           category: string
+          codigo_produto: string | null
           color: string[] | null
           color_codes: Json | null
           created_at: string
@@ -484,6 +488,7 @@ export type Database = {
         }
         Insert: {
           category: string
+          codigo_produto?: string | null
           color?: string[] | null
           color_codes?: Json | null
           created_at?: string
@@ -503,6 +508,7 @@ export type Database = {
         }
         Update: {
           category?: string
+          codigo_produto?: string | null
           color?: string[] | null
           color_codes?: Json | null
           created_at?: string
@@ -793,6 +799,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_next_product_code: { Args: never; Returns: string }
+      generate_next_variant_code: {
+        Args: { p_product_code: string }
+        Returns: string
+      }
       get_shipping_config: {
         Args: never
         Returns: {
@@ -810,6 +821,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      validate_product_code: { Args: { code: string }; Returns: boolean }
       validate_seller_code: {
         Args: { seller_code: string }
         Returns: {
