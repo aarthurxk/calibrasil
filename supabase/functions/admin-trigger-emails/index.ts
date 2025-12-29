@@ -84,10 +84,13 @@ serve(async (req) => {
     console.log("[ADMIN-TRIGGER] Calling", targetFunction, "with internal secret");
 
     // Call the target function with the internal secret
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const response = await fetch(`${supabaseUrl}/functions/v1/${targetFunction}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${supabaseAnonKey}`,
+        "apikey": supabaseAnonKey,
         "x-internal-secret": internalSecret,
       },
       body: JSON.stringify({ testMode: testMode === true, testEmail: testEmail || null }),
