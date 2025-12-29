@@ -458,30 +458,42 @@ export type Database = {
       }
       product_reviews: {
         Row: {
+          admin_comment: string | null
+          admin_edited: boolean | null
+          approved: boolean | null
           comment: string | null
           created_at: string | null
           id: string
           order_id: string | null
           product_id: string
           rating: number
+          updated_at: string | null
           user_id: string
         }
         Insert: {
+          admin_comment?: string | null
+          admin_edited?: boolean | null
+          approved?: boolean | null
           comment?: string | null
           created_at?: string | null
           id?: string
           order_id?: string | null
           product_id: string
           rating: number
+          updated_at?: string | null
           user_id: string
         }
         Update: {
+          admin_comment?: string | null
+          admin_edited?: boolean | null
+          approved?: boolean | null
           comment?: string | null
           created_at?: string | null
           id?: string
           order_id?: string | null
           product_id?: string
           rating?: number
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: [
