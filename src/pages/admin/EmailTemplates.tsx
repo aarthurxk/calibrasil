@@ -127,6 +127,12 @@ export default function EmailTemplates() {
       items_count: "3",
       admin_url: "https://calibrasil.com/admin/products",
       cart_url: "https://calibrasil.com/cart",
+      tracking_code: "BR123456789BR",
+      tracking_url: "https://www.linkcorreios.com.br/?id=BR123456789BR",
+      confirmation_url: "https://calibrasil.com/confirmar-recebimento?token=exemplo123",
+      review_url: "https://calibrasil.com/avaliar?token=exemplo123",
+      store_name: "Calibrasil",
+      store_email: "contato@calibrasil.com",
     };
 
     for (const [key, value] of Object.entries(sampleData)) {
