@@ -22,6 +22,7 @@ import {
   Wallet,
   Cog,
   MailCheck,
+  MessageSquare,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -139,6 +140,12 @@ const AdminLayout = () => {
       name: 'Clientes', 
       icon: Users, 
       path: '/admin/customers', 
+      showFor: ['admin', 'manager'] 
+    },
+    { 
+      name: 'Avaliações', 
+      icon: MessageSquare, 
+      path: '/admin/reviews', 
       showFor: ['admin', 'manager'] 
     },
     { 
