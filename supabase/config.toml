@@ -59,3 +59,12 @@ verify_jwt = true
 
 [functions.get-user-email]
 verify_jwt = true
+
+[functions.magic-login]
+verify_jwt = false
+
+[functions.verify-magic]
+verify_jwt = false
+
+[functions.confirm-order-magic]
+verify_jwt = false

@@ -31,6 +31,7 @@ const OrderDetail = lazy(() => import("./pages/OrderDetail"));
 const MyOrders = lazy(() => import("./pages/MyOrders"));
 const OrderReceived = lazy(() => import("./pages/OrderReceived"));
 const ConfirmarRecebimento = lazy(() => import("./pages/ConfirmarRecebimento"));
+const MagicLogin = lazy(() => import("./pages/MagicLogin"));
 const Review = lazy(() => import("./pages/Review"));
 const Avaliar = lazy(() => import("./pages/Avaliar"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -82,6 +83,7 @@ const App = () => (
                   <Route path="/returns" element={<Returns />} />
                   <Route path="/order-received" element={<OrderReceived />} />
                   <Route path="/confirmar-recebimento" element={<ConfirmarRecebimento />} />
+                  <Route path="/magic-login" element={<MagicLogin />} />
                   <Route path="/review/:productId" element={<Review />} />
                   <Route path="/avaliar" element={<Avaliar />} />
                   <Route path="/wishlist" element={<Wishlist />} />
