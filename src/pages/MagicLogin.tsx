@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { CheckCircle2, AlertCircle, Loader2, ShoppingBag, Star } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -27,12 +27,12 @@ interface ConfirmResponse {
 
 const MagicLogin = () => {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   
   const [status, setStatus] = useState<Status>("loading");
   const [message, setMessage] = useState("Verificando seu link...");
   const [orderId, setOrderId] = useState<string | null>(null);
   const [hasAttempted, setHasAttempted] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   const token = searchParams.get("token");
 
@@ -40,15 +40,21 @@ const MagicLogin = () => {
     if (hasAttempted) return;
     setHasAttempted(true);
 
+    console.log("[MagicLogin] Starting verification...");
+    console.log("[MagicLogin] Token present:", !!token);
+    console.log("[MagicLogin] Token length:", token?.length || 0);
+
     // Validate token
     if (!token) {
+      console.error("[MagicLogin] No token found in URL");
       setStatus("invalid");
       setMessage("Link inválido. Parâmetros ausentes.");
+      setDebugInfo("Token não encontrado na URL");
       return;
     }
 
     try {
-      console.log("[MagicLogin] Verifying token...");
+      console.log("[MagicLogin] Calling confirm-order-magic...");
       setStatus("confirming");
       setMessage("Confirmando recebimento do pedido...");
 
@@ -60,20 +66,23 @@ const MagicLogin = () => {
         }
       );
 
-      console.log("[MagicLogin] Response:", { data, error });
+      console.log("[MagicLogin] Response received:", { data, error });
 
       if (error) {
-        console.error("[MagicLogin] Error:", error);
+        console.error("[MagicLogin] Function error:", error);
         setStatus("error");
         setMessage("Erro ao confirmar recebimento. Tente novamente.");
+        setDebugInfo(`Erro da função: ${error.message || JSON.stringify(error)}`);
         return;
       }
 
       if (data) {
+        console.log("[MagicLogin] Success! Status:", data.status);
         setStatus(data.status);
         setMessage(data.message_pt);
         if (data.orderId) {
           setOrderId(data.orderId);
+          console.log("[MagicLogin] Order ID:", data.orderId);
         }
 
         // Show toast for success states
@@ -83,13 +92,16 @@ const MagicLogin = () => {
           toast.info("Este pedido já foi confirmado anteriormente.");
         }
       } else {
+        console.error("[MagicLogin] No data in response");
         setStatus("error");
         setMessage("Resposta inválida do servidor.");
+        setDebugInfo("Resposta vazia do servidor");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("[MagicLogin] Unexpected error:", err);
       setStatus("error");
       setMessage("Erro inesperado. Tente novamente mais tarde.");
+      setDebugInfo(`Erro inesperado: ${err?.message || String(err)}`);
     }
   }, [token, hasAttempted]);
 
@@ -175,12 +187,18 @@ const MagicLogin = () => {
               )}
 
               {/* Support for errors */}
-              {(status === "error" || status === "expired") && (
+              {(status === "error" || status === "expired" || status === "invalid") && (
                 <div className="mt-6 pt-6 border-t text-sm text-muted-foreground">
                   <p>Precisa de ajuda?</p>
                   <a href="mailto:oi@calibrasil.com" className="text-primary hover:underline">
                     oi@calibrasil.com
                   </a>
+                  {/* Debug info for development */}
+                  {debugInfo && (
+                    <p className="mt-4 text-xs text-muted-foreground/70 font-mono">
+                      Debug: {debugInfo}
+                    </p>
+                  )}
                 </div>
               )}
             </CardContent>

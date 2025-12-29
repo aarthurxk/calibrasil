@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.confirm-order-magic]
 verify_jwt = false
+
+[functions.get-order-items-magic]
+verify_jwt = false
