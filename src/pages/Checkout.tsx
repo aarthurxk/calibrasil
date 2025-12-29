@@ -255,8 +255,18 @@ const Checkout = () => {
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const session = await supabase.auth.getSession();
       const accessToken = session.data.session?.access_token;
+      
+      // Use access token if available, otherwise use anon key for guest checkout
+      // The Edge Function validates the request and enforces rate limiting
+      const authHeader = accessToken ? `Bearer ${accessToken}` : `Bearer ${supabaseAnonKey}`;
+      
       const response = await fetch(`${supabaseUrl}/functions/v1/create-checkout-session`, {
-        method: "POST", headers: { "Content-Type": "application/json", apikey: supabaseAnonKey, Authorization: `Bearer ${accessToken || supabaseAnonKey}` },
+        method: "POST", 
+        headers: { 
+          "Content-Type": "application/json", 
+          apikey: supabaseAnonKey, 
+          Authorization: authHeader 
+        },
         body: JSON.stringify(checkoutData),
       });
       const data = await response.json();
@@ -285,8 +295,18 @@ const Checkout = () => {
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const session = await supabase.auth.getSession();
       const accessToken = session.data.session?.access_token;
+      
+      // Use access token if available, otherwise use anon key for guest checkout
+      // The Edge Function validates the request and enforces rate limiting
+      const authHeader = accessToken ? `Bearer ${accessToken}` : `Bearer ${supabaseAnonKey}`;
+      
       const response = await fetch(`${supabaseUrl}/functions/v1/create-mercadopago-checkout`, {
-        method: "POST", headers: { "Content-Type": "application/json", apikey: supabaseAnonKey, Authorization: `Bearer ${accessToken || supabaseAnonKey}` },
+        method: "POST", 
+        headers: { 
+          "Content-Type": "application/json", 
+          apikey: supabaseAnonKey, 
+          Authorization: authHeader 
+        },
         body: JSON.stringify(checkoutData),
       });
       const data = await response.json();
