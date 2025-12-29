@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Package, ChevronRight, Loader2, ShoppingBag } from "lucide-react";
+import { ArrowLeft, Package, ChevronRight, ShoppingBag, Star, CheckCircle } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +23,8 @@ interface Order {
   status: string;
   created_at: string;
   item_count?: number;
+  review_email_sent?: boolean;
+  has_review?: boolean;
 }
 
 const MyOrders = () => {
@@ -52,10 +54,10 @@ const MyOrders = () => {
     setIsLoading(true);
 
     try {
-      // Fetch orders
+      // Fetch orders with review_email_sent
       const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
-        .select("id, total, status, created_at")
+        .select("id, total, status, created_at, review_email_sent")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
@@ -64,23 +66,31 @@ const MyOrders = () => {
         return;
       }
 
-      // Fetch item counts for each order
-      const ordersWithCounts = await Promise.all(
+      // Fetch item counts and check for existing reviews
+      const ordersWithDetails = await Promise.all(
         (ordersData || []).map(async (order) => {
-          const { count } = await supabase
+          const { count: itemCount } = await supabase
             .from("order_items")
             .select("*", { count: "exact", head: true })
             .eq("order_id", order.id);
 
+          // Check if user has any reviews for this order
+          const { count: reviewCount } = await supabase
+            .from("product_reviews")
+            .select("*", { count: "exact", head: true })
+            .eq("order_id", order.id)
+            .eq("user_id", user.id);
+
           return {
             ...order,
-            item_count: count || 0,
+            item_count: itemCount || 0,
+            has_review: (reviewCount || 0) > 0,
           };
         })
       );
 
-      setOrders(ordersWithCounts);
-      setFilteredOrders(ordersWithCounts);
+      setOrders(ordersWithDetails);
+      setFilteredOrders(ordersWithDetails);
     } catch (error) {
       console.error("Error:", error);
     } finally {
@@ -236,9 +246,27 @@ const MyOrders = () => {
                             <span className="text-sm text-muted-foreground">
                               {order.item_count} {order.item_count === 1 ? "item" : "itens"}
                             </span>
-                            <Badge variant={getStatusVariant(order.status)}>
+                                          <Badge variant={getStatusVariant(order.status)}>
                               {getStatusLabel(order.status)}
                             </Badge>
+                            {/* Review badge/button for delivered orders */}
+                            {order.status === "delivered" && (
+                              order.has_review ? (
+                                <Badge variant="outline" className="text-green-600 border-green-600">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Avaliado
+                                </Badge>
+                              ) : (
+                                <Link 
+                                  to={`/avaliar?orderId=${order.id}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                                >
+                                  <Star className="h-3 w-3 mr-1" />
+                                  Avaliar
+                                </Link>
+                              )
+                            )}
                           </div>
                           <p className="font-semibold text-lg">
                             {formatPrice(order.total)}

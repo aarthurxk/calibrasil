@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { CheckCircle2, AlertCircle, Info, ShoppingBag, Package, Loader2 } from "lucide-react";
+import { CheckCircle2, AlertCircle, Info, ShoppingBag, Package, Loader2, Star } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -142,6 +142,16 @@ const ConfirmarRecebimento = () => {
               {/* Botões de ação - só mostrar após loading */}
               {!isLoading && (
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  {/* Botão de avaliação - aparecer após confirmação bem-sucedida */}
+                  {(status === "confirmed" || status === "already") && orderId && token && (
+                    <Button asChild>
+                      <Link to={`/avaliar?orderId=${encodeURIComponent(orderId)}&token=${encodeURIComponent(token)}`}>
+                        <Star className="h-4 w-4 mr-2" />
+                        Avaliar Produtos
+                      </Link>
+                    </Button>
+                  )}
+
                   <Button asChild variant="outline">
                     <Link to="/shop">
                       <ShoppingBag className="h-4 w-4 mr-2" />
@@ -150,7 +160,7 @@ const ConfirmarRecebimento = () => {
                   </Button>
 
                   {user && (
-                    <Button asChild>
+                    <Button asChild variant="outline">
                       <Link to="/orders">
                         <Package className="h-4 w-4 mr-2" />
                         Meus Pedidos
