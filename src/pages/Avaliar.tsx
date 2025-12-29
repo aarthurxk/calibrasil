@@ -31,38 +31,35 @@ const Avaliar = () => {
   const orderId = rawOrderId ? decodeURIComponent(rawOrderId) : null;
   const token = rawToken ? decodeURIComponent(rawToken) : null;
 
-  // Fetch order items
-  const { data: orderItems, isLoading: itemsLoading, error: itemsError } = useQuery({
-    queryKey: ["order-items-review", orderId],
+  // Fetch order items using magic token (bypasses RLS)
+  const { data: magicData, isLoading: magicLoading, error: magicError } = useQuery({
+    queryKey: ["order-items-magic", orderId, token],
     queryFn: async () => {
-      if (!orderId) return [];
-      const { data, error } = await supabase
-        .from("order_items")
-        .select("id, product_id, product_name, price, quantity")
-        .eq("order_id", orderId);
-      if (error) throw error;
-      return data as OrderItem[];
+      if (!orderId || !token) return null;
+      
+      console.log("[Avaliar] Fetching order items with magic token...");
+      
+      const { data, error } = await supabase.functions.invoke("get-order-items-magic", {
+        body: { token, orderId },
+      });
+
+      if (error) {
+        console.error("[Avaliar] Magic token fetch error:", error);
+        throw error;
+      }
+
+      console.log("[Avaliar] Magic token fetch success:", data);
+      return data as { orderItems: OrderItem[]; products: Product[]; email: string };
     },
     enabled: !!orderId && !!token,
+    retry: 1,
   });
 
-  // Fetch product details for images
+  const orderItems = magicData?.orderItems || [];
+  const products = magicData?.products || [];
+
+  // Fetch existing reviews by current user (if authenticated)
   const productIds = orderItems?.map((item) => item.product_id).filter(Boolean) as string[] || [];
-  const { data: products } = useQuery({
-    queryKey: ["products-for-review", productIds],
-    queryFn: async () => {
-      if (productIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, name, image, category")
-        .in("id", productIds);
-      if (error) throw error;
-      return data as Product[];
-    },
-    enabled: productIds.length > 0,
-  });
-
-  // Fetch existing reviews by current user
   const { data: existingReviews } = useQuery({
     queryKey: ["existing-reviews", productIds, user?.id],
     queryFn: async () => {
@@ -107,7 +104,7 @@ const Avaliar = () => {
   }
 
   // Loading state
-  if (itemsLoading) {
+  if (magicLoading) {
     return (
       <MainLayout>
         <div className="container max-w-2xl mx-auto py-12 px-4">
@@ -126,14 +123,15 @@ const Avaliar = () => {
   }
 
   // Error state
-  if (itemsError) {
+  if (magicError) {
+    console.error("[Avaliar] Error loading items:", magicError);
     return (
       <MainLayout>
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
           <AlertCircle className="h-12 w-12 text-destructive mb-3" />
           <h1 className="text-xl font-semibold mb-2">Erro ao carregar pedido</h1>
           <p className="text-muted-foreground">
-            Não foi possível encontrar este pedido. Verifique o link do e-mail.
+            Não foi possível encontrar este pedido. O link pode ter expirado.
           </p>
           <Button asChild className="mt-4">
             <Link to="/">Voltar à loja</Link>
@@ -206,7 +204,7 @@ const Avaliar = () => {
                         </div>
                       ) : (
                         <Button asChild size="sm" className="flex-shrink-0">
-                          <Link to={`/review/${item.product_id}`}>
+                          <Link to={`/review/${item.product_id}?orderId=${encodeURIComponent(orderId)}&token=${encodeURIComponent(token)}`}>
                             Avaliar
                             <ArrowRight className="h-4 w-4 ml-1" />
                           </Link>

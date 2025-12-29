@@ -56,7 +56,7 @@ async function generateMagicLoginUrl(email: string, orderId: string): Promise<st
   );
   
   const now = Math.floor(Date.now() / 1000);
-  const exp = now + 15 * 60; // 15 minutes
+  const exp = now + 7 * 24 * 60 * 60; // 7 days (same as confirmation token)
   
   const jwt = await create(
     { alg: "HS256", typ: "JWT" },
@@ -230,7 +230,7 @@ async function generateFallbackEmail(supabase: any, data: OrderStatusEmailReques
                    Confirmar Recebimento
                 </a>
                 <p style="font-size: 12px; color: #888; margin: 16px 0 0 0;">
-                  Este link expira em 15 minutos.
+                  Este link expira em 7 dias.
                 </p>
               </td>
             </tr>
