@@ -28,36 +28,33 @@ interface EmailTemplate {
 
 const escapeHtml = (str: string): string => {
   return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 };
 
 // Generate Magic Login JWT (15 minutes)
 async function generateMagicLoginUrl(email: string, orderId: string): Promise<string> {
   const jwtSecret = Deno.env.get("MAGIC_LOGIN_JWT_SECRET");
   const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://calibrasil.com";
-  
+
   if (!jwtSecret) {
     console.error("[ORDER-STATUS] MAGIC_LOGIN_JWT_SECRET not configured, falling back to old method");
     throw new Error("JWT secret not configured");
   }
-  
+
   const encoder = new TextEncoder();
   const keyData = encoder.encode(jwtSecret);
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw",
-    keyData,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign", "verify"]
-  );
-  
+  const cryptoKey = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, [
+    "sign",
+    "verify",
+  ]);
+
   const now = Math.floor(Date.now() / 1000);
   const exp = now + 7 * 24 * 60 * 60; // 7 days (same as confirmation token)
-  
+
   const jwt = await create(
     { alg: "HS256", typ: "JWT" },
     {
@@ -65,64 +62,66 @@ async function generateMagicLoginUrl(email: string, orderId: string): Promise<st
       orderId,
       iat: now,
       exp,
-      purpose: "magic_login"
+      purpose: "magic_login",
     },
-    cryptoKey
+    cryptoKey,
   );
-  
+
   return `${frontendUrl}/magic-login?token=${encodeURIComponent(jwt)}`;
 }
 
 const getStatusInfo = (status: string): { label: string; emoji: string; color: string; message: string } => {
   const statusMap: Record<string, { label: string; emoji: string; color: string; message: string }> = {
     processing: {
-      label: 'Processando',
-      emoji: '⚙️',
-      color: '#3b82f6',
-      message: 'Estamos preparando seu pedido com carinho!'
+      label: "Processando",
+      emoji: "⚙️",
+      color: "#3b82f6",
+      message: "Estamos preparando seu pedido com carinho!",
     },
     shipped: {
-      label: 'Enviado',
-      emoji: '📦',
-      color: '#8b5cf6',
-      message: 'Seu pedido está a caminho! Fique de olho no rastreamento.'
+      label: "Enviado",
+      emoji: "📦",
+      color: "#8b5cf6",
+      message: "Seu pedido está a caminho! Fique de olho no rastreamento.",
     },
     delivered: {
-      label: 'Entregue',
-      emoji: '✅',
-      color: '#16a34a',
-      message: 'Seu pedido foi entregue! Esperamos que você ame seus novos produtos.'
+      label: "Entregue",
+      emoji: "✅",
+      color: "#16a34a",
+      message: "Seu pedido foi entregue! Esperamos que você ame seus novos produtos.",
     },
     cancelled: {
-      label: 'Cancelado',
-      emoji: '❌',
-      color: '#dc2626',
-      message: 'Seu pedido foi cancelado. Se tiver dúvidas, entre em contato conosco.'
+      label: "Cancelado",
+      emoji: "❌",
+      color: "#dc2626",
+      message: "Seu pedido foi cancelado. Se tiver dúvidas, entre em contato conosco.",
     },
     pending: {
-      label: 'Pendente',
-      emoji: '⏳',
-      color: '#eab308',
-      message: 'Seu pedido está aguardando processamento.'
+      label: "Pendente",
+      emoji: "⏳",
+      color: "#eab308",
+      message: "Seu pedido está aguardando processamento.",
+    },
+  };
+
+  return (
+    statusMap[status] || {
+      label: status,
+      emoji: "📋",
+      color: "#6b7280",
+      message: "O status do seu pedido foi atualizado.",
     }
-  };
-  
-  return statusMap[status] || {
-    label: status,
-    emoji: '📋',
-    color: '#6b7280',
-    message: 'O status do seu pedido foi atualizado.'
-  };
+  );
 };
 
 // Replaces template variables like {{variable_name}} with actual values
 // HTML sections (tracking_section, confirmation_section, review_section) are not escaped
 const replaceTemplateVariables = (template: string, variables: Record<string, string>): string => {
   let result = template;
-  const htmlSections = ['tracking_section', 'confirmation_section', 'review_section'];
-  
+  const htmlSections = ["tracking_section", "confirmation_section", "review_section"];
+
   for (const [key, value] of Object.entries(variables)) {
-    const regex = new RegExp(`{{${key}}}`, 'g');
+    const regex = new RegExp(`{{${key}}}`, "g");
     // Don't escape HTML for section variables that contain pre-formatted HTML
     const replacement = htmlSections.includes(key) ? value : escapeHtml(value);
     result = result.replace(regex, replacement);
@@ -133,10 +132,10 @@ const replaceTemplateVariables = (template: string, variables: Record<string, st
 // Fetch template from database
 async function fetchTemplate(supabase: any, templateKey: string): Promise<EmailTemplate | null> {
   const { data, error } = await supabase
-    .from('email_templates')
-    .select('template_key, subject, html_content, variables')
-    .eq('template_key', templateKey)
-    .eq('is_active', true)
+    .from("email_templates")
+    .select("template_key, subject, html_content, variables")
+    .eq("template_key", templateKey)
+    .eq("is_active", true)
     .maybeSingle();
 
   if (error) {
@@ -152,32 +151,35 @@ async function generateEmailFromTemplate(
   supabase: any,
   data: OrderStatusEmailRequest,
   templateKey: string,
-  variables: Record<string, string>
+  variables: Record<string, string>,
 ): Promise<{ subject: string; html: string }> {
   const template = await fetchTemplate(supabase, templateKey);
-  
+
   if (template) {
     console.log(`[ORDER-STATUS] Using database template: ${templateKey}`);
     return {
       subject: replaceTemplateVariables(template.subject, variables),
-      html: replaceTemplateVariables(template.html_content, variables)
+      html: replaceTemplateVariables(template.html_content, variables),
     };
   }
-  
+
   console.log(`[ORDER-STATUS] Template ${templateKey} not found, using fallback`);
   return generateFallbackEmail(supabase, data);
 }
 
 // Fallback hardcoded email for when template is not found (uses Magic Login)
-async function generateFallbackEmail(supabase: any, data: OrderStatusEmailRequest): Promise<{ subject: string; html: string }> {
+async function generateFallbackEmail(
+  supabase: any,
+  data: OrderStatusEmailRequest,
+): Promise<{ subject: string; html: string }> {
   const statusInfo = getStatusInfo(data.newStatus);
-  const storeUrl = Deno.env.get('FRONTEND_URL') || 'https://calibrasil.com';
-  
+  const storeUrl = Deno.env.get("FRONTEND_URL") || "https://calibrasil.com";
+
   // Use Magic Login URL for confirmation
   const magicLoginUrl = await generateMagicLoginUrl(data.customerEmail, data.orderId);
-  
+
   const subject = `${statusInfo.emoji} Seu pedido foi ${statusInfo.label.toLowerCase()}! #${data.orderId.substring(0, 8).toUpperCase()}`;
-  
+
   const html = `
 <!DOCTYPE html>
 <html>
@@ -208,21 +210,27 @@ async function generateFallbackEmail(supabase: any, data: OrderStatusEmailReques
             <td style="padding: 24px 0;">
               <div style="background: #f9fafb; border-radius: 8px; padding: 16px;">
                 <p style="margin: 0; font-size: 14px; color: #666;"><strong>Pedido:</strong> #${data.orderId.substring(0, 8).toUpperCase()}</p>
-                ${data.trackingCode ? `
+                ${
+                  data.trackingCode
+                    ? `
                   <p style="margin: 12px 0 0 0; font-size: 14px; color: #666;">
                     <strong>Rastreamento:</strong> 
                     <code style="background: #e5e7eb; padding: 4px 8px; border-radius: 4px; font-family: monospace;">${escapeHtml(data.trackingCode)}</code>
                   </p>
-                  <a href="https://www.linkcorreios.com.br/" target="_blank" style="display: inline-block; margin-top: 12px; color: #8b5cf6; text-decoration: underline; font-size: 14px;">📍 Rastrear Pedido</a>
-                ` : ''}
+                  <a href="https://rastreamento.correios.com.br/app/index.php/" target="_blank" style="display: inline-block; margin-top: 12px; color: #8b5cf6; text-decoration: underline; font-size: 14px;">📍 Rastrear Pedido</a>
+                `
+                    : ""
+                }
               </div>
             </td>
           </tr>
-          ${data.newStatus === 'shipped' || data.newStatus === 'delivered' ? `
+          ${
+            data.newStatus === "shipped" || data.newStatus === "delivered"
+              ? `
             <tr>
               <td style="padding: 24px 0;">
                 <p style="font-size: 14px; color: #555; margin: 0 0 16px 0;">
-                  ${data.newStatus === 'shipped' ? 'Já recebeu seu pedido?' : 'Confirme o recebimento e avalie seus produtos:'}
+                  ${data.newStatus === "shipped" ? "Já recebeu seu pedido?" : "Confirme o recebimento e avalie seus produtos:"}
                 </p>
                 <a href="${magicLoginUrl}" target="_blank" rel="noopener noreferrer"
                    style="display: inline-block; background: #E63946; color: #ffffff; text-decoration: none;
@@ -234,7 +242,9 @@ async function generateFallbackEmail(supabase: any, data: OrderStatusEmailReques
                 </p>
               </td>
             </tr>
-          ` : ''}
+          `
+              : ""
+          }
           <tr>
             <td style="padding-top: 32px; border-top: 1px solid #eee;">
               <p style="font-size: 13px; color: #999; margin: 0;">
@@ -252,7 +262,7 @@ async function generateFallbackEmail(supabase: any, data: OrderStatusEmailReques
 </body>
 </html>
   `;
-  
+
   return { subject, html };
 }
 
@@ -263,106 +273,97 @@ serve(async (req) => {
 
   try {
     // SECURITY: Verify the user is an admin or manager
-    const authHeader = req.headers.get('Authorization');
+    const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      console.error('[ORDER-STATUS] No authorization header');
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      console.error("[ORDER-STATUS] No authorization header");
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
     // Client for auth check (user context)
-    const supabaseAuth = createClient(
-      supabaseUrl,
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const supabaseAuth = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+      global: { headers: { Authorization: authHeader } },
+    });
 
     // Client for template fetch and token creation (service role to bypass RLS)
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseAuth.auth.getUser();
     if (authError || !user) {
-      console.error('[ORDER-STATUS] Auth error:', authError);
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      console.error("[ORDER-STATUS] Auth error:", authError);
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Check if user has admin or manager role
     const { data: roleData, error: roleError } = await supabaseAuth
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
       .single();
 
-    if (roleError || !roleData || !['admin', 'manager'].includes(roleData.role)) {
-      console.error('[ORDER-STATUS] User does not have permission to send order emails');
-      return new Response(
-        JSON.stringify({ error: 'Forbidden - Admin or Manager role required' }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (roleError || !roleData || !["admin", "manager"].includes(roleData.role)) {
+      console.error("[ORDER-STATUS] User does not have permission to send order emails");
+      return new Response(JSON.stringify({ error: "Forbidden - Admin or Manager role required" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const data: OrderStatusEmailRequest = await req.json();
-    
+
     console.log(`[ORDER-STATUS] Sending status update email for order ${data.orderId}`);
     console.log(`[ORDER-STATUS] Status change: ${data.oldStatus} -> ${data.newStatus}`);
 
     let emailContent: { subject: string; html: string };
-    
+
     // For shipped status with tracking code, use tracking_code_notification template
-    if (data.newStatus === 'shipped' && data.trackingCode) {
+    if (data.newStatus === "shipped" && data.trackingCode) {
       const magicLoginUrl = await generateMagicLoginUrl(data.customerEmail, data.orderId);
-      const trackingUrl = 'https://www.linkcorreios.com.br/';
-      
+      const trackingUrl = "https://www.linkcorreios.com.br/";
+
       const variables: Record<string, string> = {
         customer_name: data.customerName,
         order_id: data.orderId.substring(0, 8).toUpperCase(),
         tracking_code: data.trackingCode,
         tracking_url: trackingUrl,
-        confirmation_url: magicLoginUrl
+        confirmation_url: magicLoginUrl,
       };
-      
-      emailContent = await generateEmailFromTemplate(
-        supabaseAdmin,
-        data,
-        'tracking_code_notification',
-        variables
-      );
-    } else if (data.newStatus === 'delivered') {
+
+      emailContent = await generateEmailFromTemplate(supabaseAdmin, data, "tracking_code_notification", variables);
+    } else if (data.newStatus === "delivered") {
       // For delivered status, use magic login URL
       const magicLoginUrl = await generateMagicLoginUrl(data.customerEmail, data.orderId);
-      
+
       const variables: Record<string, string> = {
         customer_name: data.customerName,
         order_id: data.orderId.substring(0, 8).toUpperCase(),
         confirmation_url: magicLoginUrl,
-        review_url: magicLoginUrl
+        review_url: magicLoginUrl,
       };
-      
-      emailContent = await generateEmailFromTemplate(
-        supabaseAdmin,
-        data,
-        'order_delivered',
-        variables
-      );
+
+      emailContent = await generateEmailFromTemplate(supabaseAdmin, data, "order_delivered", variables);
     } else {
       // For other status updates, use order_status_update template
       const statusInfo = getStatusInfo(data.newStatus);
       const magicLoginUrl = await generateMagicLoginUrl(data.customerEmail, data.orderId);
-      const trackingUrl = 'https://www.linkcorreios.com.br/';
-      
+      const trackingUrl = "https://www.linkcorreios.com.br/";
+
       // Generate dynamic sections based on status
-      let trackingSection = '';
-      let confirmationSection = '';
-      let reviewSection = '';
-      
+      let trackingSection = "";
+      let confirmationSection = "";
+      let reviewSection = "";
+
       // Tracking section - show if tracking code exists
       if (data.trackingCode) {
         trackingSection = `
@@ -373,9 +374,9 @@ serve(async (req) => {
           </div>
         `;
       }
-      
+
       // Confirmation section - show for shipped status
-      if (data.newStatus === 'shipped') {
+      if (data.newStatus === "shipped") {
         confirmationSection = `
           <div style="text-align: center; margin: 20px 0;">
             <p style="color: #666;">Já recebeu? Confirme para nós:</p>
@@ -383,14 +384,20 @@ serve(async (req) => {
           </div>
         `;
       }
-      
+
       // Calculate lighter color for gradient
-      const colorLight = statusInfo.color.replace('#', '');
-      const r = Math.min(255, parseInt(colorLight.substr(0, 2), 16) + 40).toString(16).padStart(2, '0');
-      const g = Math.min(255, parseInt(colorLight.substr(2, 2), 16) + 40).toString(16).padStart(2, '0');
-      const b = Math.min(255, parseInt(colorLight.substr(4, 2), 16) + 40).toString(16).padStart(2, '0');
+      const colorLight = statusInfo.color.replace("#", "");
+      const r = Math.min(255, parseInt(colorLight.substr(0, 2), 16) + 40)
+        .toString(16)
+        .padStart(2, "0");
+      const g = Math.min(255, parseInt(colorLight.substr(2, 2), 16) + 40)
+        .toString(16)
+        .padStart(2, "0");
+      const b = Math.min(255, parseInt(colorLight.substr(4, 2), 16) + 40)
+        .toString(16)
+        .padStart(2, "0");
       const statusColorLight = `#${r}${g}${b}`;
-      
+
       const variables: Record<string, string> = {
         customer_name: data.customerName,
         order_id: data.orderId.substring(0, 8).toUpperCase(),
@@ -399,18 +406,13 @@ serve(async (req) => {
         status_color: statusInfo.color,
         status_color_light: statusColorLight,
         status_message: statusInfo.message,
-        tracking_code: data.trackingCode || '',
+        tracking_code: data.trackingCode || "",
         tracking_section: trackingSection,
         confirmation_section: confirmationSection,
-        review_section: reviewSection
+        review_section: reviewSection,
       };
-      
-      emailContent = await generateEmailFromTemplate(
-        supabaseAdmin,
-        data,
-        'order_status_update',
-        variables
-      );
+
+      emailContent = await generateEmailFromTemplate(supabaseAdmin, data, "order_status_update", variables);
     }
 
     // Using verified domain calibrasil.com for transactional emails
@@ -423,15 +425,14 @@ serve(async (req) => {
 
     console.log("[ORDER-STATUS] Email sent successfully");
 
-    return new Response(
-      JSON.stringify({ success: true, emailResult }),
-      { headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
+    return new Response(JSON.stringify({ success: true, emailResult }), {
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
   } catch (error: any) {
     console.error("[ORDER-STATUS] Error:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
   }
 });
