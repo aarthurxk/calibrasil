@@ -34,7 +34,19 @@ const MagicLogin = () => {
   const [hasAttempted, setHasAttempted] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
-  const token = searchParams.get("token");
+  // Get raw token and try to decode if it was double-encoded
+  const rawToken = searchParams.get("token");
+  const token = rawToken ? (() => {
+    try {
+      // If token contains %25 (encoded %), it was double-encoded
+      if (rawToken.includes('%')) {
+        return decodeURIComponent(rawToken);
+      }
+      return rawToken;
+    } catch {
+      return rawToken;
+    }
+  })() : null;
 
   const verifyAndConfirm = useCallback(async () => {
     if (hasAttempted) return;
