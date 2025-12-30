@@ -330,7 +330,7 @@ serve(async (req) => {
     // For shipped status with tracking code, use tracking_code_notification template
     if (data.newStatus === "shipped" && data.trackingCode) {
       const magicLoginUrl = await generateMagicLoginUrl(data.customerEmail, data.orderId);
-      const trackingUrl = "https://www.linkcorreios.com.br/";
+      const trackingUrl = "https://rastreamento.correios.com.br/app/index.php";
 
       const variables: Record<string, string> = {
         customer_name: data.customerName,
@@ -357,7 +357,7 @@ serve(async (req) => {
       // For other status updates, use order_status_update template
       const statusInfo = getStatusInfo(data.newStatus);
       const magicLoginUrl = await generateMagicLoginUrl(data.customerEmail, data.orderId);
-      const trackingUrl = "https://www.linkcorreios.com.br/";
+      const trackingUrl = "https://rastreamento.correios.com.br/app/index.php";
 
       // Generate dynamic sections based on status
       let trackingSection = "";
