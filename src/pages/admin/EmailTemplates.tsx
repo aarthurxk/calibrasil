@@ -48,10 +48,7 @@ export default function EmailTemplates() {
   const { data: templates, isLoading } = useQuery({
     queryKey: ["email-templates"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("email_templates")
-        .select("*")
-        .order("name");
+      const { data, error } = await supabase.from("email_templates").select("*").order("name");
 
       if (error) throw error;
       return data as EmailTemplate[];
@@ -109,7 +106,8 @@ export default function EmailTemplates() {
       customer_name: "João Silva",
       order_id: "ABC12345",
       items_html: '<div class="item"><p><strong>Capa iPhone 15</strong> - R$ 89,90 x 2</p></div>',
-      products_html: '<div class="product"><div class="product-info"><h4>Capa iPhone 15</h4><p>Quantidade: 2 | R$ 89,90</p></div><a href="#" class="btn">Avaliar ⭐</a></div>',
+      products_html:
+        '<div class="product"><div class="product-info"><h4>Capa iPhone 15</h4><p>Quantidade: 2 | R$ 89,90</p></div><a href="#" class="btn">Avaliar ⭐</a></div>',
       total: "R$ 179,80",
       shipping_address: "Rua das Palmeiras, 123 - Boa Viagem, Recife - PE, 51020-000",
       delivery_days: "5 a 10 dias úteis",
@@ -151,7 +149,7 @@ export default function EmailTemplates() {
     }
 
     toast.info(`Enviando email de teste para ${user.email}...`);
-    
+
     // For now, just show a success message
     // In a real implementation, you'd call an edge function to send the test email
     setTimeout(() => {
@@ -174,9 +172,7 @@ export default function EmailTemplates() {
           <Mail className="h-6 w-6" />
           Templates de Email
         </h1>
-        <p className="text-muted-foreground mt-1">
-          Edite os templates de email enviados pelo sistema
-        </p>
+        <p className="text-muted-foreground mt-1">Edite os templates de email enviados pelo sistema</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
@@ -201,12 +197,12 @@ export default function EmailTemplates() {
                   <span className="text-xl">{templateIcons[template.template_key] || "📧"}</span>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{template.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {template.template_key}
-                    </p>
+                    <p className="text-xs text-muted-foreground truncate">{template.template_key}</p>
                   </div>
                   {!template.is_active && (
-                    <Badge variant="secondary" className="text-xs">Inativo</Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      Inativo
+                    </Badge>
                   )}
                 </div>
               </button>
@@ -230,12 +226,10 @@ export default function EmailTemplates() {
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <Label htmlFor="is-active" className="text-sm">Ativo</Label>
-                    <Switch
-                      id="is-active"
-                      checked={isActive}
-                      onCheckedChange={setIsActive}
-                    />
+                    <Label htmlFor="is-active" className="text-sm">
+                      Ativo
+                    </Label>
+                    <Switch id="is-active" checked={isActive} onCheckedChange={setIsActive} />
                   </div>
                 </div>
               </CardHeader>
@@ -269,9 +263,7 @@ export default function EmailTemplates() {
                       </Badge>
                     ))}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Clique em uma variável para copiar
-                  </p>
+                  <p className="text-xs text-muted-foreground">Clique em uma variável para copiar</p>
                 </div>
 
                 {/* Tabs for Editor/Preview */}
@@ -337,9 +329,7 @@ export default function EmailTemplates() {
             <CardContent className="flex flex-col items-center justify-center h-96 text-center">
               <Mail className="h-16 w-16 text-muted-foreground/30 mb-4" />
               <h3 className="text-lg font-medium">Selecione um Template</h3>
-              <p className="text-muted-foreground mt-1">
-                Escolha um template na lista ao lado para começar a editar
-              </p>
+              <p className="text-muted-foreground mt-1">Escolha um template na lista ao lado para começar a editar</p>
             </CardContent>
           )}
         </Card>
