@@ -51,12 +51,13 @@ const Review = () => {
       
       if (existingReview) return false;
 
-      // Check if user has a delivered order with this product
+      // SECURITY: Only allow review if received_at is set (user confirmed receipt)
+      // This prevents reviews before the product was actually received
       const { data: orders } = await supabase
         .from('orders')
         .select('id')
         .eq('user_id', user.id)
-        .or('status.eq.delivered,received_at.not.is.null');
+        .not('received_at', 'is', null);
       
       if (!orders || orders.length === 0) return false;
       
