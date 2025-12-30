@@ -4,7 +4,6 @@ import { CheckCircle2, AlertCircle, Info, ShoppingBag, Package, Loader2, Star } 
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -26,7 +25,6 @@ interface ApiResponse {
 
 const ConfirmarRecebimento = () => {
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
   
   const [status, setStatus] = useState<ConfirmStatus>("loading");
   const [message, setMessage] = useState("Confirmando recebimento...");
@@ -155,18 +153,9 @@ const ConfirmarRecebimento = () => {
                   <Button asChild variant="outline">
                     <Link to="/shop">
                       <ShoppingBag className="h-4 w-4 mr-2" />
-                      Ir para a Loja
+                      Continuar Comprando
                     </Link>
                   </Button>
-
-                  {user && (
-                    <Button asChild variant="outline">
-                      <Link to="/orders">
-                        <Package className="h-4 w-4 mr-2" />
-                        Meus Pedidos
-                      </Link>
-                    </Button>
-                  )}
                 </div>
               )}
 

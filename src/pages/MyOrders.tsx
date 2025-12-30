@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Package, ChevronRight, ShoppingBag, Star, CheckCircle } from "lucide-react";
+import { ArrowLeft, Package, ChevronRight, ShoppingBag, Star, CheckCircle, PackageCheck, Loader2 } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,12 +16,14 @@ import {
 } from "@/components/ui/select";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
 
 interface Order {
   id: string;
   total: number;
   status: string;
   created_at: string;
+  received_at: string | null;
   item_count?: number;
   review_email_sent?: boolean;
   has_review?: boolean;
@@ -34,6 +36,7 @@ const MyOrders = () => {
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -54,10 +57,10 @@ const MyOrders = () => {
     setIsLoading(true);
 
     try {
-      // Fetch orders with review_email_sent
+      // Fetch orders with received_at for confirmation status
       const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
-        .select("id, total, status, created_at, review_email_sent")
+        .select("id, total, status, created_at, received_at, review_email_sent")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
@@ -85,6 +88,7 @@ const MyOrders = () => {
             ...order,
             item_count: itemCount || 0,
             has_review: (reviewCount || 0) > 0,
+            received_at: order.received_at,
           };
         })
       );
@@ -128,6 +132,57 @@ const MyOrders = () => {
 
   const formatPrice = (price: number) => {
     return price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  };
+
+  // Handle confirm receipt directly (for logged-in users)
+  const handleConfirmReceipt = async (orderId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!user) return;
+    
+    setConfirmingOrderId(orderId);
+    
+    try {
+      // Call RPC to create token and validate immediately
+      const { data: token, error: tokenError } = await supabase.rpc("create_order_confirm_token", {
+        p_order_id: orderId,
+      });
+
+      if (tokenError) throw tokenError;
+
+      // Validate and confirm using the token
+      const { data: result, error: validateError } = await supabase.rpc("validate_order_confirm_token", {
+        p_order_id: orderId,
+        p_token: token,
+      });
+
+      if (validateError) throw validateError;
+
+      // Cast result to expected shape
+      const validationResult = result as { valid?: boolean; error?: string } | null;
+
+      if (validationResult?.valid) {
+        toast.success("Recebimento confirmado!");
+        // Refresh orders list
+        fetchOrders();
+      } else if (validationResult?.error === "token_already_used") {
+        toast.info("Este pedido já foi confirmado anteriormente.");
+        fetchOrders();
+      } else {
+        toast.error("Erro ao confirmar recebimento.");
+      }
+    } catch (error) {
+      console.error("Error confirming receipt:", error);
+      toast.error("Erro ao confirmar recebimento. Tente novamente.");
+    } finally {
+      setConfirmingOrderId(null);
+    }
+  };
+
+  // Check if order can be confirmed (shipped or delivered without received_at)
+  const canConfirmReceipt = (order: Order) => {
+    return (order.status === "shipped" || order.status === "delivered") && !order.received_at;
   };
 
   if (isLoading) {
@@ -242,18 +297,43 @@ const MyOrders = () => {
                           </p>
                         </div>
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-2">
-                          <div className="flex items-center gap-3">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="text-sm text-muted-foreground">
                               {order.item_count} {order.item_count === 1 ? "item" : "itens"}
                             </span>
-                                          <Badge variant={getStatusVariant(order.status)}>
+                            <Badge variant={getStatusVariant(order.status)}>
                               {getStatusLabel(order.status)}
                             </Badge>
-                            {/* Review badge/button for delivered orders */}
-                            {order.status === "delivered" && (
+                            
+                            {/* Confirm receipt button */}
+                            {canConfirmReceipt(order) && (
+                              <button
+                                onClick={(e) => handleConfirmReceipt(order.id, e)}
+                                disabled={confirmingOrderId === order.id}
+                                className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+                              >
+                                {confirmingOrderId === order.id ? (
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                ) : (
+                                  <PackageCheck className="h-3 w-3 mr-1" />
+                                )}
+                                Confirmar Recebimento
+                              </button>
+                            )}
+                            
+                            {/* Receipt confirmed badge */}
+                            {order.received_at && (
+                              <Badge variant="outline" className="text-green-600 border-green-600">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Recebido
+                              </Badge>
+                            )}
+                            
+                            {/* Review badge/button for delivered orders with received_at */}
+                            {order.received_at && (
                               order.has_review ? (
-                                <Badge variant="outline" className="text-green-600 border-green-600">
-                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                <Badge variant="outline" className="text-blue-600 border-blue-600">
+                                  <Star className="h-3 w-3 mr-1" />
                                   Avaliado
                                 </Badge>
                               ) : (

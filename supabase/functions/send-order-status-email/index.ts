@@ -35,13 +35,39 @@ const escapeHtml = (str: string): string => {
     .replace(/'/g, "&#039;");
 };
 
-// Generate Magic Login JWT (15 minutes)
+// Generate confirmation URL using existing order_confirm_tokens system
+// This creates a secure token via RPC and returns a URL that works without auth
+async function generateConfirmReceiptUrl(supabase: any, orderId: string): Promise<string> {
+  const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://calibrasil.com";
+
+  try {
+    // Call RPC to create/update token (returns raw token, stores hash in DB)
+    const { data: token, error } = await supabase.rpc("create_order_confirm_token", {
+      p_order_id: orderId,
+    });
+
+    if (error) {
+      console.error("[ORDER-STATUS] Failed to create confirm token:", error);
+      throw new Error("Failed to create confirmation token");
+    }
+
+    console.log(`[ORDER-STATUS] Created confirm token for order ${orderId.substring(0, 8)}`);
+
+    // Return URL for public confirmation page (no auth required)
+    return `${frontendUrl}/confirmar-recebimento?orderId=${encodeURIComponent(orderId)}&token=${encodeURIComponent(token)}`;
+  } catch (err) {
+    console.error("[ORDER-STATUS] Error generating confirm URL:", err);
+    throw err;
+  }
+}
+
+// Keep Magic Login for review only (backward compatibility)
 async function generateMagicLoginUrl(email: string, orderId: string): Promise<string> {
   const jwtSecret = Deno.env.get("MAGIC_LOGIN_JWT_SECRET");
   const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://calibrasil.com";
 
   if (!jwtSecret) {
-    console.error("[ORDER-STATUS] MAGIC_LOGIN_JWT_SECRET not configured, falling back to old method");
+    console.error("[ORDER-STATUS] MAGIC_LOGIN_JWT_SECRET not configured");
     throw new Error("JWT secret not configured");
   }
 
@@ -53,7 +79,7 @@ async function generateMagicLoginUrl(email: string, orderId: string): Promise<st
   ]);
 
   const now = Math.floor(Date.now() / 1000);
-  const exp = now + 7 * 24 * 60 * 60; // 7 days (same as confirmation token)
+  const exp = now + 7 * 24 * 60 * 60; // 7 days
 
   const jwt = await create(
     { alg: "HS256", typ: "JWT" },
@@ -167,7 +193,7 @@ async function generateEmailFromTemplate(
   return generateFallbackEmail(supabase, data);
 }
 
-// Fallback hardcoded email for when template is not found (uses Magic Login)
+// Fallback hardcoded email for when template is not found
 async function generateFallbackEmail(
   supabase: any,
   data: OrderStatusEmailRequest,
@@ -175,8 +201,8 @@ async function generateFallbackEmail(
   const statusInfo = getStatusInfo(data.newStatus);
   const storeUrl = Deno.env.get("FRONTEND_URL") || "https://calibrasil.com";
 
-  // Use Magic Login URL for confirmation
-  const magicLoginUrl = await generateMagicLoginUrl(data.customerEmail, data.orderId);
+  // Use token-based confirmation URL (works without auth, no blank screen issues)
+  const confirmUrl = await generateConfirmReceiptUrl(supabase, data.orderId);
 
   const subject = `${statusInfo.emoji} Seu pedido foi ${statusInfo.label.toLowerCase()}! #${data.orderId.substring(0, 8).toUpperCase()}`;
 
@@ -232,10 +258,10 @@ async function generateFallbackEmail(
                 <p style="font-size: 14px; color: #555; margin: 0 0 16px 0;">
                   ${data.newStatus === "shipped" ? "Já recebeu seu pedido?" : "Confirme o recebimento e avalie seus produtos:"}
                 </p>
-                <a href="${magicLoginUrl}" target="_blank" rel="noopener noreferrer"
+                <a href="${confirmUrl}" target="_blank" rel="noopener noreferrer"
                    style="display: inline-block; background: #E63946; color: #ffffff; text-decoration: none;
                    padding: 14px 32px; border-radius: 6px; font-weight: 500; font-size: 16px;">
-                   Confirmar Recebimento
+                   ✅ Confirmar Recebimento
                 </a>
                 <p style="font-size: 12px; color: #888; margin: 16px 0 0 0;">
                   Este link expira em 7 dias.
@@ -329,7 +355,8 @@ serve(async (req) => {
 
     // For shipped status with tracking code, use tracking_code_notification template
     if (data.newStatus === "shipped" && data.trackingCode) {
-      const magicLoginUrl = await generateMagicLoginUrl(data.customerEmail, data.orderId);
+      // Use token-based confirmation URL (works without auth)
+      const confirmUrl = await generateConfirmReceiptUrl(supabaseAdmin, data.orderId);
       const trackingUrl = "https://rastreamento.correios.com.br/app/index.php";
 
       const variables: Record<string, string> = {
@@ -337,21 +364,22 @@ serve(async (req) => {
         order_id: data.orderId.substring(0, 8).toUpperCase(),
         tracking_code: data.trackingCode,
         tracking_url: trackingUrl,
-        confirmation_url: magicLoginUrl,
+        confirmation_url: confirmUrl,
         store_name: "Cali Brasil",
         store_email: "oi@calibrasil.com",
       };
 
       emailContent = await generateEmailFromTemplate(supabaseAdmin, data, "tracking_code_notification", variables);
     } else if (data.newStatus === "delivered") {
-      // For delivered status, use magic login URL
-      const magicLoginUrl = await generateMagicLoginUrl(data.customerEmail, data.orderId);
+      // For delivered status, use token-based confirmation + magic login for review
+      const confirmUrl = await generateConfirmReceiptUrl(supabaseAdmin, data.orderId);
+      const reviewUrl = await generateMagicLoginUrl(data.customerEmail, data.orderId);
 
       const variables: Record<string, string> = {
         customer_name: data.customerName,
         order_id: data.orderId.substring(0, 8).toUpperCase(),
-        confirmation_url: magicLoginUrl,
-        review_url: magicLoginUrl,
+        confirmation_url: confirmUrl,
+        review_url: reviewUrl,
         store_name: "Cali Brasil",
         store_email: "oi@calibrasil.com",
       };
@@ -360,7 +388,6 @@ serve(async (req) => {
     } else {
       // For other status updates, use order_status_update template
       const statusInfo = getStatusInfo(data.newStatus);
-      const magicLoginUrl = await generateMagicLoginUrl(data.customerEmail, data.orderId);
       const trackingUrl = "https://rastreamento.correios.com.br/app/index.php";
 
       // Generate dynamic sections based on status
@@ -379,12 +406,13 @@ serve(async (req) => {
         `;
       }
 
-      // Confirmation section - show for shipped status
+      // Confirmation section - show for shipped status (use token-based URL)
       if (data.newStatus === "shipped") {
+        const confirmUrl = await generateConfirmReceiptUrl(supabaseAdmin, data.orderId);
         confirmationSection = `
           <div style="text-align: center; margin: 20px 0;">
             <p style="color: #666;">Já recebeu? Confirme para nós:</p>
-            <a href="${magicLoginUrl}" style="display: inline-block; background: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">✅ Recebi meu Pedido</a>
+            <a href="${confirmUrl}" style="display: inline-block; background: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">✅ Recebi meu Pedido</a>
           </div>
         `;
       }
