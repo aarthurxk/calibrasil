@@ -67,7 +67,7 @@ async function generateMagicLoginUrl(email: string, orderId: string): Promise<st
     cryptoKey,
   );
 
-  return `${frontendUrl}/magic-login?token=${encodeURIComponent(jwt)}`;
+  return `${frontendUrl}/magic-login?token=${jwt}`;
 }
 
 const getStatusInfo = (status: string): { label: string; emoji: string; color: string; message: string } => {
@@ -338,6 +338,8 @@ serve(async (req) => {
         tracking_code: data.trackingCode,
         tracking_url: trackingUrl,
         confirmation_url: magicLoginUrl,
+        store_name: "Cali Brasil",
+        store_email: "oi@calibrasil.com",
       };
 
       emailContent = await generateEmailFromTemplate(supabaseAdmin, data, "tracking_code_notification", variables);
@@ -350,6 +352,8 @@ serve(async (req) => {
         order_id: data.orderId.substring(0, 8).toUpperCase(),
         confirmation_url: magicLoginUrl,
         review_url: magicLoginUrl,
+        store_name: "Cali Brasil",
+        store_email: "oi@calibrasil.com",
       };
 
       emailContent = await generateEmailFromTemplate(supabaseAdmin, data, "order_delivered", variables);
@@ -410,6 +414,8 @@ serve(async (req) => {
         tracking_section: trackingSection,
         confirmation_section: confirmationSection,
         review_section: reviewSection,
+        store_name: "Cali Brasil",
+        store_email: "oi@calibrasil.com",
       };
 
       emailContent = await generateEmailFromTemplate(supabaseAdmin, data, "order_status_update", variables);
