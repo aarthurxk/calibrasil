@@ -249,7 +249,7 @@ const Checkout = () => {
         shipping_address: isPickup ? { firstName, lastName, street: "Retirada na Loja", number: "", complement: settings.store_pickup_address || "", neighborhood: "", city: "", state: "", zip: "" }
           : { firstName, lastName, street: payload.shippingAddress?.street, number: payload.shippingAddress?.houseNumber, complement: payload.shippingAddress?.complement, neighborhood: payload.shippingAddress?.neighborhood, city: payload.shippingAddress?.city, state: payload.shippingAddress?.state, zip: payload.shippingAddress?.zip },
         user_id: payload.user_id, total: finalTotal, shipping, shipping_method: payload.shippingMethod, payment_method: "card",
-        success_url: `${baseUrl}/order-confirmation`, cancel_url: `${baseUrl}/checkout`, coupon_code: payload.couponCode,
+        success_url: `${baseUrl}/order-confirmation`, cancel_url: `${baseUrl}/checkout`, coupon_code: payload.couponCode || "",
       };
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
