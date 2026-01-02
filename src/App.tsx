@@ -54,6 +54,7 @@ const OrderMonitor = lazy(() => import("./pages/admin/OrderMonitor"));
 const Diagnostic = lazy(() => import("./pages/admin/Diagnostic"));
 const EmailTests = lazy(() => import("./pages/admin/EmailTests"));
 const Reviews = lazy(() => import("./pages/admin/Reviews"));
+const ShippingLabelPage = lazy(() => import("./pages/admin/ShippingLabelPage"));
 
 const queryClient = new QueryClient();
 
@@ -137,6 +138,7 @@ const App = () => (
                   <Route path="diagnostic" element={<Diagnostic />} />
                   <Route path="email-tests" element={<EmailTests />} />
                   <Route path="reviews" element={<Reviews />} />
+                  <Route path="shipping-label/:orderId" element={<ShippingLabelPage />} />
                 </Route>
                 
                   {/* Catch-all */}

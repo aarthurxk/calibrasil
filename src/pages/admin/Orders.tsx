@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Eye, Loader2, X, Filter } from 'lucide-react';
+import { Search, Eye, Loader2, X, Filter, Printer } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -505,17 +505,27 @@ const Orders = () => {
                       </td>
                       {canEditOrders && (
                         <td className="py-3 px-4">
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            aria-label="Ver detalhes do pedido"
-                            onClick={() => {
-                              setSelectedOrder(order);
-                              setIsDetailsOpen(true);
-                            }}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              aria-label="Ver detalhes do pedido"
+                              onClick={() => {
+                                setSelectedOrder(order);
+                                setIsDetailsOpen(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Imprimir etiqueta"
+                              onClick={() => window.open(`/admin/shipping-label/${order.id}`, '_blank')}
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </td>
                       )}
                     </tr>
