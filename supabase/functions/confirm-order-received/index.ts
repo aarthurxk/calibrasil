@@ -15,8 +15,8 @@ interface ApiResponse {
 }
 
 const statusMessages: Record<ConfirmStatus, string> = {
-  confirmed: "Recebimento confirmado com sucesso!",
-  already: "Este pedido já havia sido confirmado anteriormente.",
+  confirmed: "Recebimento confirmado com sucesso! Agora você pode avaliar seus produtos.",
+  already: "Este pedido já havia sido confirmado anteriormente. Você pode avaliar os produtos.",
   invalid: "Link inválido. O token não corresponde ao pedido.",
   expired: "Este link expirou. Solicite um novo link.",
   error: "Ocorreu um erro ao processar sua solicitação.",
@@ -55,7 +55,7 @@ serve(async (req) => {
       return jsonResponse({ status: "error", message_pt: "Requisição inválida." }, 400);
     }
 
-    console.log(`[CONFIRM] Processing order: ${orderId}`);
+    console.log(`[CONFIRM] Processing order: ${orderId?.substring(0, 8)}`);
 
     // Validar parâmetros
     if (!orderId || typeof orderId !== "string") {
@@ -81,13 +81,13 @@ serve(async (req) => {
     }
 
     if (!order) {
-      console.error("[CONFIRM] Order not found:", orderId);
+      console.error("[CONFIRM] Order not found:", orderId.substring(0, 8));
       return jsonResponse({ status: "error", message_pt: "Pedido não encontrado." }, 404);
     }
 
     // IDEMPOTÊNCIA: Se já está confirmado (delivered ou received), retornar sucesso
     if (order.status === "delivered" || order.status === "received" || order.received_at) {
-      console.log(`[CONFIRM] Order ${orderId} already confirmed (status: ${order.status}, received_at: ${order.received_at})`);
+      console.log(`[CONFIRM] Order ${orderId.substring(0, 8)} already confirmed (status: ${order.status})`);
       
       // Log da tentativa
       await logAudit(supabase, orderId, "already", req);
@@ -121,11 +121,17 @@ serve(async (req) => {
 
       await logAudit(supabase, orderId, status, req, { error: errorType });
 
+      // Se token já foi usado, ainda permite avaliar
+      if (status === "already") {
+        return jsonResponse({ status: "already", message_pt: statusMessages.already }, 200);
+      }
+
       return jsonResponse({ status, message_pt: statusMessages[status] }, 200);
     }
 
     // Sucesso! O RPC já atualizou o pedido e marcou o token como usado
-    console.log(`[CONFIRM] Order ${orderId} confirmed successfully`);
+    // Nota: O RPC validate_order_confirm_token já atualiza status para 'delivered' e received_at
+    console.log(`[CONFIRM] Order ${orderId.substring(0, 8)} confirmed successfully`);
     await logAudit(supabase, orderId, "confirmed", req);
 
     return jsonResponse({ status: "confirmed", message_pt: statusMessages.confirmed }, 200);
@@ -135,7 +141,8 @@ serve(async (req) => {
     return jsonResponse({ status: "error", message_pt: statusMessages.error }, 500);
   }
 });
-// ✅ Helper: JSON response with proper headers and CORS
+
+// Helper: JSON response with proper headers and CORS
 function jsonResponse(data: ApiResponse, statusCode: number = 200): Response {
   return new Response(JSON.stringify(data), {
     status: statusCode,
@@ -147,7 +154,6 @@ function jsonResponse(data: ApiResponse, statusCode: number = 200): Response {
     },
   });
 }
-// Helper: JSON response with CORS (backup version, now using the enhanced version above)
 
 // Helper: Log para auditoria
 async function logAudit(
@@ -162,9 +168,14 @@ async function logAudit(
       action: "confirm_order_received",
       entity_type: "order",
       entity_id: orderId,
-      metadata: { status, ...metadata },
+      metadata: { 
+        status, 
+        confirmed_at: new Date().toISOString(),
+        ...metadata 
+      },
       user_agent: req.headers.get("user-agent"),
     });
+    console.log(`[CONFIRM] Audit log created for order ${orderId.substring(0, 8)}`);
   } catch (e) {
     console.error("[CONFIRM] Failed to log audit:", e);
   }
