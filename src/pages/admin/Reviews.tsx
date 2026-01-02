@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Star, Check, X, Search, Filter, Edit2, Trash2, MessageSquare, Loader2 } from "lucide-react";
+import { Star, Check, X, Search, Filter, Edit2, Trash2, MessageSquare, Loader2, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -71,6 +72,23 @@ const Reviews = () => {
   const [deleteReview, setDeleteReview] = useState<Review | null>(null);
   const [page, setPage] = useState(1);
   const pageSize = 10;
+
+  // Fetch stats for dashboard cards
+  const { data: stats } = useQuery({
+    queryKey: ["admin-reviews-stats"],
+    queryFn: async () => {
+      const [pendingRes, approvedRes, lowRatingRes] = await Promise.all([
+        supabase.from("product_reviews").select("id", { count: "exact", head: true }).eq("approved", false),
+        supabase.from("product_reviews").select("id", { count: "exact", head: true }).eq("approved", true),
+        supabase.from("product_reviews").select("id", { count: "exact", head: true }).lte("rating", 2),
+      ]);
+      return {
+        pending: pendingRes.count || 0,
+        approved: approvedRes.count || 0,
+        lowRating: lowRatingRes.count || 0,
+      };
+    },
+  });
 
   // Fetch reviews with product info
   const { data: reviewsData, isLoading } = useQuery({
@@ -210,6 +228,59 @@ const Reviews = () => {
         <p className="text-muted-foreground">
           Gerencie as avaliações de produtos da loja
         </p>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card 
+          className={`cursor-pointer transition-all hover:border-primary/50 ${statusFilter === "pending" ? "border-primary ring-1 ring-primary/20" : ""}`}
+          onClick={() => setStatusFilter("pending")}
+        >
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+              <Clock className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Pendentes</p>
+              <p className="text-2xl font-bold">{stats?.pending || 0}</p>
+            </div>
+            {(stats?.pending || 0) > 0 && (
+              <Badge variant="secondary" className="ml-auto bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                Requer ação
+              </Badge>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card 
+          className={`cursor-pointer transition-all hover:border-primary/50 ${statusFilter === "approved" ? "border-primary ring-1 ring-primary/20" : ""}`}
+          onClick={() => setStatusFilter("approved")}
+        >
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+              <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Aprovadas</p>
+              <p className="text-2xl font-bold">{stats?.approved || 0}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="cursor-pointer transition-all hover:border-primary/50"
+          onClick={() => { setStatusFilter("all"); setRatingFilter("1"); }}
+        >
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+              <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Notas Baixas (≤2)</p>
+              <p className="text-2xl font-bold">{stats?.lowRating || 0}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
