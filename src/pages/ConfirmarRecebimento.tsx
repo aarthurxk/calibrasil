@@ -1,222 +1,218 @@
-import { useEffect, useState, useCallback } from "react";
-import { useSearchParams, Link, useNavigate } from "react-router-dom";
-import { CheckCircle2, AlertCircle, Info, ShoppingBag, Loader2, Star } from "lucide-react";
-import MainLayout from "@/components/layout/MainLayout";
+import { useEffect, useState } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { CheckCircle2, XCircle, Loader2, AlertCircle, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import MainLayout from "@/components/layout/MainLayout";
 import { supabase } from "@/integrations/supabase/client";
 
-/**
- * PÁGINA PÚBLICA DE CONFIRMAÇÃO DE RECEBIMENTO
- * 
- * Rota: /confirmar-recebimento
- * 
- * Esta página é acessada via link do e-mail.
- * Ela chama a Edge Function via POST e exibe o resultado.
- * Após confirmação bem-sucedida, redireciona para a página de avaliação.
- */
-
-type ConfirmStatus = "loading" | "confirmed" | "already" | "invalid" | "expired" | "error";
+type ConfirmStatus = "loading" | "confirmed" | "already" | "invalid" | "expired" | "error" | "missing_params";
 
 interface ApiResponse {
-  status: ConfirmStatus;
+  status: string;
   message_pt: string;
 }
 
 const ConfirmarRecebimento = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  
   const [status, setStatus] = useState<ConfirmStatus>("loading");
-  const [message, setMessage] = useState("Confirmando recebimento...");
-  const [hasAttempted, setHasAttempted] = useState(false);
-  const [countdown, setCountdown] = useState(3);
+  const [message, setMessage] = useState<string>("");
+  const [orderId, setOrderId] = useState<string>("");
 
-  const rawOrderId = searchParams.get("orderId");
-  const rawToken = searchParams.get("token");
-  const orderId = rawOrderId ? decodeURIComponent(rawOrderId) : null;
-  const token = rawToken ? decodeURIComponent(rawToken) : null;
-
-  // Auto-redirect countdown for successful confirmations
   useEffect(() => {
-    if ((status === "confirmed" || status === "already") && orderId && token) {
-      const timer = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            navigate(`/avaliar?orderId=${encodeURIComponent(orderId)}&token=${encodeURIComponent(token)}`);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      return () => clearInterval(timer);
-    }
-  }, [status, orderId, token, navigate]);
+    const orderIdParam = searchParams.get("orderId");
+    const tokenParam = searchParams.get("token");
 
-  const confirmReceipt = useCallback(async () => {
-    // Evitar chamadas duplicadas
-    if (hasAttempted) return;
-    setHasAttempted(true);
+    console.log("[CONFIRM-PAGE] URL params:", { orderIdParam, tokenParam });
 
-    // Validar parâmetros antes de chamar API
-    if (!orderId || !token) {
-      setStatus("invalid");
-      setMessage("Link inválido. Parâmetros ausentes.");
+    // Validar parâmetros da URL
+    if (!orderIdParam || !tokenParam) {
+      console.error("[CONFIRM-PAGE] Missing required parameters");
+      setStatus("missing_params");
+      setMessage("Link de confirmação incompleto. Verifique o link enviado por e-mail.");
       return;
     }
 
-    try {
-      console.log("[ConfirmarRecebimento] Calling edge function...");
-      
-      const { data, error } = await supabase.functions.invoke<ApiResponse>(
-        "confirm-order-received",
-        {
-          body: { orderId, token },
-        }
-      );
+    setOrderId(orderIdParam);
+    confirmarRecebimento(orderIdParam, tokenParam);
+  }, [searchParams]);
 
-      console.log("[ConfirmarRecebimento] Response:", { data, error });
+  const confirmarRecebimento = async (orderId: string, token: string) => {
+    console.log("[CONFIRM-PAGE] Starting confirmation process...");
+
+    try {
+      setStatus("loading");
+
+      // Chamar a Edge Function via supabase.functions.invoke
+      const { data, error } = await supabase.functions.invoke("confirm-order-received-v2", {
+        body: { orderId, token },
+      });
+
+      console.log("[CONFIRM-PAGE] Response:", { data, error });
 
       if (error) {
-        console.error("[ConfirmarRecebimento] Error:", error);
+        console.error("[CONFIRM-PAGE] Function invocation error:", error);
         setStatus("error");
-        setMessage("Erro ao confirmar recebimento. Tente novamente.");
+        setMessage("Erro ao processar sua solicitação. Tente novamente mais tarde.");
         return;
       }
 
-      if (data) {
-        setStatus(data.status as ConfirmStatus);
-        setMessage(data.message_pt);
+      // Processar resposta da API
+      const response = data as ApiResponse;
+
+      if (response.status === "confirmed") {
+        setStatus("confirmed");
+        setMessage(response.message_pt || "Recebimento confirmado com sucesso!");
+
+        // Redirecionar para avaliação após 3 segundos
+        setTimeout(() => {
+          navigate(`/avaliar?orderId=${orderId}`);
+        }, 3000);
+      } else if (response.status === "already") {
+        setStatus("already");
+        setMessage(response.message_pt || "Este pedido já foi confirmado anteriormente.");
+      } else if (response.status === "invalid") {
+        setStatus("invalid");
+        setMessage(response.message_pt || "Link inválido. O token não corresponde ao pedido.");
+      } else if (response.status === "expired") {
+        setStatus("expired");
+        setMessage(response.message_pt || "Este link expirou. Solicite um novo link.");
       } else {
         setStatus("error");
-        setMessage("Resposta inválida do servidor.");
+        setMessage(response.message_pt || "Erro ao processar sua solicitação.");
       }
     } catch (err) {
-      console.error("[ConfirmarRecebimento] Unexpected error:", err);
+      console.error("[CONFIRM-PAGE] Unexpected error:", err);
       setStatus("error");
-      setMessage("Erro inesperado. Tente novamente mais tarde.");
-    }
-  }, [orderId, token, hasAttempted]);
-
-  useEffect(() => {
-    confirmReceipt();
-  }, [confirmReceipt]);
-
-  // Configuração visual por status
-  const getContent = () => {
-    switch (status) {
-      case "loading":
-        return {
-          icon: <Loader2 className="h-16 w-16 text-primary animate-spin" />,
-          title: "Confirmando recebimento...",
-          subtitle: "Aguarde um momento",
-        };
-      case "confirmed":
-        return {
-          icon: <CheckCircle2 className="h-16 w-16 text-green-500" />,
-          title: "Recebimento confirmado!",
-          subtitle: "Obrigado por confiar na Calibrasil 💛",
-        };
-      case "already":
-        return {
-          icon: <Info className="h-16 w-16 text-blue-500" />,
-          title: "Pedido já confirmado",
-          subtitle: "Você já confirmou este pedido anteriormente.",
-        };
-      case "expired":
-        return {
-          icon: <AlertCircle className="h-16 w-16 text-amber-500" />,
-          title: "Link expirado",
-          subtitle: "Este link não é mais válido. Solicite um novo.",
-        };
-      case "invalid":
-      case "error":
-      default:
-        return {
-          icon: <AlertCircle className="h-16 w-16 text-destructive" />,
-          title: "Erro na confirmação",
-          subtitle: "Não foi possível processar sua solicitação.",
-        };
+      setMessage("Erro inesperado ao confirmar recebimento. Tente novamente.");
     }
   };
 
-  const content = getContent();
-  const isLoading = status === "loading";
-  const isSuccess = status === "confirmed" || status === "already";
+  const renderContent = () => {
+    switch (status) {
+      case "loading":
+        return (
+          <Card className="w-full max-w-md mx-auto">
+            <CardContent className="pt-6 text-center">
+              <Loader2 className="h-16 w-16 animate-spin text-primary mx-auto mb-4" />
+              <CardTitle className="text-xl mb-2">Confirmando recebimento...</CardTitle>
+              <CardDescription>Por favor, aguarde um momento.</CardDescription>
+            </CardContent>
+          </Card>
+        );
+
+      case "confirmed":
+        return (
+          <Card className="w-full max-w-md mx-auto">
+            <CardHeader className="text-center">
+              <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
+              <CardTitle className="text-2xl">Recebimento Confirmado! ✅</CardTitle>
+              <CardDescription className="text-base mt-2">{message}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-center text-sm text-muted-foreground">
+                Você será redirecionado para avaliar o produto em alguns segundos...
+              </p>
+              <Button onClick={() => navigate(`/avaliar?orderId=${orderId}`)} className="w-full">
+                Avaliar produto agora
+              </Button>
+              <Button onClick={() => navigate("/")} variant="outline" className="w-full">
+                Voltar para a loja
+              </Button>
+            </CardContent>
+          </Card>
+        );
+
+      case "already":
+        return (
+          <Card className="w-full max-w-md mx-auto">
+            <CardHeader className="text-center">
+              <AlertCircle className="h-16 w-16 text-blue-500 mx-auto mb-4" />
+              <CardTitle className="text-2xl">Já Confirmado</CardTitle>
+              <CardDescription className="text-base mt-2">{message}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button onClick={() => navigate(`/avaliar?orderId=${orderId}`)} className="w-full">
+                Avaliar produto
+              </Button>
+              <Button onClick={() => navigate("/orders")} variant="outline" className="w-full">
+                Ver meus pedidos
+              </Button>
+            </CardContent>
+          </Card>
+        );
+
+      case "invalid":
+      case "expired":
+        return (
+          <Card className="w-full max-w-md mx-auto">
+            <CardHeader className="text-center">
+              <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+              <CardTitle className="text-2xl">{status === "invalid" ? "Link Inválido" : "Link Expirado"}</CardTitle>
+              <CardDescription className="text-base mt-2">{message}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-center text-sm text-muted-foreground">
+                Entre em contato conosco para obter um novo link de confirmação.
+              </p>
+              <Button onClick={() => navigate("/contact")} className="w-full">
+                Falar com o suporte
+              </Button>
+              <Button onClick={() => navigate("/")} variant="outline" className="w-full">
+                Voltar para a loja
+              </Button>
+            </CardContent>
+          </Card>
+        );
+
+      case "missing_params":
+        return (
+          <Card className="w-full max-w-md mx-auto">
+            <CardHeader className="text-center">
+              <Package className="h-16 w-16 text-orange-500 mx-auto mb-4" />
+              <CardTitle className="text-2xl">Link Incompleto</CardTitle>
+              <CardDescription className="text-base mt-2">{message}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-center text-sm text-muted-foreground">
+                Certifique-se de usar o link completo enviado no e-mail.
+              </p>
+              <Button onClick={() => navigate("/orders")} className="w-full">
+                Ver meus pedidos
+              </Button>
+              <Button onClick={() => navigate("/")} variant="outline" className="w-full">
+                Voltar para a loja
+              </Button>
+            </CardContent>
+          </Card>
+        );
+
+      case "error":
+      default:
+        return (
+          <Card className="w-full max-w-md mx-auto">
+            <CardHeader className="text-center">
+              <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+              <CardTitle className="text-2xl">Erro na Confirmação</CardTitle>
+              <CardDescription className="text-base mt-2">{message}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button onClick={() => window.location.reload()} className="w-full">
+                Tentar novamente
+              </Button>
+              <Button onClick={() => navigate("/contact")} variant="outline" className="w-full">
+                Falar com o suporte
+              </Button>
+            </CardContent>
+          </Card>
+        );
+    }
+  };
 
   return (
     <MainLayout>
-      <div className="container py-12 animate-fade-in">
-        <div className="max-w-lg mx-auto">
-          <Card className="text-center overflow-hidden">
-            {/* Success gradient header */}
-            {isSuccess && (
-              <div className="h-2 bg-gradient-to-r from-green-400 via-primary to-accent" />
-            )}
-            
-            <CardContent className="pt-8 pb-8">
-              {/* Ícone com animação */}
-              <div className="flex justify-center mb-6 transition-all duration-500 ease-out">
-                {content.icon}
-              </div>
-
-              {/* Título */}
-              <h1 className="text-2xl font-bold mb-2 transition-all duration-300">
-                {content.title}
-              </h1>
-
-              {/* Subtítulo */}
-              <p className="text-muted-foreground mb-2">{content.subtitle}</p>
-
-              {/* Mensagem detalhada */}
-              <p className="text-sm text-muted-foreground/80 mb-6">{message}</p>
-
-              {/* Countdown para redirecionamento */}
-              {isSuccess && orderId && token && (
-                <div className="bg-muted/50 rounded-lg p-4 mb-6 transition-all duration-300">
-                  <p className="text-sm text-muted-foreground">
-                    Redirecionando para avaliação em{" "}
-                    <span className="font-bold text-primary">{countdown}s</span>
-                  </p>
-                </div>
-              )}
-
-              {/* Botões de ação */}
-              {!isLoading && (
-                <div className="flex flex-col sm:flex-row gap-3 justify-center transition-all duration-300">
-                  {/* Botão de avaliação - aparecer após confirmação bem-sucedida */}
-                  {isSuccess && orderId && token && (
-                    <Button asChild size="lg">
-                      <Link to={`/avaliar?orderId=${encodeURIComponent(orderId)}&token=${encodeURIComponent(token)}`}>
-                        <Star className="h-4 w-4 mr-2" />
-                        Avaliar Produtos Agora
-                      </Link>
-                    </Button>
-                  )}
-
-                  <Button asChild variant={isSuccess ? "outline" : "default"} size="lg">
-                    <Link to="/shop">
-                      <ShoppingBag className="h-4 w-4 mr-2" />
-                      Continuar Comprando
-                    </Link>
-                  </Button>
-                </div>
-              )}
-
-              {/* Suporte para erros */}
-              {(status === "error" || status === "invalid" || status === "expired") && (
-                <div className="mt-6 pt-6 border-t text-sm text-muted-foreground">
-                  <p>Precisa de ajuda?</p>
-                  <a href="mailto:oi@calibrasil.com" className="text-primary hover:underline">
-                    oi@calibrasil.com
-                  </a>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <div className="container py-12 min-h-[60vh] flex items-center justify-center px-4">{renderContent()}</div>
     </MainLayout>
   );
 };
