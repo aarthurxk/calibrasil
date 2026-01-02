@@ -21,7 +21,8 @@ import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MapPin, Phone, Mail, Package, CreditCard, Calendar, Truck, Loader2, User, Send, Trash2 } from 'lucide-react';
+import { MapPin, Phone, Mail, Package, CreditCard, Calendar, Truck, Loader2, User, Send, Trash2, Printer } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
@@ -126,6 +127,7 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onTrackingCodeSa
   const [isSaving, setIsSaving] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const navigate = useNavigate();
 
   // Buscar dados do perfil quando há user_id
   const { data: profile } = useQuery({
@@ -528,6 +530,18 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onTrackingCodeSa
           <div>
             <h3 className="font-semibold mb-3">Ações</h3>
             <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  onOpenChange(false);
+                  navigate(`/admin/shipping-label/${order.id}`);
+                }}
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Imprimir Etiqueta
+              </Button>
+              
               <Button
                 variant="outline"
                 size="sm"
