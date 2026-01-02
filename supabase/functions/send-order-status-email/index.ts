@@ -199,12 +199,13 @@ async function generateFallbackEmail(
   data: OrderStatusEmailRequest,
 ): Promise<{ subject: string; html: string }> {
   const statusInfo = getStatusInfo(data.newStatus);
-  const storeUrl = Deno.env.get("FRONTEND_URL") || "https://calibrasil.com";
 
   // Use token-based confirmation URL (works without auth, no blank screen issues)
   const confirmUrl = await generateConfirmReceiptUrl(supabase, data.orderId);
 
-  const subject = `${statusInfo.emoji} Seu pedido foi ${statusInfo.label.toLowerCase()}! #${data.orderId.substring(0, 8).toUpperCase()}`;
+  const subject = data.newStatus === "shipped" 
+    ? `🚚 Seu pedido está a caminho! #${data.orderId.substring(0, 8).toUpperCase()}`
+    : `${statusInfo.emoji} Seu pedido foi ${statusInfo.label.toLowerCase()}! #${data.orderId.substring(0, 8).toUpperCase()}`;
 
   const html = `
 <!DOCTYPE html>
@@ -212,75 +213,111 @@ async function generateFallbackEmail(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calibrasil - Atualização do Pedido</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f5f5;">
     <tr>
       <td align="center" style="padding: 40px 20px;">
-        <table role="presentation" style="width: 100%; max-width: 600px; background: #ffffff; border-radius: 8px; padding: 32px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+        <table role="presentation" style="width: 100%; max-width: 560px; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
+          
+          <!-- Header with gradient -->
           <tr>
-            <td style="padding-bottom: 24px;">
-              <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #1a1a1a;">Calibrasil</h1>
+            <td style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); padding: 32px 24px; text-align: center;">
+              <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">Calibrasil</h1>
+              <p style="margin: 8px 0 0; font-size: 14px; color: #FFD700; font-weight: 500;">Estilo beach-tech 🏖️</p>
             </td>
           </tr>
+
+          <!-- Status badge -->
           <tr>
-            <td>
-              <div style="display: inline-block; background: ${statusInfo.color}; color: white; padding: 8px 16px; border-radius: 16px; font-size: 14px; font-weight: 500; margin-bottom: 16px;">
-                ${statusInfo.emoji} ${statusInfo.label}
+            <td style="padding: 32px 24px 16px; text-align: center;">
+              <div style="display: inline-block; background: ${statusInfo.color}; color: white; padding: 10px 20px; border-radius: 24px; font-size: 14px; font-weight: 600; letter-spacing: 0.3px;">
+                ${statusInfo.emoji} ${statusInfo.label.toUpperCase()}
               </div>
-              <h2 style="font-size: 20px; font-weight: 600; margin: 16px 0 8px 0; color: #1a1a1a;">Olá, ${escapeHtml(data.customerName)}!</h2>
-              <p style="font-size: 16px; color: #555; margin: 0;">${statusInfo.message}</p>
             </td>
           </tr>
+
+          <!-- Greeting and message -->
           <tr>
-            <td style="padding: 24px 0;">
-              <div style="background: #f9fafb; border-radius: 8px; padding: 16px;">
-                <p style="margin: 0; font-size: 14px; color: #666;"><strong>Pedido:</strong> #${data.orderId.substring(0, 8).toUpperCase()}</p>
+            <td style="padding: 0 24px 24px; text-align: center;">
+              <h2 style="font-size: 22px; font-weight: 600; margin: 16px 0 8px 0; color: #1a1a1a;">
+                ${data.newStatus === "shipped" ? "Seu pedido está a caminho! 🚚" : `Olá, ${escapeHtml(data.customerName)}!`}
+              </h2>
+              <p style="font-size: 16px; color: #666; margin: 0; line-height: 1.6;">
+                ${statusInfo.message}
+              </p>
+            </td>
+          </tr>
+
+          <!-- Order info box -->
+          <tr>
+            <td style="padding: 0 24px 24px;">
+              <div style="background: #fafafa; border-radius: 12px; padding: 20px; border: 1px solid #eee;">
+                <p style="margin: 0 0 8px 0; font-size: 14px; color: #888;">Número do Pedido</p>
+                <p style="margin: 0; font-size: 18px; font-weight: 700; color: #1a1a1a; letter-spacing: 1px;">
+                  #${data.orderId.substring(0, 8).toUpperCase()}
+                </p>
                 ${
                   data.trackingCode
                     ? `
-                  <p style="margin: 12px 0 0 0; font-size: 14px; color: #666;">
-                    <strong>Rastreamento:</strong> 
-                    <code style="background: #e5e7eb; padding: 4px 8px; border-radius: 4px; font-family: monospace;">${escapeHtml(data.trackingCode)}</code>
-                  </p>
-                  <a href="https://rastreamento.correios.com.br/app/index.php/" target="_blank" style="display: inline-block; margin-top: 12px; color: #8b5cf6; text-decoration: underline; font-size: 14px;">📍 Rastrear Pedido</a>
+                  <div style="margin-top: 16px; padding-top: 16px; border-top: 1px dashed #ddd;">
+                    <p style="margin: 0 0 8px 0; font-size: 14px; color: #888;">Código de Rastreamento</p>
+                    <p style="margin: 0; font-size: 16px; font-weight: 600; color: #1a1a1a; font-family: monospace; background: #fff; padding: 8px 12px; border-radius: 6px; display: inline-block;">
+                      ${escapeHtml(data.trackingCode)}
+                    </p>
+                    <p style="margin: 12px 0 0 0;">
+                      <a href="https://rastreamento.correios.com.br/app/index.php" target="_blank" style="color: #8b5cf6; text-decoration: none; font-size: 14px; font-weight: 500;">
+                        📍 Rastrear nos Correios →
+                      </a>
+                    </p>
+                  </div>
                 `
                     : ""
                 }
               </div>
             </td>
           </tr>
+
+          <!-- CTA Button - Only for shipped/delivered -->
           ${
             data.newStatus === "shipped" || data.newStatus === "delivered"
               ? `
             <tr>
-              <td style="padding: 24px 0;">
-                <p style="font-size: 14px; color: #555; margin: 0 0 16px 0;">
-                  ${data.newStatus === "shipped" ? "Já recebeu seu pedido?" : "Confirme o recebimento e avalie seus produtos:"}
+              <td style="padding: 0 24px 32px; text-align: center;">
+                <p style="font-size: 15px; color: #666; margin: 0 0 20px 0;">
+                  ${data.newStatus === "shipped" ? "Recebeu seu pedido? Confirme para nós!" : "Confirme o recebimento e avalie:"}
                 </p>
                 <a href="${confirmUrl}" target="_blank" rel="noopener noreferrer"
-                   style="display: inline-block; background: #E63946; color: #ffffff; text-decoration: none;
-                   padding: 14px 32px; border-radius: 6px; font-weight: 500; font-size: 16px;">
+                   style="display: inline-block; background: #FFD700; color: #1a1a1a; text-decoration: none;
+                   padding: 16px 40px; border-radius: 8px; font-weight: 700; font-size: 16px; letter-spacing: 0.3px;
+                   box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4); transition: all 0.3s ease;">
                    ✅ Confirmar Recebimento
                 </a>
-                <p style="font-size: 12px; color: #888; margin: 16px 0 0 0;">
-                  Este link expira em 7 dias.
+                <p style="font-size: 12px; color: #999; margin: 16px 0 0 0;">
+                  Link válido por 7 dias
                 </p>
               </td>
             </tr>
           `
               : ""
           }
+
+          <!-- Footer -->
           <tr>
-            <td style="padding-top: 32px; border-top: 1px solid #eee;">
-              <p style="font-size: 13px; color: #999; margin: 0;">
-                Dúvidas? <a href="mailto:oi@calibrasil.com" style="color: #E63946;">oi@calibrasil.com</a>
+            <td style="background: #fafafa; padding: 24px; text-align: center; border-top: 1px solid #eee;">
+              <p style="font-size: 14px; color: #888; margin: 0 0 8px 0;">
+                Obrigado por escolher a Calibrasil 💛
               </p>
-              <p style="font-size: 12px; color: #999; margin: 16px 0 0 0;">
+              <p style="font-size: 13px; color: #aaa; margin: 0 0 12px 0;">
+                Dúvidas? <a href="mailto:oi@calibrasil.com" style="color: #E63946; text-decoration: none;">oi@calibrasil.com</a>
+              </p>
+              <p style="font-size: 11px; color: #bbb; margin: 0;">
                 © ${new Date().getFullYear()} Calibrasil — Estilo e tecnologia para seu dia a dia.
               </p>
             </td>
           </tr>
+
         </table>
       </td>
     </tr>
