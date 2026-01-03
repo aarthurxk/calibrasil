@@ -382,9 +382,13 @@ export type Database = {
         Row: {
           coupon_code: string | null
           created_at: string
+          declared_value: number | null
           discount_amount: number | null
           guest_email: string | null
           id: string
+          label_generated: boolean | null
+          label_generated_at: string | null
+          label_pdf_url: string | null
           mercadopago_payment_id: string | null
           pagseguro_transaction_id: string | null
           payment_gateway: string | null
@@ -398,6 +402,8 @@ export type Database = {
           shipping_address: Json | null
           shipping_cost: number | null
           shipping_method: string | null
+          shipping_weight: number | null
+          sigep_etiqueta: string | null
           status: string
           total: number
           tracking_code: string | null
@@ -407,9 +413,13 @@ export type Database = {
         Insert: {
           coupon_code?: string | null
           created_at?: string
+          declared_value?: number | null
           discount_amount?: number | null
           guest_email?: string | null
           id?: string
+          label_generated?: boolean | null
+          label_generated_at?: string | null
+          label_pdf_url?: string | null
           mercadopago_payment_id?: string | null
           pagseguro_transaction_id?: string | null
           payment_gateway?: string | null
@@ -423,6 +433,8 @@ export type Database = {
           shipping_address?: Json | null
           shipping_cost?: number | null
           shipping_method?: string | null
+          shipping_weight?: number | null
+          sigep_etiqueta?: string | null
           status?: string
           total: number
           tracking_code?: string | null
@@ -432,9 +444,13 @@ export type Database = {
         Update: {
           coupon_code?: string | null
           created_at?: string
+          declared_value?: number | null
           discount_amount?: number | null
           guest_email?: string | null
           id?: string
+          label_generated?: boolean | null
+          label_generated_at?: string | null
+          label_pdf_url?: string | null
           mercadopago_payment_id?: string | null
           pagseguro_transaction_id?: string | null
           payment_gateway?: string | null
@@ -448,6 +464,8 @@ export type Database = {
           shipping_address?: Json | null
           shipping_cost?: number | null
           shipping_method?: string | null
+          shipping_weight?: number | null
+          sigep_etiqueta?: string | null
           status?: string
           total?: number
           tracking_code?: string | null
@@ -718,6 +736,59 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      shipping_labels: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          declared_value: number | null
+          id: string
+          label_number: string
+          order_id: string | null
+          pdf_url: string | null
+          service_type: string
+          tracking_code: string
+          weight: number | null
+          xml_request: string | null
+          xml_response: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          declared_value?: number | null
+          id?: string
+          label_number: string
+          order_id?: string | null
+          pdf_url?: string | null
+          service_type: string
+          tracking_code: string
+          weight?: number | null
+          xml_request?: string | null
+          xml_response?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          declared_value?: number | null
+          id?: string
+          label_number?: string
+          order_id?: string | null
+          pdf_url?: string | null
+          service_type?: string
+          tracking_code?: string
+          weight?: number | null
+          xml_request?: string | null
+          xml_response?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipping_labels_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       store_settings: {
         Row: {
