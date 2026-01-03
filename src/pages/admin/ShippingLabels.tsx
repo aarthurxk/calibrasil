@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -9,9 +9,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Printer, Package, Search, Loader2, Tag, CheckCircle2, AlertTriangle, Shield } from 'lucide-react';
+import { Printer, Package, Search, Loader2, Tag, CheckCircle2, AlertTriangle, Shield, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { ShippingLabelPrint, ShippingLabelPrintData } from '@/components/shipping/ShippingLabelPrint';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface ShippingAddress {
   firstName?: string;
@@ -42,6 +43,29 @@ interface Order {
   phone: string | null;
 }
 
+interface CredentialStatus {
+  configured: boolean;
+  environment: string;
+  details: {
+    user: boolean;
+    password: boolean;
+    cnpj: boolean;
+    contractCode: boolean;
+    cardCode: boolean;
+    adminCode: boolean;
+  };
+}
+
+interface ConnectionTestResult {
+  success: boolean;
+  test: boolean;
+  connected: boolean;
+  credentialStatus: CredentialStatus;
+  sigepResponse?: string;
+  environment?: string;
+  wsdlUrl?: string;
+}
+
 const ShippingLabels = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -50,8 +74,42 @@ const ShippingLabels = () => {
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   const [currentLabelData, setCurrentLabelData] = useState<ShippingLabelPrintData | null>(null);
   const [sigepEnvironment, setSigepEnvironment] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionTestResult | null>(null);
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
+
+  // Test SIGEP connection on mount
+  const testConnectionMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('generate-sigep-label', {
+        body: { test: true },
+      });
+
+      if (error) throw error;
+      return data as ConnectionTestResult;
+    },
+    onSuccess: (data) => {
+      setConnectionStatus(data);
+      setSigepEnvironment(data.environment || 'simulated');
+      
+      if (data.connected) {
+        toast.success('Conexão SIGEP OK!');
+      } else if (data.credentialStatus?.configured) {
+        toast.warning(`Credenciais configuradas, mas conexão falhou: ${data.sigepResponse}`);
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(`Erro ao testar conexão: ${error.message}`);
+      setConnectionStatus(null);
+    },
+  });
+
+  // Test connection on mount
+  useEffect(() => {
+    testConnectionMutation.mutate();
+  }, []);
 
   // Fetch orders ready for shipping
   const { data: orders, isLoading } = useQuery({
@@ -83,6 +141,7 @@ const ShippingLabels = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['shipping-orders'] });
+      setLastError(null);
       
       // Track environment
       if (data.environment) {
@@ -101,9 +160,15 @@ const ShippingLabels = () => {
       setLabelDialogOpen(true);
       
       const envLabel = data.isSimulated ? ' (SIMULADA)' : data.environment === 'homologation' ? ' (HOMOLOGAÇÃO)' : '';
-      toast.success(`Etiqueta gerada: ${data.trackingCode}${envLabel}`);
+      
+      if (data.errorDetails) {
+        toast.warning(`Etiqueta gerada em modo fallback${envLabel}: ${data.errorDetails}`);
+      } else {
+        toast.success(`Etiqueta gerada: ${data.trackingCode}${envLabel}`);
+      }
     },
     onError: (error: Error) => {
+      setLastError(error.message);
       toast.error(`Erro ao gerar etiqueta: ${error.message}`);
     },
   });
@@ -172,30 +237,93 @@ const ShippingLabels = () => {
   const pendingCount = orders?.filter(o => !o.label_generated).length || 0;
   const generatedCount = orders?.filter(o => o.label_generated).length || 0;
 
+  const getEnvironmentBadge = () => {
+    if (!sigepEnvironment) return null;
+    
+    const config = {
+      production: { label: 'PRODUÇÃO', className: 'bg-green-500 hover:bg-green-600' },
+      homologation: { label: 'HOMOLOGAÇÃO', className: 'bg-orange-500 hover:bg-orange-600' },
+      simulated: { label: 'SIMULADO', className: 'bg-red-500 hover:bg-red-600' },
+    }[sigepEnvironment] || { label: sigepEnvironment.toUpperCase(), className: 'bg-muted' };
+
+    return (
+      <Badge variant="secondary" className={config.className}>
+        {config.label}
+      </Badge>
+    );
+  };
+
   return (
     <div className="space-y-6">
-      {/* Environment Alert */}
-      {sigepEnvironment && sigepEnvironment !== 'production' && (
-        <Alert variant={sigepEnvironment === 'simulated' ? 'destructive' : 'default'} className="border-orange-500/50 bg-orange-500/10">
-          <AlertTriangle className="h-4 w-4 text-orange-500" />
-          <AlertTitle className="text-orange-600 dark:text-orange-400">
-            {sigepEnvironment === 'simulated' ? 'Modo Simulado' : 'Ambiente de Homologação'}
+      {/* Connection Status Alert */}
+      {connectionStatus && (
+        <Alert 
+          variant={connectionStatus.connected ? 'default' : 'destructive'} 
+          className={
+            connectionStatus.connected 
+              ? 'border-green-500/50 bg-green-500/10'
+              : connectionStatus.credentialStatus?.configured 
+                ? 'border-orange-500/50 bg-orange-500/10'
+                : 'border-red-500/50 bg-red-500/10'
+          }
+        >
+          {connectionStatus.connected ? (
+            <Wifi className="h-4 w-4 text-green-500" />
+          ) : (
+            <WifiOff className="h-4 w-4 text-orange-500" />
+          )}
+          <AlertTitle className={connectionStatus.connected ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}>
+            {connectionStatus.connected 
+              ? `Conectado ao SIGEP (${connectionStatus.environment?.toUpperCase()})` 
+              : connectionStatus.credentialStatus?.configured 
+                ? 'Credenciais configuradas, mas conexão falhou'
+                : 'Modo Simulado'}
           </AlertTitle>
-          <AlertDescription className="text-orange-600/80 dark:text-orange-400/80">
-            {sigepEnvironment === 'simulated' 
-              ? 'Credenciais SIGEP não configuradas. Etiquetas geradas são simuladas e não podem ser usadas para envio real.'
-              : 'As etiquetas geradas são de teste e não podem ser usadas para envio real. Configure as credenciais de produção para gerar etiquetas válidas.'}
+          <AlertDescription className={connectionStatus.connected ? 'text-green-600/80 dark:text-green-400/80' : 'text-orange-600/80 dark:text-orange-400/80'}>
+            {connectionStatus.connected 
+              ? 'Etiquetas serão geradas através do SIGEP dos Correios.'
+              : connectionStatus.sigepResponse || 'Configure as credenciais SIGEP para gerar etiquetas válidas.'}
           </AlertDescription>
+          
+          {/* Debug Info Collapsible */}
+          <Collapsible open={showDebugInfo} onOpenChange={setShowDebugInfo} className="mt-3">
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                {showDebugInfo ? 'Ocultar' : 'Ver'} detalhes técnicos
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2 space-y-1 text-xs font-mono">
+              <div className="grid grid-cols-2 gap-1 p-2 rounded bg-muted/50">
+                <span>SIGEP_USER:</span>
+                <span>{connectionStatus.credentialStatus?.details.user ? '✓' : '✗'}</span>
+                <span>SIGEP_PASSWORD:</span>
+                <span>{connectionStatus.credentialStatus?.details.password ? '✓' : '✗'}</span>
+                <span>SIGEP_CNPJ:</span>
+                <span>{connectionStatus.credentialStatus?.details.cnpj ? '✓' : '✗'}</span>
+                <span>SIGEP_CONTRACT_CODE:</span>
+                <span>{connectionStatus.credentialStatus?.details.contractCode ? '✓' : '✗'}</span>
+                <span>SIGEP_CARD_CODE:</span>
+                <span>{connectionStatus.credentialStatus?.details.cardCode ? '✓' : '✗'}</span>
+                <span>SIGEP_ADMINISTRATIVE_CODE:</span>
+                <span>{connectionStatus.credentialStatus?.details.adminCode ? '✓' : '✗'}</span>
+              </div>
+              {connectionStatus.wsdlUrl && (
+                <div className="p-2 rounded bg-muted/50">
+                  <span className="text-muted-foreground">URL: </span>
+                  <span className="break-all">{connectionStatus.wsdlUrl}</span>
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
         </Alert>
       )}
 
-      {sigepEnvironment === 'production' && (
-        <Alert className="border-green-500/50 bg-green-500/10">
-          <Shield className="h-4 w-4 text-green-500" />
-          <AlertTitle className="text-green-600 dark:text-green-400">Ambiente de Produção</AlertTitle>
-          <AlertDescription className="text-green-600/80 dark:text-green-400/80">
-            Conectado ao SIGEP dos Correios. Etiquetas geradas são válidas para envio.
-          </AlertDescription>
+      {/* Last Error Alert */}
+      {lastError && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Erro na última operação</AlertTitle>
+          <AlertDescription className="font-mono text-xs">{lastError}</AlertDescription>
         </Alert>
       )}
 
@@ -206,21 +334,22 @@ const ShippingLabels = () => {
             <h1 className="text-2xl font-bold">Etiquetas de Envio</h1>
             <p className="text-muted-foreground">Gerencie etiquetas dos Correios para envio de pedidos</p>
           </div>
-          {sigepEnvironment && (
-            <Badge 
-              variant={sigepEnvironment === 'production' ? 'default' : 'secondary'}
-              className={
-                sigepEnvironment === 'production' 
-                  ? 'bg-green-500 hover:bg-green-600' 
-                  : sigepEnvironment === 'homologation'
-                  ? 'bg-orange-500 hover:bg-orange-600'
-                  : 'bg-red-500 hover:bg-red-600'
-              }
-            >
-              {sigepEnvironment === 'production' ? 'PRODUÇÃO' : sigepEnvironment === 'homologation' ? 'HOMOLOGAÇÃO' : 'SIMULADO'}
-            </Badge>
-          )}
+          {getEnvironmentBadge()}
         </div>
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => testConnectionMutation.mutate()}
+          disabled={testConnectionMutation.isPending}
+        >
+          {testConnectionMutation.isPending ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4 mr-2" />
+          )}
+          Testar Conexão SIGEP
+        </Button>
       </div>
 
       {/* Stats Cards */}
