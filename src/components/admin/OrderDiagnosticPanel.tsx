@@ -9,7 +9,8 @@ import {
   Truck,
   ChevronDown,
   ChevronUp,
-  ExternalLink
+  ExternalLink,
+  Send
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ export const OrderDiagnosticPanel = ({ order, flowResult }: OrderDiagnosticPanel
   const [logsOpen, setLogsOpen] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [isRechecking, setIsRechecking] = useState(false);
+  const [isResendingTracking, setIsResendingTracking] = useState(false);
 
   const formatPrice = (price: number) => {
     return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -87,11 +89,21 @@ export const OrderDiagnosticPanel = ({ order, flowResult }: OrderDiagnosticPanel
 
     if (order.tracking_code) {
       logs.push({
-        timestamp: order.updated_at,
+        timestamp: order.label_generated_at || order.updated_at,
         event: 'RASTREIO_GERADO',
         result: 'success',
         details: order.tracking_code,
       });
+      
+      // Add tracking email sent log if order is shipped
+      if (order.status === 'shipped' || order.status === 'delivered') {
+        logs.push({
+          timestamp: order.label_generated_at || order.updated_at,
+          event: 'EMAIL_RASTREIO_ENVIADO',
+          result: 'success',
+          details: `Rastreio enviado automaticamente`,
+        });
+      }
     }
 
     if (order.received_at) {
@@ -156,6 +168,62 @@ export const OrderDiagnosticPanel = ({ order, flowResult }: OrderDiagnosticPanel
       toast.error(`Erro: ${error.message}`);
     } finally {
       setIsRechecking(false);
+    }
+  };
+
+  const handleResendTrackingEmail = async () => {
+    if (!order.tracking_code) {
+      toast.error('Pedido não possui código de rastreio');
+      return;
+    }
+    
+    setIsResendingTracking(true);
+    try {
+      let emailToUse = order.guest_email;
+      
+      if (!emailToUse && order.user_id) {
+        const { data: emailData, error: emailError } = await supabase.functions.invoke('get-user-email', {
+          body: { userId: order.user_id },
+        });
+        
+        if (emailError) {
+          throw new Error(`Não foi possível obter o email do usuário: ${emailError.message}`);
+        }
+        
+        if (emailData?.email) {
+          emailToUse = emailData.email;
+        }
+      }
+      
+      if (!emailToUse) {
+        throw new Error('Email do cliente não encontrado');
+      }
+      
+      const shippingAddress = order.shipping_address as any;
+      const customerName = shippingAddress?.name || 
+        `${shippingAddress?.firstName || ''} ${shippingAddress?.lastName || ''}`.trim() || 
+        'Cliente';
+      
+      const response = await supabase.functions.invoke('send-order-status-email', {
+        body: {
+          orderId: order.id,
+          customerEmail: emailToUse,
+          customerName,
+          oldStatus: 'processing',
+          newStatus: 'shipped',
+          trackingCode: order.tracking_code,
+        },
+      });
+      
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+      
+      toast.success('Email de rastreio reenviado com sucesso!');
+    } catch (error: any) {
+      toast.error(`Erro ao reenviar email: ${error.message}`);
+    } finally {
+      setIsResendingTracking(false);
     }
   };
 
@@ -314,6 +382,20 @@ export const OrderDiagnosticPanel = ({ order, flowResult }: OrderDiagnosticPanel
                 <CreditCard className="h-4 w-4 mr-2" />
               )}
               Reconsultar Pagamento
+            </Button>
+
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleResendTrackingEmail}
+              disabled={isResendingTracking || !order.tracking_code}
+            >
+              {isResendingTracking ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              Reenviar Rastreio
             </Button>
 
             <Button 

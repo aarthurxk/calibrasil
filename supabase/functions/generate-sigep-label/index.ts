@@ -339,6 +339,76 @@ serve(async (req) => {
       console.error("[SIGEP-LABEL] Erro ao criar registro de etiqueta:", labelError);
     }
 
+    // 10.5 Send tracking email automatically (only for delivery, not pickup)
+    let emailSent = false;
+    let emailErrorMsg: string | null = null;
+    
+    if (order.shipping_method !== "pickup") {
+      console.log("[SIGEP-LABEL] Enviando email de rastreio automaticamente...");
+      
+      try {
+        // Get customer email
+        let customerEmail = order.guest_email;
+        const shippingAddr = order.shipping_address as ShippingAddress | null;
+        const emailRecipientName = shippingAddr?.name || 
+          `${shippingAddr?.firstName || ''} ${shippingAddr?.lastName || ''}`.trim() || 
+          customerName ||
+          "Cliente";
+        
+        // If no guest email, try to get user email
+        if (!customerEmail && order.user_id) {
+          const { data: authData } = await supabase.auth.admin.getUserById(order.user_id);
+          customerEmail = authData?.user?.email || null;
+        }
+        
+        if (customerEmail) {
+          // Call send-order-status-email internally
+          const internalSecret = Deno.env.get("INTERNAL_API_SECRET");
+          const supabaseUrl = Deno.env.get("SUPABASE_URL");
+          const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+          
+          if (internalSecret && supabaseUrl && supabaseAnonKey) {
+            const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-order-status-email`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${supabaseAnonKey}`,
+                "x-internal-secret": internalSecret,
+              },
+              body: JSON.stringify({
+                orderId: order.id,
+                customerEmail,
+                customerName: emailRecipientName,
+                oldStatus: order.status,
+                newStatus: "shipped",
+                trackingCode,
+              }),
+            });
+            
+            const emailResult = await emailResponse.json();
+            emailSent = emailResponse.ok && emailResult.success;
+            
+            if (!emailSent) {
+              emailErrorMsg = emailResult.error || "Falha no envio";
+            }
+            
+            console.log(`[SIGEP-LABEL] Email de rastreio ${emailSent ? "✓ enviado" : "✗ falhou"}: ${customerEmail}`);
+          } else {
+            emailErrorMsg = "INTERNAL_API_SECRET não configurado";
+            console.log("[SIGEP-LABEL] ⚠️ INTERNAL_API_SECRET não configurado, email não enviado");
+          }
+        } else {
+          emailErrorMsg = "Email do cliente não encontrado";
+          console.log("[SIGEP-LABEL] ⚠️ Email do cliente não encontrado");
+        }
+      } catch (err: any) {
+        emailErrorMsg = err.message;
+        console.error("[SIGEP-LABEL] Erro ao enviar email de rastreio:", err);
+      }
+    } else {
+      console.log("[SIGEP-LABEL] Pedido é retirada na loja, email de rastreio não enviado");
+    }
+
     // 11. Get sender data
     const { data: storeSettings } = await supabase
       .from("store_settings")
@@ -368,6 +438,8 @@ serve(async (req) => {
         environment,
         isSimulated,
         errorDetails,
+        emailSent,
+        emailError: emailErrorMsg,
         sender: {
           name: senderName,
           address: senderAddress,

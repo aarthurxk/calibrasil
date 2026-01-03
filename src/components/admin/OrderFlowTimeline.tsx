@@ -29,6 +29,7 @@ const stepIcons: Record<string, React.ComponentType<any>> = {
   shipping_created: MapPin,
   tracking_generated: Send,
   confirmation_email: Mail,
+  tracking_email_sent: Truck,
   order_shipped: Truck,
   order_delivered: CheckCircle2,
   review_requested: MessageSquare,

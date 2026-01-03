@@ -2,6 +2,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useOrderFlowChecker } from '@/hooks/useOrderFlowChecker';
 import { cn } from '@/lib/utils';
+import { Store, Truck } from 'lucide-react';
 
 interface OrderMonitorCardProps {
   order: any;
@@ -61,6 +62,9 @@ export const OrderMonitorCard = ({ order, isSelected, onClick }: OrderMonitorCar
   const customerName = shippingAddress?.name || 
     `${shippingAddress?.firstName || ''} ${shippingAddress?.lastName || ''}`.trim() || 
     'Cliente';
+  
+  const isPickup = order.shipping_method === 'pickup';
+  const hasTracking = !!order.tracking_code;
 
   return (
     <Card 
@@ -75,7 +79,7 @@ export const OrderMonitorCard = ({ order, isSelected, onClick }: OrderMonitorCar
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-mono text-sm font-medium">
               #{order.id.slice(0, 8)}
             </span>
@@ -85,6 +89,18 @@ export const OrderMonitorCard = ({ order, isSelected, onClick }: OrderMonitorCar
             )}>
               {getStatusBadge()}
             </div>
+            {isPickup && (
+              <Badge variant="outline" className="text-xs gap-1 bg-blue-50 border-blue-200 text-blue-700">
+                <Store className="h-3 w-3" />
+                Retirada
+              </Badge>
+            )}
+            {hasTracking && !isPickup && (
+              <Badge variant="outline" className="text-xs gap-1 bg-purple-50 border-purple-200 text-purple-700">
+                <Truck className="h-3 w-3" />
+                {order.tracking_code?.slice(0, 13)}
+              </Badge>
+            )}
           </div>
           
           <p className="text-sm text-muted-foreground truncate mt-1">
