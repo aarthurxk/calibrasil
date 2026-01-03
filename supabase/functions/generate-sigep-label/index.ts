@@ -27,6 +27,41 @@ interface ShippingAddress {
   cep?: string;
 }
 
+interface SigepCredentials {
+  user: string;
+  password: string;
+  cnpj: string;
+  contractCode: string;
+  cardCode: string;
+  adminCode: string;
+  environment: "production" | "homologation";
+}
+
+function getSigepCredentials(): SigepCredentials | null {
+  const user = Deno.env.get("SIGEP_USER");
+  const password = Deno.env.get("SIGEP_PASSWORD");
+  const cnpj = Deno.env.get("SIGEP_CNPJ");
+  const contractCode = Deno.env.get("SIGEP_CONTRACT_CODE");
+  const cardCode = Deno.env.get("SIGEP_CARD_CODE");
+  const adminCode = Deno.env.get("SIGEP_ADMINISTRATIVE_CODE");
+  const environment = (Deno.env.get("SIGEP_ENVIRONMENT") || "homologation") as "production" | "homologation";
+
+  // Check if all required credentials are present
+  if (!user || !password || !cnpj || !contractCode || !cardCode || !adminCode) {
+    console.log("[SIGEP] Credenciais faltando:");
+    console.log(`  - SIGEP_USER: ${user ? "✓" : "✗"}`);
+    console.log(`  - SIGEP_PASSWORD: ${password ? "✓" : "✗"}`);
+    console.log(`  - SIGEP_CNPJ: ${cnpj ? "✓" : "✗"}`);
+    console.log(`  - SIGEP_CONTRACT_CODE: ${contractCode ? "✓" : "✗"}`);
+    console.log(`  - SIGEP_CARD_CODE: ${cardCode ? "✓" : "✗"}`);
+    console.log(`  - SIGEP_ADMINISTRATIVE_CODE: ${adminCode ? "✓" : "✗"}`);
+    return null;
+  }
+
+  console.log(`[SIGEP] Credenciais configuradas. Ambiente: ${environment.toUpperCase()}`);
+  return { user, password, cnpj, contractCode, cardCode, adminCode, environment };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -89,14 +124,8 @@ serve(async (req) => {
       throw new Error("CEP do destinatário não informado");
     }
 
-    // 6. Credenciais SIGEP
-    const sigepUser = Deno.env.get("CORREIOS_USUARIO");
-    const sigepPassword = Deno.env.get("CORREIOS_SENHA_API");
-    const sigepContract = Deno.env.get("CORREIOS_CARTAO_POSTAGEM");
-    
-    if (!sigepUser || !sigepPassword) {
-      console.log("[SIGEP-LABEL] Credenciais SIGEP não configuradas, usando modo simulado");
-    }
+    // 6. Obter credenciais SIGEP
+    const credentials = getSigepCredentials();
 
     // 7. Determinar código do serviço
     const serviceCode = serviceType === "SEDEX" ? "04162" : "04510"; // SEDEX ou PAC
@@ -106,15 +135,14 @@ serve(async (req) => {
     let etiquetaNumber: string;
     let xmlRequest = "";
     let xmlResponse = "";
+    let isSimulated = false;
 
-    if (sigepUser && sigepPassword && sigepContract) {
+    if (credentials) {
       // Modo real: chamar SIGEP Web
-      console.log("[SIGEP-LABEL] Chamando SIGEP Web...");
+      console.log(`[SIGEP-LABEL] Chamando SIGEP Web (${credentials.environment.toUpperCase()})...`);
       
       const sigepResult = await callSigepWebService({
-        user: sigepUser,
-        password: sigepPassword,
-        contractCode: sigepContract,
+        credentials,
         serviceCode,
       });
       
@@ -122,16 +150,18 @@ serve(async (req) => {
       etiquetaNumber = sigepResult.etiquetaNumber;
       xmlRequest = sigepResult.xmlRequest;
       xmlResponse = sigepResult.xmlResponse;
+      isSimulated = sigepResult.isSimulated;
     } else {
       // Modo simulado para desenvolvimento
-      console.log("[SIGEP-LABEL] Modo simulado (sem credenciais SIGEP)");
+      console.log("[SIGEP-LABEL] Modo simulado (credenciais incompletas)");
       const prefix = serviceType === "SEDEX" ? "NX" : "PM";
       const randomNum = Math.floor(Math.random() * 900000000) + 100000000;
       trackingCode = `${prefix}${randomNum}BR`;
       etiquetaNumber = `${prefix} ${String(randomNum).substring(0, 3)} ${String(randomNum).substring(3, 6)} ${String(randomNum).substring(6)} BR`;
+      isSimulated = true;
     }
 
-    console.log(`[SIGEP-LABEL] Etiqueta gerada: ${trackingCode}`);
+    console.log(`[SIGEP-LABEL] Etiqueta gerada: ${trackingCode} (simulado: ${isSimulated})`);
 
     // 9. Atualizar pedido
     const { error: updateError } = await supabase
@@ -189,12 +219,17 @@ serve(async (req) => {
       customerName || 
       "Destinatário";
 
-    // 13. Retornar dados para gerar etiqueta no frontend
+    // 13. Determinar ambiente para resposta
+    const environment = credentials?.environment || "simulated";
+
+    // 14. Retornar dados para gerar etiqueta no frontend
     return new Response(
       JSON.stringify({
         success: true,
         trackingCode,
         etiquetaNumber,
+        environment,
+        isSimulated,
         sender: {
           name: senderName,
           address: senderAddress,
@@ -236,10 +271,8 @@ serve(async (req) => {
 });
 
 // Helper: Chamar SIGEP Web Service
-interface SigepConfig {
-  user: string;
-  password: string;
-  contractCode: string;
+interface SigepCallConfig {
+  credentials: SigepCredentials;
   serviceCode: string;
 }
 
@@ -248,11 +281,13 @@ interface SigepResult {
   etiquetaNumber: string;
   xmlRequest: string;
   xmlResponse: string;
+  isSimulated: boolean;
 }
 
-async function callSigepWebService(config: SigepConfig): Promise<SigepResult> {
-  const environment = Deno.env.get("SIGEP_ENVIRONMENT") || "production";
-  const wsdlUrl = environment === "production"
+async function callSigepWebService(config: SigepCallConfig): Promise<SigepResult> {
+  const { credentials, serviceCode } = config;
+  
+  const wsdlUrl = credentials.environment === "production"
     ? "https://apps.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente"
     : "https://apphom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente";
 
@@ -263,16 +298,19 @@ async function callSigepWebService(config: SigepConfig): Promise<SigepResult> {
   <soapenv:Body>
     <cli:solicitaEtiquetas>
       <tipoDestinatario>C</tipoDestinatario>
-      <identificador>${config.contractCode}</identificador>
-      <idServico>${config.serviceCode}</idServico>
+      <identificador>${credentials.cnpj}</identificador>
+      <idServico>${serviceCode}</idServico>
       <qtdEtiquetas>1</qtdEtiquetas>
-      <usuario>${config.user}</usuario>
-      <senha>${config.password}</senha>
+      <usuario>${credentials.user}</usuario>
+      <senha>${credentials.password}</senha>
     </cli:solicitaEtiquetas>
   </soapenv:Body>
 </soapenv:Envelope>`;
 
-  console.log("[SIGEP] Enviando requisição para:", wsdlUrl);
+  console.log(`[SIGEP] Enviando requisição para: ${wsdlUrl}`);
+  console.log(`[SIGEP] Usuário: ${credentials.user}`);
+  console.log(`[SIGEP] CNPJ: ${credentials.cnpj}`);
+  console.log(`[SIGEP] Código de Serviço: ${serviceCode}`);
 
   try {
     const response = await fetch(wsdlUrl, {
@@ -292,6 +330,14 @@ async function callSigepWebService(config: SigepConfig): Promise<SigepResult> {
       throw new Error(`Erro SIGEP: ${response.status}`);
     }
 
+    // Verificar se há erro de autenticação
+    if (responseText.includes("faultstring") || responseText.includes("Fault")) {
+      const faultMatch = responseText.match(/<faultstring>(.*?)<\/faultstring>/);
+      const errorMsg = faultMatch ? faultMatch[1] : "Erro desconhecido";
+      console.error("[SIGEP] Erro SOAP:", errorMsg);
+      throw new Error(`Erro SIGEP: ${errorMsg}`);
+    }
+
     // Extrair número da etiqueta do XML de resposta
     const etiquetaMatch = responseText.match(/<return>(.*?)<\/return>/);
     if (!etiquetaMatch || !etiquetaMatch[1]) {
@@ -302,18 +348,22 @@ async function callSigepWebService(config: SigepConfig): Promise<SigepResult> {
     const etiquetaNumber = etiquetaMatch[1].trim();
     const trackingCode = etiquetaNumber.replace(/\s/g, "");
 
+    console.log(`[SIGEP] Etiqueta obtida com sucesso: ${trackingCode}`);
+
     return {
       trackingCode,
       etiquetaNumber,
       xmlRequest: soapXML,
       xmlResponse: responseText,
+      isSimulated: false,
     };
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("[SIGEP] Erro ao chamar serviço:", errorMessage);
     
     // Fallback para modo simulado em caso de erro
-    const prefix = config.serviceCode === "04162" ? "NX" : "PM";
+    console.log("[SIGEP] Usando fallback simulado devido a erro");
+    const prefix = serviceCode === "04162" ? "NX" : "PM";
     const randomNum = Math.floor(Math.random() * 900000000) + 100000000;
     const trackingCode = `${prefix}${randomNum}BR`;
     const etiquetaNumber = `${prefix} ${String(randomNum).substring(0, 3)} ${String(randomNum).substring(3, 6)} ${String(randomNum).substring(6)} BR`;
@@ -323,6 +373,7 @@ async function callSigepWebService(config: SigepConfig): Promise<SigepResult> {
       etiquetaNumber,
       xmlRequest: soapXML,
       xmlResponse: `ERRO: ${errorMessage}`,
+      isSimulated: true,
     };
   }
 }
