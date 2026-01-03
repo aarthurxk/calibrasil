@@ -1,6 +1,10 @@
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Printer, Download } from 'lucide-react';
+import JsBarcode from 'jsbarcode';
+import { QRCodeSVG } from 'qrcode.react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import caliLogo from '@/assets/cali-logo.jpeg';
 
 export interface ShippingLabelPrintData {
@@ -39,12 +43,56 @@ interface ShippingLabelPrintProps {
 
 export function ShippingLabelPrint({ data, onClose }: ShippingLabelPrintProps) {
   const labelRef = useRef<HTMLDivElement>(null);
+  const barcodeRef = useRef<SVGSVGElement>(null);
+
+  // Generate barcode when component mounts or tracking code changes
+  useEffect(() => {
+    if (barcodeRef.current && data.trackingCode) {
+      try {
+        JsBarcode(barcodeRef.current, data.trackingCode, {
+          format: 'CODE128',
+          width: 2,
+          height: 50,
+          displayValue: false,
+          margin: 0,
+        });
+      } catch (error) {
+        console.error('Error generating barcode:', error);
+      }
+    }
+  }, [data.trackingCode]);
 
   const handlePrint = () => {
     window.print();
   };
 
+  const handleDownloadPDF = async () => {
+    if (!labelRef.current) return;
+
+    try {
+      const canvas = await html2canvas(labelRef.current, {
+        scale: 3,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [100, 150],
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, 100, 150);
+      pdf.save(`etiqueta-${data.trackingCode}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    }
+  };
+
   const serviceColor = data.serviceType === 'SEDEX' ? '#003D7A' : '#00A859';
+  const trackingUrl = `https://rastreamento.correios.com.br/app/index.php?id=${data.trackingCode}`;
 
   return (
     <div className="flex flex-col gap-4">
@@ -85,6 +133,10 @@ export function ShippingLabelPrint({ data, onClose }: ShippingLabelPrintProps) {
               Fechar
             </Button>
           )}
+          <Button variant="outline" onClick={handleDownloadPDF}>
+            <Download className="h-4 w-4 mr-2" />
+            Baixar PDF
+          </Button>
           <Button onClick={handlePrint}>
             <Printer className="h-4 w-4 mr-2" />
             Imprimir
@@ -152,22 +204,26 @@ export function ShippingLabelPrint({ data, onClose }: ShippingLabelPrintProps) {
           </div>
         </div>
 
-        {/* Tracking Code (replacing barcode for now) */}
+        {/* Barcode */}
         <div className="flex flex-col items-center justify-center py-3 border-b border-foreground/20">
-          <p className="text-xs text-muted-foreground mb-1">Código de Rastreio</p>
-          <p className="font-mono font-bold text-xl tracking-wider">{data.trackingCode}</p>
+          <svg ref={barcodeRef} className="w-full max-w-[90%]" />
+          <p className="font-mono font-bold text-sm mt-1 tracking-wider">{data.trackingCode}</p>
         </div>
 
-        {/* Footer - Weight, Value */}
+        {/* Footer - Weight, Value, QR Code */}
         <div className="flex justify-between items-center px-3 py-2 border-b border-dashed border-foreground/40">
           <div className="text-xs space-y-0.5">
             <p>Peso: {data.orderData.weight.toFixed(3)} kg</p>
             <p>Valor Declarado: R$ {data.orderData.declaredValue.toFixed(2)}</p>
             <p className="text-muted-foreground">Pedido: #{data.orderData.orderId.slice(0, 8)}</p>
           </div>
-          <div className="text-xs text-right">
-            <p className="text-muted-foreground">Rastrear em:</p>
-            <p className="font-semibold">correios.com.br</p>
+          <div className="flex flex-col items-center">
+            <QRCodeSVG 
+              value={trackingUrl} 
+              size={50}
+              level="M"
+            />
+            <p className="text-[8px] text-muted-foreground mt-1">Rastrear</p>
           </div>
         </div>
 
