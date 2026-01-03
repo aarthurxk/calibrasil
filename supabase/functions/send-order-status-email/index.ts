@@ -335,52 +335,61 @@ serve(async (req) => {
   }
 
   try {
-    // SECURITY: Verify the user is an admin or manager
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      console.error("[ORDER-STATUS] No authorization header");
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-    // Client for auth check (user context)
-    const supabaseAuth = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
-      global: { headers: { Authorization: authHeader } },
-    });
-
+    
     // Client for template fetch and token creation (service role to bypass RLS)
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Check for internal call via secret header (from generate-sigep-label)
+    const internalSecret = req.headers.get("x-internal-secret");
+    const expectedSecret = Deno.env.get("INTERNAL_API_SECRET");
+    const isInternalCall = internalSecret && expectedSecret && internalSecret === expectedSecret;
+    
+    if (isInternalCall) {
+      console.log("[ORDER-STATUS] Chamada interna autorizada via x-internal-secret");
+    } else {
+      // SECURITY: Verify the user is an admin or manager
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) {
+        console.error("[ORDER-STATUS] No authorization header");
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseAuth.auth.getUser();
-    if (authError || !user) {
-      console.error("[ORDER-STATUS] Auth error:", authError);
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      // Client for auth check (user context)
+      const supabaseAuth = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+        global: { headers: { Authorization: authHeader } },
       });
-    }
 
-    // Check if user has admin or manager role
-    const { data: roleData, error: roleError } = await supabaseAuth
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .single();
+      const {
+        data: { user },
+        error: authError,
+      } = await supabaseAuth.auth.getUser();
+      if (authError || !user) {
+        console.error("[ORDER-STATUS] Auth error:", authError);
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-    if (roleError || !roleData || !["admin", "manager"].includes(roleData.role)) {
-      console.error("[ORDER-STATUS] User does not have permission to send order emails");
-      return new Response(JSON.stringify({ error: "Forbidden - Admin or Manager role required" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Check if user has admin or manager role
+      const { data: roleData, error: roleError } = await supabaseAuth
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
+
+      if (roleError || !roleData || !["admin", "manager"].includes(roleData.role)) {
+        console.error("[ORDER-STATUS] User does not have permission to send order emails");
+        return new Response(JSON.stringify({ error: "Forbidden - Admin or Manager role required" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const data: OrderStatusEmailRequest = await req.json();

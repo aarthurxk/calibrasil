@@ -141,6 +141,18 @@ export const useOrderFlowChecker = (order: Order | null): OrderFlowResult | null
         reason: isPaid && !order.guest_email && !order.user_id ? 'Email do cliente não encontrado' : undefined,
       },
       
+      // 9.5. Email de rastreio enviado (automático após etiqueta)
+      {
+        id: 'tracking_email_sent',
+        name: 'Email de rastreio enviado',
+        status: isPickup ? 'na' :
+                order.tracking_code && (order.status === 'shipped' || order.status === 'delivered') ? 'ok' : 
+                order.tracking_code ? 'pending' : 'na',
+        evidence: order.tracking_code ? `Rastreio: ${order.tracking_code}` : undefined,
+        reason: !isPickup && order.tracking_code && order.status !== 'shipped' && order.status !== 'delivered' 
+          ? 'Aguardando confirmação de envio' : undefined,
+      },
+      
       // 10. Pedido enviado
       {
         id: 'order_shipped',
@@ -221,7 +233,7 @@ export const useOrderFlowChecker = (order: Order | null): OrderFlowResult | null
     } else if (pendingSteps.length > 0 && isPaid) {
       // Só marcar como pendente se houver etapas pendentes após pagamento
       const criticalPending = pendingSteps.filter(s => 
-        ['confirmation_email', 'order_shipped', 'tracking_generated'].includes(s.id)
+        ['confirmation_email', 'order_shipped', 'tracking_generated', 'tracking_email_sent'].includes(s.id)
       );
       if (criticalPending.length > 0) {
         overallStatus = 'pending';
