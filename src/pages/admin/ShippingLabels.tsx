@@ -62,6 +62,7 @@ interface ConnectionTestResult {
   connected: boolean;
   credentialStatus: CredentialStatus;
   sigepResponse?: string;
+  message?: string;
   environment?: string;
   wsdlUrl?: string;
 }
@@ -97,7 +98,7 @@ const ShippingLabels = () => {
       if (data.connected) {
         toast.success('Conexão SIGEP OK!');
       } else if (data.credentialStatus?.configured) {
-        toast.warning(`Credenciais configuradas, mas conexão falhou: ${data.sigepResponse}`);
+        toast.warning(`Credenciais configuradas, mas conexão falhou: ${data.message || data.sigepResponse || 'Erro desconhecido'}`);
       }
     },
     onError: (error: Error) => {
@@ -289,7 +290,7 @@ const ShippingLabels = () => {
           <AlertDescription className={connectionStatus.connected ? 'text-green-600/80 dark:text-green-400/80' : 'text-orange-600/80 dark:text-orange-400/80'}>
             {connectionStatus.connected 
               ? 'Etiquetas serão geradas através do SIGEP dos Correios.'
-              : connectionStatus.sigepResponse || 'Configure as credenciais SIGEP para gerar etiquetas válidas.'}
+              : connectionStatus.message || connectionStatus.sigepResponse || 'Configure as credenciais SIGEP para gerar etiquetas válidas.'}
           </AlertDescription>
           
           {/* Debug Info Collapsible */}
