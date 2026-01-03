@@ -515,7 +515,7 @@ async function testSigepConnectivity(credentials: SigepCredentials): Promise<{ c
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
-        "SOAPAction": "buscaCliente",
+        "SOAPAction": "",
       },
       body: soapXML,
       signal: controller.signal,
@@ -609,7 +609,7 @@ async function callSigepWebService(config: SigepCallConfig): Promise<SigepResult
         method: "POST",
         headers: {
           "Content-Type": "text/xml; charset=utf-8",
-          "SOAPAction": "solicitaEtiquetas",
+          "SOAPAction": "",
         },
         body: soapXML,
         signal: controller.signal,
