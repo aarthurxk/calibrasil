@@ -23,6 +23,7 @@ import {
   Cog,
   MailCheck,
   MessageSquare,
+  Tag,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -134,6 +135,7 @@ const AdminLayout = () => {
           badge: monitorStats?.errors || 0,
           badgeType: monitorStats?.errors ? 'error' : 'warning'
         },
+        { name: 'Etiquetas', icon: Tag, path: '/admin/shipping-labels' },
       ]
     },
     { 
