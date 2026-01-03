@@ -9,8 +9,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Printer, Package, Search, Loader2, Tag, CheckCircle2 } from 'lucide-react';
+import { Printer, Package, Search, Loader2, Tag, CheckCircle2, AlertTriangle, Shield } from 'lucide-react';
 import { ShippingLabelPrint, ShippingLabelPrintData } from '@/components/shipping/ShippingLabelPrint';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface ShippingAddress {
   firstName?: string;
@@ -48,6 +49,7 @@ const ShippingLabels = () => {
   const [serviceType, setServiceType] = useState<'PAC' | 'SEDEX'>('PAC');
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   const [currentLabelData, setCurrentLabelData] = useState<ShippingLabelPrintData | null>(null);
+  const [sigepEnvironment, setSigepEnvironment] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -82,6 +84,11 @@ const ShippingLabels = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['shipping-orders'] });
       
+      // Track environment
+      if (data.environment) {
+        setSigepEnvironment(data.environment);
+      }
+      
       // Open label dialog with data
       setCurrentLabelData({
         trackingCode: data.trackingCode,
@@ -93,7 +100,8 @@ const ShippingLabels = () => {
       });
       setLabelDialogOpen(true);
       
-      toast.success(`Etiqueta gerada: ${data.trackingCode}`);
+      const envLabel = data.isSimulated ? ' (SIMULADA)' : data.environment === 'homologation' ? ' (HOMOLOGAÇÃO)' : '';
+      toast.success(`Etiqueta gerada: ${data.trackingCode}${envLabel}`);
     },
     onError: (error: Error) => {
       toast.error(`Erro ao gerar etiqueta: ${error.message}`);
@@ -166,11 +174,52 @@ const ShippingLabels = () => {
 
   return (
     <div className="space-y-6">
+      {/* Environment Alert */}
+      {sigepEnvironment && sigepEnvironment !== 'production' && (
+        <Alert variant={sigepEnvironment === 'simulated' ? 'destructive' : 'default'} className="border-orange-500/50 bg-orange-500/10">
+          <AlertTriangle className="h-4 w-4 text-orange-500" />
+          <AlertTitle className="text-orange-600 dark:text-orange-400">
+            {sigepEnvironment === 'simulated' ? 'Modo Simulado' : 'Ambiente de Homologação'}
+          </AlertTitle>
+          <AlertDescription className="text-orange-600/80 dark:text-orange-400/80">
+            {sigepEnvironment === 'simulated' 
+              ? 'Credenciais SIGEP não configuradas. Etiquetas geradas são simuladas e não podem ser usadas para envio real.'
+              : 'As etiquetas geradas são de teste e não podem ser usadas para envio real. Configure as credenciais de produção para gerar etiquetas válidas.'}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {sigepEnvironment === 'production' && (
+        <Alert className="border-green-500/50 bg-green-500/10">
+          <Shield className="h-4 w-4 text-green-500" />
+          <AlertTitle className="text-green-600 dark:text-green-400">Ambiente de Produção</AlertTitle>
+          <AlertDescription className="text-green-600/80 dark:text-green-400/80">
+            Conectado ao SIGEP dos Correios. Etiquetas geradas são válidas para envio.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Etiquetas de Envio</h1>
-          <p className="text-muted-foreground">Gerencie etiquetas dos Correios para envio de pedidos</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-bold">Etiquetas de Envio</h1>
+            <p className="text-muted-foreground">Gerencie etiquetas dos Correios para envio de pedidos</p>
+          </div>
+          {sigepEnvironment && (
+            <Badge 
+              variant={sigepEnvironment === 'production' ? 'default' : 'secondary'}
+              className={
+                sigepEnvironment === 'production' 
+                  ? 'bg-green-500 hover:bg-green-600' 
+                  : sigepEnvironment === 'homologation'
+                  ? 'bg-orange-500 hover:bg-orange-600'
+                  : 'bg-red-500 hover:bg-red-600'
+              }
+            >
+              {sigepEnvironment === 'production' ? 'PRODUÇÃO' : sigepEnvironment === 'homologation' ? 'HOMOLOGAÇÃO' : 'SIMULADO'}
+            </Badge>
+          )}
         </div>
       </div>
 
