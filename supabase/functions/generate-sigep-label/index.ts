@@ -11,8 +11,8 @@ interface GenerateLabelRequest {
   serviceType?: "PAC" | "SEDEX";
   weight?: number;
   declaredValue?: number;
-  test?: boolean; // Test mode - only check connectivity
-  offline?: boolean; // Offline mode - generate label without SIGEP connection
+  test?: boolean;
+  offline?: boolean;
 }
 
 interface ShippingAddress {
@@ -29,26 +29,23 @@ interface ShippingAddress {
   cep?: string;
 }
 
-interface SigepCredentials {
+interface CwsCredentials {
   user: string;
   password: string;
-  cnpj: string;
-  contractCode: string;
-  cardCode: string;
-  adminCode: string;
+  contract: string;
+  card: string;
   environment: "production" | "homologation";
 }
 
 interface CredentialStatus {
   configured: boolean;
   environment: string;
+  apiType: "cws" | "sigep" | "none";
   details: {
     user: boolean;
     password: boolean;
-    cnpj: boolean;
-    contractCode: boolean;
-    cardCode: boolean;
-    adminCode: boolean;
+    contract: boolean;
+    card: boolean;
   };
 }
 
@@ -58,63 +55,47 @@ function maskSecret(value: string | undefined): string {
   return value.substring(0, 2) + "***" + value.substring(value.length - 2);
 }
 
-function getSigepCredentials(): SigepCredentials | null {
-  const user = Deno.env.get("SIGEP_USER");
-  const password = Deno.env.get("SIGEP_PASSWORD");
-  const cnpj = Deno.env.get("SIGEP_CNPJ");
-  const contractCode = Deno.env.get("SIGEP_CONTRACT_CODE");
-  const cardCode = Deno.env.get("SIGEP_CARD_CODE");
-  const adminCode = Deno.env.get("SIGEP_ADMINISTRATIVE_CODE");
-  const environment = (Deno.env.get("SIGEP_ENVIRONMENT") || "homologation") as "production" | "homologation";
+function getCwsCredentials(): CwsCredentials | null {
+  const user = Deno.env.get("CWS_USER");
+  const password = Deno.env.get("CWS_PASSWORD");
+  const contract = Deno.env.get("CWS_CONTRACT");
+  const card = Deno.env.get("CWS_CARD");
+  const environment = (Deno.env.get("CWS_ENVIRONMENT") || "homologation") as "production" | "homologation";
 
-  // Log credential status with masked values
-  console.log("[SIGEP] === Status das Credenciais ===");
-  console.log(`  - SIGEP_USER: ${maskSecret(user)}`);
-  console.log(`  - SIGEP_PASSWORD: ${password ? "✓ (configurado)" : "✗ (vazio)"}`);
-  console.log(`  - SIGEP_CNPJ: ${maskSecret(cnpj)}`);
-  console.log(`  - SIGEP_CONTRACT_CODE: ${maskSecret(contractCode)}`);
-  console.log(`  - SIGEP_CARD_CODE: ${maskSecret(cardCode)}`);
-  console.log(`  - SIGEP_ADMINISTRATIVE_CODE: ${maskSecret(adminCode)}`);
-  console.log(`  - SIGEP_ENVIRONMENT: ${environment}`);
+  console.log("[CWS] === Status das Credenciais CWS ===");
+  console.log(`  - CWS_USER: ${maskSecret(user)}`);
+  console.log(`  - CWS_PASSWORD: ${password ? "✓ (configurado)" : "✗ (vazio)"}`);
+  console.log(`  - CWS_CONTRACT: ${maskSecret(contract)}`);
+  console.log(`  - CWS_CARD: ${maskSecret(card)}`);
+  console.log(`  - CWS_ENVIRONMENT: ${environment}`);
 
-  // Check if all required credentials are present
-  if (!user || !password || !cnpj || !contractCode || !cardCode || !adminCode) {
-    console.log("[SIGEP] ⚠️ Credenciais incompletas - usando modo simulado");
+  if (!user || !password || !contract || !card) {
+    console.log("[CWS] ⚠️ Credenciais CWS incompletas");
     return null;
   }
 
-  // Validate CNPJ format (14 digits)
-  const cnpjClean = cnpj.replace(/\D/g, "");
-  if (cnpjClean.length !== 14) {
-    console.log(`[SIGEP] ⚠️ CNPJ inválido: ${cnpj} (deve ter 14 dígitos, tem ${cnpjClean.length})`);
-    return null;
-  }
-
-  console.log(`[SIGEP] ✓ Credenciais OK. Ambiente: ${environment.toUpperCase()}`);
-  return { user, password, cnpj: cnpjClean, contractCode, cardCode, adminCode, environment };
+  console.log(`[CWS] ✓ Credenciais CWS OK. Ambiente: ${environment.toUpperCase()}`);
+  return { user, password, contract, card, environment };
 }
 
 function getCredentialStatus(): CredentialStatus {
-  const user = Deno.env.get("SIGEP_USER");
-  const password = Deno.env.get("SIGEP_PASSWORD");
-  const cnpj = Deno.env.get("SIGEP_CNPJ");
-  const contractCode = Deno.env.get("SIGEP_CONTRACT_CODE");
-  const cardCode = Deno.env.get("SIGEP_CARD_CODE");
-  const adminCode = Deno.env.get("SIGEP_ADMINISTRATIVE_CODE");
-  const environment = Deno.env.get("SIGEP_ENVIRONMENT") || "homologation";
+  const user = Deno.env.get("CWS_USER");
+  const password = Deno.env.get("CWS_PASSWORD");
+  const contract = Deno.env.get("CWS_CONTRACT");
+  const card = Deno.env.get("CWS_CARD");
+  const environment = Deno.env.get("CWS_ENVIRONMENT") || "homologation";
 
-  const allConfigured = !!(user && password && cnpj && contractCode && cardCode && adminCode);
+  const allConfigured = !!(user && password && contract && card);
 
   return {
     configured: allConfigured,
     environment: allConfigured ? environment : "simulated",
+    apiType: allConfigured ? "cws" : "none",
     details: {
       user: !!user,
       password: !!password,
-      cnpj: !!cnpj,
-      contractCode: !!contractCode,
-      cardCode: !!cardCode,
-      adminCode: !!adminCode,
+      contract: !!contract,
+      card: !!card,
     },
   };
 }
@@ -154,13 +135,257 @@ function validateOrderData(order: any, shippingAddress: ShippingAddress | null):
   return errors;
 }
 
+// === CWS Authentication ===
+interface CwsToken {
+  token: string;
+  expiresAt: Date;
+}
+
+async function getCwsToken(credentials: CwsCredentials): Promise<CwsToken | null> {
+  const baseUrl = credentials.environment === "production"
+    ? "https://api.correios.com.br"
+    : "https://apihom.correios.com.br";
+
+  const authUrl = `${baseUrl}/token/v1/autentica/cartaopostagem`;
+  
+  // Basic auth: user:password in base64
+  const basicAuth = btoa(`${credentials.user}:${credentials.password}`);
+  
+  console.log(`[CWS-AUTH] Autenticando em: ${authUrl}`);
+  console.log(`[CWS-AUTH] Usuário: ${credentials.user}`);
+  
+  try {
+    const response = await fetch(authUrl, {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${basicAuth}`,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify({
+        numero: credentials.card,
+      }),
+    });
+
+    console.log(`[CWS-AUTH] Status: ${response.status}`);
+    
+    const responseText = await response.text();
+    console.log(`[CWS-AUTH] Resposta: ${responseText.substring(0, 500)}`);
+    
+    if (!response.ok) {
+      console.error(`[CWS-AUTH] ❌ Erro de autenticação: ${response.status}`);
+      return null;
+    }
+
+    const data = JSON.parse(responseText);
+    
+    if (!data.token) {
+      console.error("[CWS-AUTH] ❌ Token não encontrado na resposta");
+      return null;
+    }
+
+    // Token expira em ~1h, mas usamos margem de 55min
+    const expiresAt = new Date(Date.now() + 55 * 60 * 1000);
+    
+    console.log("[CWS-AUTH] ✓ Token obtido com sucesso");
+    return { token: data.token, expiresAt };
+  } catch (error: any) {
+    console.error(`[CWS-AUTH] ❌ Erro de conexão: ${error.message}`);
+    return null;
+  }
+}
+
+// === Test CWS Connectivity ===
+interface ConnectivityResult {
+  connected: boolean;
+  message: string;
+  httpStatus?: number;
+  environment?: string;
+  apiType?: string;
+  details?: any;
+}
+
+async function testCwsConnectivity(credentials: CwsCredentials): Promise<ConnectivityResult> {
+  const tokenResult = await getCwsToken(credentials);
+  
+  if (!tokenResult) {
+    return {
+      connected: false,
+      message: "Falha na autenticação CWS. Verifique usuário e código de acesso.",
+      environment: credentials.environment,
+      apiType: "cws",
+    };
+  }
+
+  return {
+    connected: true,
+    message: "Conexão CWS estabelecida com sucesso!",
+    environment: credentials.environment,
+    apiType: "cws",
+    details: {
+      tokenObtained: true,
+      expiresAt: tokenResult.expiresAt.toISOString(),
+    },
+  };
+}
+
+// === CWS Pre-Posting API ===
+interface PrePostingResult {
+  trackingCode: string;
+  etiquetaNumber: string;
+  isSimulated: boolean;
+  errorDetails: string | null;
+}
+
+async function createCwsPrePosting(
+  credentials: CwsCredentials, 
+  token: string,
+  serviceCode: string,
+  order: any,
+  shippingAddress: ShippingAddress,
+  senderData: any,
+  weight: number,
+  declaredValue: number
+): Promise<PrePostingResult> {
+  const baseUrl = credentials.environment === "production"
+    ? "https://api.correios.com.br"
+    : "https://apihom.correios.com.br";
+
+  const apiUrl = `${baseUrl}/prepostagem/v1/prepostagens`;
+
+  const recipientName = shippingAddress.name || 
+    `${shippingAddress.firstName || ''} ${shippingAddress.lastName || ''}`.trim() || 
+    "Destinatário";
+  
+  const recipientZip = (shippingAddress.zip || shippingAddress.cep || "").replace(/\D/g, "");
+  const senderZip = (senderData.zipcode || "").replace(/\D/g, "");
+
+  // Build pre-posting request according to CWS API
+  const prePostingData = {
+    idCorreios: credentials.user,
+    codigoServico: serviceCode,
+    remetente: {
+      nome: senderData.name,
+      endereco: {
+        cep: senderZip,
+        logradouro: senderData.address?.split(",")[0] || senderData.address,
+        numero: "S/N",
+        bairro: senderData.neighborhood || "Centro",
+        cidade: senderData.city,
+        uf: senderData.state,
+      },
+    },
+    destinatario: {
+      nome: recipientName.substring(0, 60),
+      endereco: {
+        cep: recipientZip,
+        logradouro: shippingAddress.street?.substring(0, 60) || "",
+        numero: shippingAddress.number || "S/N",
+        complemento: shippingAddress.complement?.substring(0, 30) || "",
+        bairro: shippingAddress.neighborhood?.substring(0, 30) || "",
+        cidade: shippingAddress.city?.substring(0, 40) || "",
+        uf: shippingAddress.state || "",
+      },
+    },
+    objetoPostal: {
+      peso: Math.max(1, Math.round(weight * 1000)), // Weight in grams
+      valorDeclarado: declaredValue > 0 ? Math.round(declaredValue * 100) : undefined, // Value in cents
+    },
+    codigoRastreio: "", // CWS will generate
+  };
+
+  console.log(`[CWS-PREPOSTAGEM] Criando pré-postagem...`);
+  console.log(`[CWS-PREPOSTAGEM] URL: ${apiUrl}`);
+  console.log(`[CWS-PREPOSTAGEM] Serviço: ${serviceCode}`);
+  console.log(`[CWS-PREPOSTAGEM] Destinatário: ${recipientName}`);
+  console.log(`[CWS-PREPOSTAGEM] CEP Destino: ${recipientZip}`);
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify(prePostingData),
+    });
+
+    console.log(`[CWS-PREPOSTAGEM] Status: ${response.status}`);
+    
+    const responseText = await response.text();
+    console.log(`[CWS-PREPOSTAGEM] Resposta: ${responseText.substring(0, 500)}`);
+
+    if (!response.ok) {
+      console.error(`[CWS-PREPOSTAGEM] ❌ Erro: ${response.status}`);
+      
+      // Parse error message if available
+      let errorMsg = `Erro HTTP ${response.status}`;
+      try {
+        const errorData = JSON.parse(responseText);
+        errorMsg = errorData.msgs?.[0]?.texto || errorData.message || errorMsg;
+      } catch {}
+      
+      return generateSimulatedLabel(serviceCode, errorMsg);
+    }
+
+    const data = JSON.parse(responseText);
+    
+    if (!data.codigoRastreio) {
+      console.error("[CWS-PREPOSTAGEM] ❌ Código de rastreio não encontrado na resposta");
+      return generateSimulatedLabel(serviceCode, "Código de rastreio não retornado");
+    }
+
+    const trackingCode = data.codigoRastreio;
+    const etiquetaNumber = formatTrackingCode(trackingCode);
+
+    console.log(`[CWS-PREPOSTAGEM] ✓ Etiqueta obtida: ${trackingCode}`);
+
+    return {
+      trackingCode,
+      etiquetaNumber,
+      isSimulated: false,
+      errorDetails: null,
+    };
+  } catch (error: any) {
+    console.error(`[CWS-PREPOSTAGEM] ❌ Erro de conexão: ${error.message}`);
+    return generateSimulatedLabel(serviceCode, error.message);
+  }
+}
+
+function generateSimulatedLabel(serviceCode: string, errorDetails: string): PrePostingResult {
+  const prefix = serviceCode === "03220" || serviceCode === "04162" ? "NX" : "PM";
+  const randomNum = Math.floor(Math.random() * 900000000) + 100000000;
+  const trackingCode = `${prefix}${randomNum}BR`;
+  const etiquetaNumber = formatTrackingCode(trackingCode);
+  
+  console.log(`[CWS] ⚠️ Usando fallback simulado: ${trackingCode}`);
+  console.log(`[CWS] Motivo: ${errorDetails}`);
+  
+  return {
+    trackingCode,
+    etiquetaNumber,
+    isSimulated: true,
+    errorDetails,
+  };
+}
+
+function formatTrackingCode(code: string): string {
+  // Format: AB 123 456 789 BR
+  const clean = code.replace(/\s/g, "");
+  if (clean.length === 13) {
+    return `${clean.substring(0, 2)} ${clean.substring(2, 5)} ${clean.substring(5, 8)} ${clean.substring(8, 11)} ${clean.substring(11)}`;
+  }
+  return code;
+}
+
+// === Main Handler ===
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // 1. Authentication
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       throw new Error("Não autorizado");
@@ -171,16 +396,15 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // 2. Parse body
     const body: GenerateLabelRequest = await req.json();
     const { orderId, serviceType = "PAC", weight = 0.5, declaredValue, test = false, offline = false } = body;
 
-    // === TEST MODE: Only check connectivity ===
+    // === TEST MODE ===
     if (test) {
-      console.log("[SIGEP-TEST] Iniciando teste de conectividade...");
+      console.log("[CWS-TEST] Iniciando teste de conectividade...");
       
       const credentialStatus = getCredentialStatus();
-      const credentials = getSigepCredentials();
+      const credentials = getCwsCredentials();
       
       if (!credentials) {
         return new Response(
@@ -189,14 +413,14 @@ serve(async (req) => {
             test: true,
             connected: false,
             credentialStatus,
-            message: "Credenciais SIGEP incompletas. Modo simulado ativo.",
+            message: "Credenciais CWS não configuradas. Configure CWS_USER, CWS_PASSWORD, CWS_CONTRACT e CWS_CARD.",
+            apiType: "cws",
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Try to connect to SIGEP
-      const connectivityResult = await testSigepConnectivity(credentials);
+      const connectivityResult = await testCwsConnectivity(credentials);
 
       return new Response(
         JSON.stringify({
@@ -204,30 +428,26 @@ serve(async (req) => {
           test: true,
           connected: connectivityResult.connected,
           credentialStatus,
-          sigepResponse: connectivityResult.message,
+          message: connectivityResult.message,
           environment: credentials.environment,
-          wsdlUrl: credentials.environment === "production"
-            ? "https://apps.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente"
-            : "https://apphom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente",
-          debugInfo: {
-            httpStatus: connectivityResult.httpStatus,
-            responseHeaders: connectivityResult.responseHeaders,
-            responsePreview: connectivityResult.responsePreview,
-            requestXml: connectivityResult.requestXml,
-          },
+          apiType: "cws",
+          apiUrl: credentials.environment === "production"
+            ? "https://api.correios.com.br"
+            : "https://apihom.correios.com.br",
+          details: connectivityResult.details,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // === NORMAL MODE: Generate label ===
+    // === LABEL GENERATION ===
     if (!orderId) {
       throw new Error("orderId é obrigatório");
     }
 
-    console.log(`[SIGEP-LABEL] Iniciando geração para pedido ${orderId}, serviço: ${serviceType}`);
+    console.log(`[CWS-LABEL] Gerando etiqueta para pedido ${orderId}, serviço: ${serviceType}`);
 
-    // 3. Get order data
+    // Get order data
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .select("*")
@@ -235,11 +455,11 @@ serve(async (req) => {
       .single();
 
     if (orderError || !order) {
-      console.error("[SIGEP-LABEL] Pedido não encontrado:", orderError);
+      console.error("[CWS-LABEL] Pedido não encontrado:", orderError);
       throw new Error("Pedido não encontrado");
     }
 
-    // 4. Get customer profile
+    // Get customer profile
     let customerName = "";
     let customerPhone = "";
     
@@ -256,77 +476,95 @@ serve(async (req) => {
       }
     }
 
-    // 5. Validate address
+    // Validate address
     const shippingAddress = order.shipping_address as ShippingAddress | null;
     const validationErrors = validateOrderData(order, shippingAddress);
     
     if (validationErrors.length > 0) {
-      console.error("[SIGEP-LABEL] Erros de validação:", validationErrors);
+      console.error("[CWS-LABEL] Erros de validação:", validationErrors);
       throw new Error(`Dados incompletos: ${validationErrors.join("; ")}`);
     }
 
     const recipientZip = (shippingAddress!.zip || shippingAddress!.cep || "").replace(/\D/g, "");
 
-    // 6. Get SIGEP credentials
-    const credentials = getSigepCredentials();
+    // Get sender data
+    const { data: storeSettings } = await supabase
+      .from("store_settings")
+      .select("store_name, store_pickup_address")
+      .limit(1)
+      .maybeSingle();
 
-    // 7. Determine service code
-    const serviceCode = serviceType === "SEDEX" ? "04162" : "04510"; // SEDEX or PAC
+    const senderName = storeSettings?.store_name || "Cali Beach Tech";
+    const senderAddress = storeSettings?.store_pickup_address || "Shopping RioMar, Av. República do Líbano, 251 - Piso L1, Recife - PE";
+    const senderCep = Deno.env.get("CORREIOS_CEP_ORIGEM") || "51110-160";
 
-    // 8. Generate label (simulated, offline, or real)
-    let trackingCode: string;
-    let etiquetaNumber: string;
-    let xmlRequest = "";
-    let xmlResponse = "";
-    let isSimulated = false;
+    const senderData = {
+      name: senderName,
+      address: senderAddress,
+      city: "Recife",
+      state: "PE",
+      zipcode: senderCep,
+      phone: "",
+    };
+
+    // CWS service codes: PAC = 03298, SEDEX = 03220
+    const serviceCode = serviceType === "SEDEX" ? "03220" : "03298";
+
+    // Generate label
+    let result: PrePostingResult;
     let isOffline = false;
-    let errorDetails: string | null = null;
 
-    // Offline mode - generate label without SIGEP
     if (offline) {
-      console.log("[SIGEP-LABEL] Modo OFFLINE solicitado - gerando etiqueta manual");
+      console.log("[CWS-LABEL] Modo OFFLINE solicitado");
       const prefix = serviceType === "SEDEX" ? "NX" : "PM";
       const timestamp = Date.now().toString().slice(-9);
-      trackingCode = `OFFLINE-${prefix}${timestamp}`;
-      etiquetaNumber = `${prefix} ${timestamp.substring(0, 3)} ${timestamp.substring(3, 6)} ${timestamp.substring(6)} BR`;
+      result = {
+        trackingCode: `OFFLINE-${prefix}${timestamp}`,
+        etiquetaNumber: `${prefix} ${timestamp.substring(0, 3)} ${timestamp.substring(3, 6)} ${timestamp.substring(6)} BR`,
+        isSimulated: true,
+        errorDetails: null,
+      };
       isOffline = true;
-      isSimulated = true;
-    } else if (credentials) {
-      // Real mode: call SIGEP Web
-      console.log(`[SIGEP-LABEL] Chamando SIGEP Web (${credentials.environment.toUpperCase()})...`);
-      
-      const sigepResult = await callSigepWebService({
-        credentials,
-        serviceCode,
-      });
-      
-      trackingCode = sigepResult.trackingCode;
-      etiquetaNumber = sigepResult.etiquetaNumber;
-      xmlRequest = sigepResult.xmlRequest;
-      xmlResponse = sigepResult.xmlResponse;
-      isSimulated = sigepResult.isSimulated;
-      errorDetails = sigepResult.errorDetails;
     } else {
-      // Simulated mode for development
-      console.log("[SIGEP-LABEL] Modo simulado (credenciais incompletas)");
-      const prefix = serviceType === "SEDEX" ? "NX" : "PM";
-      const randomNum = Math.floor(Math.random() * 900000000) + 100000000;
-      trackingCode = `${prefix}${randomNum}BR`;
-      etiquetaNumber = `${prefix} ${String(randomNum).substring(0, 3)} ${String(randomNum).substring(3, 6)} ${String(randomNum).substring(6)} BR`;
-      isSimulated = true;
+      const credentials = getCwsCredentials();
+      
+      if (!credentials) {
+        console.log("[CWS-LABEL] Credenciais CWS não configuradas - modo simulado");
+        result = generateSimulatedLabel(serviceCode, "Credenciais CWS não configuradas");
+      } else {
+        // Get CWS token
+        const tokenResult = await getCwsToken(credentials);
+        
+        if (!tokenResult) {
+          console.log("[CWS-LABEL] Falha na autenticação CWS - modo simulado");
+          result = generateSimulatedLabel(serviceCode, "Falha na autenticação CWS");
+        } else {
+          // Create pre-posting
+          result = await createCwsPrePosting(
+            credentials,
+            tokenResult.token,
+            serviceCode,
+            order,
+            shippingAddress!,
+            senderData,
+            weight,
+            declaredValue || order.total
+          );
+        }
+      }
     }
 
-    console.log(`[SIGEP-LABEL] Etiqueta gerada: ${trackingCode} (simulado: ${isSimulated})`);
+    console.log(`[CWS-LABEL] Etiqueta gerada: ${result.trackingCode} (simulado: ${result.isSimulated})`);
 
-    // 9. Update order
+    // Update order
     const { error: updateError } = await supabase
       .from("orders")
       .update({
-        tracking_code: trackingCode,
+        tracking_code: result.trackingCode,
         label_generated: true,
         label_generated_at: new Date().toISOString(),
         shipping_method: serviceType,
-        sigep_etiqueta: etiquetaNumber,
+        sigep_etiqueta: result.etiquetaNumber,
         shipping_weight: weight,
         declared_value: declaredValue || order.total,
         status: order.status === "processing" ? "shipped" : order.status,
@@ -334,52 +572,48 @@ serve(async (req) => {
       .eq("id", orderId);
 
     if (updateError) {
-      console.error("[SIGEP-LABEL] Erro ao atualizar pedido:", updateError);
+      console.error("[CWS-LABEL] Erro ao atualizar pedido:", updateError);
       throw new Error("Erro ao atualizar pedido");
     }
 
-    // 10. Create shipping_labels record
+    // Create shipping_labels record
     const { error: labelError } = await supabase
       .from("shipping_labels")
       .insert({
         order_id: orderId,
-        tracking_code: trackingCode,
-        label_number: etiquetaNumber,
+        tracking_code: result.trackingCode,
+        label_number: result.etiquetaNumber,
         service_type: serviceType,
         weight,
         declared_value: declaredValue || order.total,
-        xml_request: xmlRequest,
-        xml_response: xmlResponse,
+        xml_request: "",
+        xml_response: result.isSimulated ? `SIMULADO: ${result.errorDetails || "offline"}` : "CWS API",
       });
 
     if (labelError) {
-      console.error("[SIGEP-LABEL] Erro ao criar registro de etiqueta:", labelError);
+      console.error("[CWS-LABEL] Erro ao criar registro de etiqueta:", labelError);
     }
 
-    // 10.5 Send tracking email automatically (only for delivery, not pickup)
+    // Send tracking email
     let emailSent = false;
     let emailErrorMsg: string | null = null;
     
     if (order.shipping_method !== "pickup") {
-      console.log("[SIGEP-LABEL] Enviando email de rastreio automaticamente...");
+      console.log("[CWS-LABEL] Enviando email de rastreio...");
       
       try {
-        // Get customer email
         let customerEmail = order.guest_email;
         const shippingAddr = order.shipping_address as ShippingAddress | null;
         const emailRecipientName = shippingAddr?.name || 
           `${shippingAddr?.firstName || ''} ${shippingAddr?.lastName || ''}`.trim() || 
-          customerName ||
-          "Cliente";
+          customerName || "Cliente";
         
-        // If no guest email, try to get user email
         if (!customerEmail && order.user_id) {
           const { data: authData } = await supabase.auth.admin.getUserById(order.user_id);
           customerEmail = authData?.user?.email || null;
         }
         
         if (customerEmail) {
-          // Call send-order-status-email internally
           const internalSecret = Deno.env.get("INTERNAL_API_SECRET");
           const supabaseUrl = Deno.env.get("SUPABASE_URL");
           const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
@@ -398,7 +632,7 @@ serve(async (req) => {
                 customerName: emailRecipientName,
                 oldStatus: order.status,
                 newStatus: "shipped",
-                trackingCode,
+                trackingCode: result.trackingCode,
               }),
             });
             
@@ -409,63 +643,37 @@ serve(async (req) => {
               emailErrorMsg = emailResult.error || "Falha no envio";
             }
             
-            console.log(`[SIGEP-LABEL] Email de rastreio ${emailSent ? "✓ enviado" : "✗ falhou"}: ${customerEmail}`);
-          } else {
-            emailErrorMsg = "INTERNAL_API_SECRET não configurado";
-            console.log("[SIGEP-LABEL] ⚠️ INTERNAL_API_SECRET não configurado, email não enviado");
+            console.log(`[CWS-LABEL] Email ${emailSent ? "✓ enviado" : "✗ falhou"}: ${customerEmail}`);
           }
-        } else {
-          emailErrorMsg = "Email do cliente não encontrado";
-          console.log("[SIGEP-LABEL] ⚠️ Email do cliente não encontrado");
         }
       } catch (err: any) {
         emailErrorMsg = err.message;
-        console.error("[SIGEP-LABEL] Erro ao enviar email de rastreio:", err);
+        console.error("[CWS-LABEL] Erro ao enviar email:", err);
       }
-    } else {
-      console.log("[SIGEP-LABEL] Pedido é retirada na loja, email de rastreio não enviado");
     }
 
-    // 11. Get sender data
-    const { data: storeSettings } = await supabase
-      .from("store_settings")
-      .select("store_name, store_pickup_address")
-      .limit(1)
-      .maybeSingle();
-
-    const senderName = storeSettings?.store_name || "Cali Beach Tech";
-    const senderAddress = storeSettings?.store_pickup_address || "Shopping RioMar, Av. República do Líbano, 251 - Piso L1, Recife - PE";
-    const senderCep = Deno.env.get("CORREIOS_CEP_ORIGEM") || "51110-160";
-
-    // 12. Build recipient name
+    // Build recipient name for response
     const recipientName = shippingAddress!.name || 
       `${shippingAddress!.firstName || ''} ${shippingAddress!.lastName || ''}`.trim() || 
-      customerName || 
-      "Destinatário";
+      customerName || "Destinatário";
 
-    // 13. Determine environment for response
-    const environment = credentials?.environment || "simulated";
+    // Determine environment for response
+    const credentials = getCwsCredentials();
+    const environment = isOffline ? "offline" : (credentials?.environment || "simulated");
 
-    // 14. Return data for frontend label generation
     return new Response(
       JSON.stringify({
         success: true,
-        trackingCode,
-        etiquetaNumber,
-        environment: isOffline ? "offline" : environment,
-        isSimulated,
+        trackingCode: result.trackingCode,
+        etiquetaNumber: result.etiquetaNumber,
+        environment,
+        isSimulated: result.isSimulated,
         isOffline,
-        errorDetails,
+        errorDetails: result.errorDetails,
         emailSent,
         emailError: emailErrorMsg,
-        sender: {
-          name: senderName,
-          address: senderAddress,
-          city: "Recife",
-          state: "PE",
-          zipcode: senderCep,
-          phone: "",
-        },
+        apiType: "cws",
+        sender: senderData,
         receiver: {
           name: recipientName,
           address: `${shippingAddress!.street || ""}, ${shippingAddress!.number || ""}${shippingAddress!.complement ? ` - ${shippingAddress!.complement}` : ""}`,
@@ -482,13 +690,11 @@ serve(async (req) => {
           serviceType,
         },
       }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
-    console.error("[SIGEP-LABEL] Erro:", error);
-    console.error("[SIGEP-LABEL] Stack:", error.stack);
+    console.error("[CWS-LABEL] Erro:", error);
+    console.error("[CWS-LABEL] Stack:", error.stack);
     return new Response(
       JSON.stringify({ 
         success: false, 
@@ -502,281 +708,3 @@ serve(async (req) => {
     );
   }
 });
-
-// === Test SIGEP Connectivity ===
-interface ConnectivityResult {
-  connected: boolean;
-  message: string;
-  httpStatus?: number;
-  responseHeaders?: Record<string, string>;
-  responsePreview?: string;
-  requestXml?: string;
-}
-
-async function testSigepConnectivity(credentials: SigepCredentials): Promise<ConnectivityResult> {
-  const wsdlUrl = credentials.environment === "production"
-    ? "https://apps.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente"
-    : "https://apphom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente";
-
-  // Test with buscaCliente operation (doesn't consume label quota)
-  const soapXML = `<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:cli="http://cliente.bean.master.sigep.bsb.correios.com.br/">
-  <soapenv:Header/>
-  <soapenv:Body>
-    <cli:buscaCliente>
-      <idContrato>${credentials.contractCode}</idContrato>
-      <idCartaoPostagem>${credentials.cardCode}</idCartaoPostagem>
-      <usuario>${credentials.user}</usuario>
-      <senha>${credentials.password}</senha>
-    </cli:buscaCliente>
-  </soapenv:Body>
-</soapenv:Envelope>`;
-
-  console.log(`[SIGEP-TEST] Testando conexão com: ${wsdlUrl}`);
-  console.log(`[SIGEP-TEST] === Dados da Requisição ===`);
-  console.log(`[SIGEP-TEST] Usuário: ${credentials.user}`);
-  console.log(`[SIGEP-TEST] Contrato: ${credentials.contractCode}`);
-  console.log(`[SIGEP-TEST] Cartão: ${credentials.cardCode}`);
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
-
-    const response = await fetch(wsdlUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/xml; charset=utf-8",
-        "SOAPAction": "",
-      },
-      body: soapXML,
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    const responseText = await response.text();
-    
-    // Log detailed response info
-    console.log(`[SIGEP-TEST] === Resposta do Servidor ===`);
-    console.log(`[SIGEP-TEST] Status HTTP: ${response.status}`);
-    console.log(`[SIGEP-TEST] Status Text: ${response.statusText}`);
-    
-    // Log response headers
-    const responseHeaders: Record<string, string> = {};
-    response.headers.forEach((value, key) => {
-      responseHeaders[key] = value;
-      console.log(`[SIGEP-TEST] Header ${key}: ${value}`);
-    });
-    
-    // Log response body preview (first 1000 chars)
-    console.log(`[SIGEP-TEST] Resposta (primeiros 1000 chars):`);
-    console.log(responseText.substring(0, 1000));
-
-    if (responseText.includes("faultstring") || responseText.includes("Fault")) {
-      const faultMatch = responseText.match(/<faultstring>(.*?)<\/faultstring>/);
-      const errorMsg = faultMatch ? faultMatch[1] : "Erro desconhecido";
-      console.log(`[SIGEP-TEST] ❌ Erro SOAP detectado: ${errorMsg}`);
-      
-      // Extract more detail if available
-      const faultDetailMatch = responseText.match(/<detail>(.*?)<\/detail>/s);
-      if (faultDetailMatch) {
-        console.log(`[SIGEP-TEST] Detalhe do erro: ${faultDetailMatch[1]}`);
-      }
-      
-      return { 
-        connected: false, 
-        message: `Erro de autenticação: ${errorMsg}`,
-        httpStatus: response.status,
-        responseHeaders,
-        responsePreview: responseText.substring(0, 500),
-        requestXml: soapXML,
-      };
-    }
-
-    if (response.ok && responseText.includes("return")) {
-      console.log("[SIGEP-TEST] ✓ Conexão OK - Cliente encontrado");
-      return { 
-        connected: true, 
-        message: "Conexão estabelecida com sucesso!",
-        httpStatus: response.status,
-        responseHeaders,
-        responsePreview: responseText.substring(0, 500),
-      };
-    }
-
-    console.log(`[SIGEP-TEST] ⚠️ Resposta inesperada`);
-    return { 
-      connected: false, 
-      message: `Resposta inesperada: HTTP ${response.status}`,
-      httpStatus: response.status,
-      responseHeaders,
-      responsePreview: responseText.substring(0, 500),
-    };
-  } catch (error: any) {
-    console.error("[SIGEP-TEST] ❌ Erro de conexão:", error.message);
-    console.error("[SIGEP-TEST] Stack:", error.stack);
-    
-    if (error.name === "AbortError") {
-      return { 
-        connected: false, 
-        message: "Timeout: Servidor SIGEP não respondeu em 30 segundos",
-        requestXml: soapXML,
-      };
-    }
-    
-    return { 
-      connected: false, 
-      message: `Erro de rede: ${error.message}`,
-      requestXml: soapXML,
-    };
-  }
-}
-
-// === Call SIGEP Web Service ===
-interface SigepCallConfig {
-  credentials: SigepCredentials;
-  serviceCode: string;
-}
-
-interface SigepResult {
-  trackingCode: string;
-  etiquetaNumber: string;
-  xmlRequest: string;
-  xmlResponse: string;
-  isSimulated: boolean;
-  errorDetails: string | null;
-}
-
-async function callSigepWebService(config: SigepCallConfig): Promise<SigepResult> {
-  const { credentials, serviceCode } = config;
-  
-  const wsdlUrl = credentials.environment === "production"
-    ? "https://apps.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente"
-    : "https://apphom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente";
-
-  // SOAP XML to request label
-  const soapXML = `<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:cli="http://cliente.bean.master.sigep.bsb.correios.com.br/">
-  <soapenv:Header/>
-  <soapenv:Body>
-    <cli:solicitaEtiquetas>
-      <tipoDestinatario>C</tipoDestinatario>
-      <identificador>${credentials.cnpj}</identificador>
-      <idServico>${serviceCode}</idServico>
-      <qtdEtiquetas>1</qtdEtiquetas>
-      <usuario>${credentials.user}</usuario>
-      <senha>${credentials.password}</senha>
-    </cli:solicitaEtiquetas>
-  </soapenv:Body>
-</soapenv:Envelope>`;
-
-  console.log(`[SIGEP] === Requisição SIGEP ===`);
-  console.log(`[SIGEP] URL: ${wsdlUrl}`);
-  console.log(`[SIGEP] Usuário: ${credentials.user}`);
-  console.log(`[SIGEP] CNPJ: ${maskSecret(credentials.cnpj)}`);
-  console.log(`[SIGEP] Código de Serviço: ${serviceCode}`);
-  console.log(`[SIGEP] Ambiente: ${credentials.environment.toUpperCase()}`);
-
-  const maxRetries = 2;
-  let lastError: string | null = null;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`[SIGEP] Tentativa ${attempt}/${maxRetries}...`);
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
-
-      const response = await fetch(wsdlUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "text/xml; charset=utf-8",
-          "SOAPAction": "",
-        },
-        body: soapXML,
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      const responseText = await response.text();
-      console.log(`[SIGEP] Status HTTP: ${response.status}`);
-      console.log(`[SIGEP] Resposta (primeiros 500 chars): ${responseText.substring(0, 500)}`);
-
-      if (!response.ok) {
-        console.error(`[SIGEP] ❌ Erro HTTP: ${response.status}`);
-        lastError = `Erro HTTP ${response.status}`;
-        continue; // Retry
-      }
-
-      // Check for SOAP fault
-      if (responseText.includes("faultstring") || responseText.includes("Fault")) {
-        const faultMatch = responseText.match(/<faultstring>(.*?)<\/faultstring>/);
-        const errorMsg = faultMatch ? faultMatch[1] : "Erro desconhecido";
-        console.error(`[SIGEP] ❌ Erro SOAP: ${errorMsg}`);
-        lastError = errorMsg;
-        
-        // Don't retry for authentication errors
-        if (errorMsg.toLowerCase().includes("senha") || errorMsg.toLowerCase().includes("usuario") || errorMsg.toLowerCase().includes("autenticacao")) {
-          break;
-        }
-        continue;
-      }
-
-      // Extract label number from response
-      const etiquetaMatch = responseText.match(/<return>(.*?)<\/return>/);
-      if (!etiquetaMatch || !etiquetaMatch[1]) {
-        console.error("[SIGEP] ❌ Etiqueta não encontrada na resposta");
-        console.error(`[SIGEP] Resposta completa: ${responseText}`);
-        lastError = "Etiqueta não encontrada na resposta";
-        continue;
-      }
-
-      const etiquetaNumber = etiquetaMatch[1].trim();
-      const trackingCode = etiquetaNumber.replace(/\s/g, "");
-
-      console.log(`[SIGEP] ✓ Etiqueta obtida: ${trackingCode}`);
-
-      return {
-        trackingCode,
-        etiquetaNumber,
-        xmlRequest: soapXML,
-        xmlResponse: responseText,
-        isSimulated: false,
-        errorDetails: null,
-      };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`[SIGEP] ❌ Erro na tentativa ${attempt}: ${errorMessage}`);
-      
-      if (error instanceof Error && error.name === "AbortError") {
-        lastError = "Timeout: servidor não respondeu em 30 segundos";
-      } else {
-        lastError = errorMessage;
-      }
-      
-      if (attempt < maxRetries) {
-        console.log(`[SIGEP] Aguardando 2s antes de tentar novamente...`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-    }
-  }
-
-  // Fallback to simulated mode
-  console.log(`[SIGEP] ⚠️ Usando fallback simulado após ${maxRetries} tentativas`);
-  console.log(`[SIGEP] Último erro: ${lastError}`);
-  
-  const prefix = serviceCode === "04162" ? "NX" : "PM";
-  const randomNum = Math.floor(Math.random() * 900000000) + 100000000;
-  const trackingCode = `${prefix}${randomNum}BR`;
-  const etiquetaNumber = `${prefix} ${String(randomNum).substring(0, 3)} ${String(randomNum).substring(3, 6)} ${String(randomNum).substring(6)} BR`;
-  
-  return {
-    trackingCode,
-    etiquetaNumber,
-    xmlRequest: soapXML,
-    xmlResponse: `ERRO: ${lastError}`,
-    isSimulated: true,
-    errorDetails: lastError,
-  };
-}
