@@ -155,6 +155,11 @@ async function getCwsToken(credentials: CwsCredentials): Promise<CwsToken | null
   console.log(`[CWS-AUTH] Usuário: ${credentials.user}`);
   
   try {
+    const requestBody = JSON.stringify({ numero: credentials.card });
+    
+    console.log(`[CWS-AUTH] Request body: ${requestBody}`);
+    console.log(`[CWS-AUTH] Headers: Authorization=Basic *****, Content-Type=application/json`);
+    
     const response = await fetch(authUrl, {
       method: "POST",
       headers: {
@@ -162,18 +167,43 @@ async function getCwsToken(credentials: CwsCredentials): Promise<CwsToken | null
         "Content-Type": "application/json",
         "Accept": "application/json",
       },
-      body: JSON.stringify({
-        numero: credentials.card,
-      }),
+      body: requestBody,
     });
 
     console.log(`[CWS-AUTH] Status: ${response.status}`);
+    console.log(`[CWS-AUTH] Status Text: ${response.statusText}`);
+    
+    // Log response headers for debugging
+    const headersObj: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      headersObj[key] = value;
+    });
+    console.log(`[CWS-AUTH] Response Headers: ${JSON.stringify(headersObj)}`);
     
     const responseText = await response.text();
-    console.log(`[CWS-AUTH] Resposta: ${responseText.substring(0, 500)}`);
+    console.log(`[CWS-AUTH] Response Body (first 1000 chars): ${responseText.substring(0, 1000)}`);
     
     if (!response.ok) {
       console.error(`[CWS-AUTH] ❌ Erro de autenticação: ${response.status}`);
+      
+      // Parse error details if JSON
+      try {
+        const errorData = JSON.parse(responseText);
+        console.error(`[CWS-AUTH] ❌ Erro JSON: ${JSON.stringify(errorData, null, 2)}`);
+        console.error(`[CWS-AUTH] ❌ Mensagem: ${errorData.msg || errorData.message || errorData.error || 'Sem mensagem'}`);
+        console.error(`[CWS-AUTH] ❌ Código: ${errorData.cod || errorData.code || 'Sem código'}`);
+      } catch {
+        console.error(`[CWS-AUTH] ❌ Resposta não é JSON: ${responseText}`);
+      }
+      
+      // Specific guidance for 401 errors
+      if (response.status === 401) {
+        console.error(`[CWS-AUTH] ⚠️ DICA: Erro 401 geralmente significa:`);
+        console.error(`[CWS-AUTH]   1. CWS_USER deve ser o 'idCorreios' (login do Meu Correios), não o CNPJ`);
+        console.error(`[CWS-AUTH]   2. CWS_PASSWORD deve ser o código de acesso gerado no portal CWS`);
+        console.error(`[CWS-AUTH]   3. Verifique se as credenciais são do ambiente correto (${credentials.environment})`);
+      }
+      
       return null;
     }
 
@@ -181,6 +211,7 @@ async function getCwsToken(credentials: CwsCredentials): Promise<CwsToken | null
     
     if (!data.token) {
       console.error("[CWS-AUTH] ❌ Token não encontrado na resposta");
+      console.error(`[CWS-AUTH] ❌ Resposta completa: ${JSON.stringify(data, null, 2)}`);
       return null;
     }
 
@@ -188,9 +219,11 @@ async function getCwsToken(credentials: CwsCredentials): Promise<CwsToken | null
     const expiresAt = new Date(Date.now() + 55 * 60 * 1000);
     
     console.log("[CWS-AUTH] ✓ Token obtido com sucesso");
+    console.log(`[CWS-AUTH] ✓ Expira em: ${expiresAt.toISOString()}`);
     return { token: data.token, expiresAt };
   } catch (error: any) {
     console.error(`[CWS-AUTH] ❌ Erro de conexão: ${error.message}`);
+    console.error(`[CWS-AUTH] ❌ Stack: ${error.stack}`);
     return null;
   }
 }
