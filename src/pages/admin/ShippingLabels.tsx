@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Printer, Package, Search, Loader2, Tag, CheckCircle2, AlertTriangle, Shield, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { Printer, Package, Search, Loader2, Tag, CheckCircle2, AlertTriangle, Shield, Wifi, WifiOff, RefreshCw, CloudOff } from 'lucide-react';
 import { ShippingLabelPrint, ShippingLabelPrintData } from '@/components/shipping/ShippingLabelPrint';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -129,9 +129,9 @@ const ShippingLabels = () => {
 
   // Generate label mutation
   const generateLabelMutation = useMutation({
-    mutationFn: async ({ orderId, serviceType, weight }: { orderId: string; serviceType: 'PAC' | 'SEDEX'; weight: number }) => {
+    mutationFn: async ({ orderId, serviceType, weight, offline = false }: { orderId: string; serviceType: 'PAC' | 'SEDEX'; weight: number; offline?: boolean }) => {
       const { data, error } = await supabase.functions.invoke('generate-sigep-label', {
-        body: { orderId, serviceType, weight, declaredValue: undefined },
+        body: { orderId, serviceType, weight, declaredValue: undefined, offline },
       });
 
       if (error) throw error;
@@ -159,7 +159,14 @@ const ShippingLabels = () => {
       });
       setLabelDialogOpen(true);
       
-      const envLabel = data.isSimulated ? ' (SIMULADA)' : data.environment === 'homologation' ? ' (HOMOLOGAÇÃO)' : '';
+      let envLabel = '';
+      if (data.isOffline) {
+        envLabel = ' (OFFLINE)';
+      } else if (data.isSimulated) {
+        envLabel = ' (SIMULADA)';
+      } else if (data.environment === 'homologation') {
+        envLabel = ' (HOMOLOGAÇÃO)';
+      }
       
       if (data.errorDetails) {
         toast.warning(`Etiqueta gerada em modo fallback${envLabel}: ${data.errorDetails}`);
@@ -173,8 +180,8 @@ const ShippingLabels = () => {
     },
   });
 
-  const handleGenerateLabel = (orderId: string) => {
-    generateLabelMutation.mutate({ orderId, serviceType, weight: 0.5 });
+  const handleGenerateLabel = (orderId: string, offline = false) => {
+    generateLabelMutation.mutate({ orderId, serviceType, weight: 0.5, offline });
   };
 
   const handleSelectOrder = (orderId: string, checked: boolean) => {
@@ -517,21 +524,33 @@ const ShippingLabels = () => {
                         )}
                       </td>
                       <td className="py-3 px-2">
-                        <Button
-                          size="sm"
-                          variant={order.label_generated ? "outline" : "default"}
-                          onClick={() => handleGenerateLabel(order.id)}
-                          disabled={generateLabelMutation.isPending}
-                        >
-                          {generateLabelMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Printer className="h-4 w-4" />
-                          )}
-                          <span className="ml-2 hidden sm:inline">
-                            {order.label_generated ? 'Reimprimir' : 'Gerar'}
-                          </span>
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant={order.label_generated ? "outline" : "default"}
+                            onClick={() => handleGenerateLabel(order.id, false)}
+                            disabled={generateLabelMutation.isPending}
+                            title="Gerar etiqueta via SIGEP"
+                          >
+                            {generateLabelMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Printer className="h-4 w-4" />
+                            )}
+                            <span className="ml-2 hidden sm:inline">
+                              {order.label_generated ? 'Reimprimir' : 'Gerar'}
+                            </span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleGenerateLabel(order.id, true)}
+                            disabled={generateLabelMutation.isPending}
+                            title="Gerar etiqueta offline (sem SIGEP)"
+                          >
+                            <CloudOff className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}

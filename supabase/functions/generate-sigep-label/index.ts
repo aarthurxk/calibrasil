@@ -12,6 +12,7 @@ interface GenerateLabelRequest {
   weight?: number;
   declaredValue?: number;
   test?: boolean; // Test mode - only check connectivity
+  offline?: boolean; // Offline mode - generate label without SIGEP connection
 }
 
 interface ShippingAddress {
@@ -172,7 +173,7 @@ serve(async (req) => {
 
     // 2. Parse body
     const body: GenerateLabelRequest = await req.json();
-    const { orderId, serviceType = "PAC", weight = 0.5, declaredValue, test = false } = body;
+    const { orderId, serviceType = "PAC", weight = 0.5, declaredValue, test = false, offline = false } = body;
 
     // === TEST MODE: Only check connectivity ===
     if (test) {
@@ -208,6 +209,12 @@ serve(async (req) => {
           wsdlUrl: credentials.environment === "production"
             ? "https://apps.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente"
             : "https://apphom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente",
+          debugInfo: {
+            httpStatus: connectivityResult.httpStatus,
+            responseHeaders: connectivityResult.responseHeaders,
+            responsePreview: connectivityResult.responsePreview,
+            requestXml: connectivityResult.requestXml,
+          },
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -266,15 +273,25 @@ serve(async (req) => {
     // 7. Determine service code
     const serviceCode = serviceType === "SEDEX" ? "04162" : "04510"; // SEDEX or PAC
 
-    // 8. Generate label (simulated or real)
+    // 8. Generate label (simulated, offline, or real)
     let trackingCode: string;
     let etiquetaNumber: string;
     let xmlRequest = "";
     let xmlResponse = "";
     let isSimulated = false;
+    let isOffline = false;
     let errorDetails: string | null = null;
 
-    if (credentials) {
+    // Offline mode - generate label without SIGEP
+    if (offline) {
+      console.log("[SIGEP-LABEL] Modo OFFLINE solicitado - gerando etiqueta manual");
+      const prefix = serviceType === "SEDEX" ? "NX" : "PM";
+      const timestamp = Date.now().toString().slice(-9);
+      trackingCode = `OFFLINE-${prefix}${timestamp}`;
+      etiquetaNumber = `${prefix} ${timestamp.substring(0, 3)} ${timestamp.substring(3, 6)} ${timestamp.substring(6)} BR`;
+      isOffline = true;
+      isSimulated = true;
+    } else if (credentials) {
       // Real mode: call SIGEP Web
       console.log(`[SIGEP-LABEL] Chamando SIGEP Web (${credentials.environment.toUpperCase()})...`);
       
@@ -435,8 +452,9 @@ serve(async (req) => {
         success: true,
         trackingCode,
         etiquetaNumber,
-        environment,
+        environment: isOffline ? "offline" : environment,
         isSimulated,
+        isOffline,
         errorDetails,
         emailSent,
         emailError: emailErrorMsg,
@@ -486,7 +504,16 @@ serve(async (req) => {
 });
 
 // === Test SIGEP Connectivity ===
-async function testSigepConnectivity(credentials: SigepCredentials): Promise<{ connected: boolean; message: string }> {
+interface ConnectivityResult {
+  connected: boolean;
+  message: string;
+  httpStatus?: number;
+  responseHeaders?: Record<string, string>;
+  responsePreview?: string;
+  requestXml?: string;
+}
+
+async function testSigepConnectivity(credentials: SigepCredentials): Promise<ConnectivityResult> {
   const wsdlUrl = credentials.environment === "production"
     ? "https://apps.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente"
     : "https://apphom.correios.com.br/SigepMasterJPA/AtendeClienteService/AtendeCliente";
@@ -506,6 +533,10 @@ async function testSigepConnectivity(credentials: SigepCredentials): Promise<{ c
 </soapenv:Envelope>`;
 
   console.log(`[SIGEP-TEST] Testando conexão com: ${wsdlUrl}`);
+  console.log(`[SIGEP-TEST] === Dados da Requisição ===`);
+  console.log(`[SIGEP-TEST] Usuário: ${credentials.user}`);
+  console.log(`[SIGEP-TEST] Contrato: ${credentials.contractCode}`);
+  console.log(`[SIGEP-TEST] Cartão: ${credentials.cardCode}`);
 
   try {
     const controller = new AbortController();
@@ -524,29 +555,80 @@ async function testSigepConnectivity(credentials: SigepCredentials): Promise<{ c
     clearTimeout(timeoutId);
 
     const responseText = await response.text();
-    console.log(`[SIGEP-TEST] Status: ${response.status}`);
+    
+    // Log detailed response info
+    console.log(`[SIGEP-TEST] === Resposta do Servidor ===`);
+    console.log(`[SIGEP-TEST] Status HTTP: ${response.status}`);
+    console.log(`[SIGEP-TEST] Status Text: ${response.statusText}`);
+    
+    // Log response headers
+    const responseHeaders: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      responseHeaders[key] = value;
+      console.log(`[SIGEP-TEST] Header ${key}: ${value}`);
+    });
+    
+    // Log response body preview (first 1000 chars)
+    console.log(`[SIGEP-TEST] Resposta (primeiros 1000 chars):`);
+    console.log(responseText.substring(0, 1000));
 
     if (responseText.includes("faultstring") || responseText.includes("Fault")) {
       const faultMatch = responseText.match(/<faultstring>(.*?)<\/faultstring>/);
       const errorMsg = faultMatch ? faultMatch[1] : "Erro desconhecido";
-      console.log(`[SIGEP-TEST] ❌ Erro SOAP: ${errorMsg}`);
-      return { connected: false, message: `Erro de autenticação: ${errorMsg}` };
+      console.log(`[SIGEP-TEST] ❌ Erro SOAP detectado: ${errorMsg}`);
+      
+      // Extract more detail if available
+      const faultDetailMatch = responseText.match(/<detail>(.*?)<\/detail>/s);
+      if (faultDetailMatch) {
+        console.log(`[SIGEP-TEST] Detalhe do erro: ${faultDetailMatch[1]}`);
+      }
+      
+      return { 
+        connected: false, 
+        message: `Erro de autenticação: ${errorMsg}`,
+        httpStatus: response.status,
+        responseHeaders,
+        responsePreview: responseText.substring(0, 500),
+        requestXml: soapXML,
+      };
     }
 
     if (response.ok && responseText.includes("return")) {
-      console.log("[SIGEP-TEST] ✓ Conexão OK");
-      return { connected: true, message: "Conexão estabelecida com sucesso!" };
+      console.log("[SIGEP-TEST] ✓ Conexão OK - Cliente encontrado");
+      return { 
+        connected: true, 
+        message: "Conexão estabelecida com sucesso!",
+        httpStatus: response.status,
+        responseHeaders,
+        responsePreview: responseText.substring(0, 500),
+      };
     }
 
-    return { connected: false, message: `Resposta inesperada: ${response.status}` };
+    console.log(`[SIGEP-TEST] ⚠️ Resposta inesperada`);
+    return { 
+      connected: false, 
+      message: `Resposta inesperada: HTTP ${response.status}`,
+      httpStatus: response.status,
+      responseHeaders,
+      responsePreview: responseText.substring(0, 500),
+    };
   } catch (error: any) {
     console.error("[SIGEP-TEST] ❌ Erro de conexão:", error.message);
+    console.error("[SIGEP-TEST] Stack:", error.stack);
     
     if (error.name === "AbortError") {
-      return { connected: false, message: "Timeout: Servidor SIGEP não respondeu em 30 segundos" };
+      return { 
+        connected: false, 
+        message: "Timeout: Servidor SIGEP não respondeu em 30 segundos",
+        requestXml: soapXML,
+      };
     }
     
-    return { connected: false, message: `Erro de rede: ${error.message}` };
+    return { 
+      connected: false, 
+      message: `Erro de rede: ${error.message}`,
+      requestXml: soapXML,
+    };
   }
 }
 
