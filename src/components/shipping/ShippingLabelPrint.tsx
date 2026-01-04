@@ -1,6 +1,7 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Printer, Download } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Printer, Download, FileText } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { QRCodeSVG } from 'qrcode.react';
 import html2canvas from 'html2canvas';
@@ -44,6 +45,7 @@ interface ShippingLabelPrintProps {
 export function ShippingLabelPrint({ data, onClose }: ShippingLabelPrintProps) {
   const labelRef = useRef<HTMLDivElement>(null);
   const barcodeRef = useRef<SVGSVGElement>(null);
+  const [paperSize, setPaperSize] = useState<'a4' | 'thermal'>('a4');
 
   // Generate barcode when component mounts or tracking code changes
   useEffect(() => {
@@ -96,7 +98,7 @@ export function ShippingLabelPrint({ data, onClose }: ShippingLabelPrintProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Print Styles */}
+      {/* Print Styles - Dynamic based on paper size selection */}
       <style>{`
         @media print {
           html, body {
@@ -104,12 +106,44 @@ export function ShippingLabelPrint({ data, onClose }: ShippingLabelPrintProps) {
             padding: 0 !important;
             width: 100% !important;
             height: 100% !important;
+            background: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           body * {
-            visibility: hidden;
+            visibility: hidden !important;
           }
           #shipping-label-print, #shipping-label-print * {
             visibility: visible !important;
+          }
+          .print-hide {
+            display: none !important;
+          }
+          ${paperSize === 'a4' ? `
+          /* A4 Mode - Scale label to fill page */
+          @page {
+            size: A4 portrait;
+            margin: 10mm;
+          }
+          #shipping-label-print {
+            position: fixed !important;
+            left: 50% !important;
+            top: 50% !important;
+            width: 100mm !important;
+            height: 150mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+            transform: translate(-50%, -50%) scale(1.7) !important;
+            transform-origin: center center !important;
+            background: white !important;
+            border: 1px solid #ccc !important;
+          }
+          ` : `
+          /* Thermal Printer Mode - Native 10x15cm */
+          @page {
+            size: 100mm 150mm;
+            margin: 0;
           }
           #shipping-label-print {
             position: fixed !important;
@@ -117,43 +151,63 @@ export function ShippingLabelPrint({ data, onClose }: ShippingLabelPrintProps) {
             top: 0 !important;
             width: 100mm !important;
             height: 150mm !important;
-            max-width: 100vw !important;
-            max-height: 100vh !important;
             margin: 0 !important;
             padding: 0 !important;
             box-sizing: border-box !important;
             transform: none !important;
-            border: none !important;
             background: white !important;
+            border: none !important;
           }
-          .print-hide {
-            display: none !important;
-          }
-          @page {
-            size: 100mm 150mm;
-            margin: 0;
-          }
+          `}
         }
       `}</style>
 
       {/* Action Buttons */}
-      <div className="print-hide flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Etiqueta de Envio - Correios</h2>
-        <div className="flex gap-2">
-          {onClose && (
-            <Button variant="outline" onClick={onClose}>
-              Fechar
-            </Button>
-          )}
-          <Button variant="outline" onClick={handleDownloadPDF}>
-            <Download className="h-4 w-4 mr-2" />
-            Baixar PDF
-          </Button>
-          <Button onClick={handlePrint}>
-            <Printer className="h-4 w-4 mr-2" />
-            Imprimir
-          </Button>
+      <div className="print-hide flex flex-col gap-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-lg font-semibold">Etiqueta de Envio - Correios</h2>
+          <div className="flex gap-2">
+            {onClose && (
+              <Button variant="outline" onClick={onClose}>
+                Fechar
+              </Button>
+            )}
+          </div>
         </div>
+        
+        {/* Paper Size Selector and Actions */}
+        <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/50 rounded-lg border">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Tamanho do papel:</span>
+          </div>
+          <Select value={paperSize} onValueChange={(v) => setPaperSize(v as 'a4' | 'thermal')}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="a4">A4 (impressora comum)</SelectItem>
+              <SelectItem value="thermal">10x15cm (térmica)</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <div className="flex gap-2 ml-auto">
+            <Button variant="outline" onClick={handleDownloadPDF}>
+              <Download className="h-4 w-4 mr-2" />
+              Baixar PDF
+            </Button>
+            <Button onClick={handlePrint}>
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir
+            </Button>
+          </div>
+        </div>
+        
+        {paperSize === 'a4' && (
+          <p className="text-xs text-muted-foreground">
+            💡 A etiqueta será escalada para preencher a página A4. Para impressoras térmicas, selecione "10x15cm".
+          </p>
+        )}
       </div>
 
       {/* Label Content */}
