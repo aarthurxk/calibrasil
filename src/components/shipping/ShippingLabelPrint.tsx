@@ -284,22 +284,22 @@ export function ShippingLabelPrint({ data, onClose }: ShippingLabelPrintProps) {
       >
         {/* Header - Logo and Service Type */}
         <div 
-          className="flex justify-between items-center px-3 py-2 border-b-2 border-foreground/30"
+          className="flex justify-between items-center px-2 py-1.5 border-b-2 border-foreground/30"
           style={{ backgroundColor: '#FFCC00' }}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <img 
               src={caliLogo} 
               alt="Logo" 
-              className="w-10 h-10 object-contain rounded"
+              className="w-6 h-6 object-contain rounded"
             />
             <div>
-              <p className="font-bold text-xs" style={{ color: '#003D7A' }}>CORREIOS</p>
-              <p className="text-[8px]" style={{ color: '#003D7A' }}>ECT - EMPRESA BRASILEIRA DE CORREIOS</p>
+              <p className="font-bold text-[10px]" style={{ color: '#003D7A' }}>CORREIOS</p>
+              <p className="text-[7px]" style={{ color: '#003D7A' }}>ECT - EMPRESA BRASILEIRA DE CORREIOS</p>
             </div>
           </div>
           <div 
-            className="px-3 py-1 rounded text-white font-bold text-lg"
+            className="px-2 py-0.5 rounded text-white font-bold text-sm"
             style={{ backgroundColor: serviceColor }}
           >
             {data.serviceType}
