@@ -65,7 +65,72 @@ export function ShippingLabelPrint({ data, onClose }: ShippingLabelPrintProps) {
   }, [data.trackingCode]);
 
   const handlePrint = () => {
-    window.print();
+    if (!labelRef.current) return;
+    
+    const labelHTML = labelRef.current.outerHTML;
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    
+    if (!printWindow) {
+      // Fallback if popup blocked
+      window.print();
+      return;
+    }
+
+    const isA4 = paperSize === 'a4';
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Etiqueta - ${data.trackingCode}</title>
+          <style>
+            @page {
+              size: ${isA4 ? 'A4 portrait' : '100mm 150mm'};
+              margin: ${isA4 ? '10mm' : '0'};
+            }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            body {
+              font-family: Arial, sans-serif;
+              background: white;
+              display: flex;
+              justify-content: center;
+              align-items: ${isA4 ? 'center' : 'flex-start'};
+              min-height: 100vh;
+              padding: ${isA4 ? '0' : '0'};
+            }
+            #shipping-label-print {
+              width: 100mm;
+              min-height: 150mm;
+              background: white;
+              border: 2px solid #e0e0e0;
+              ${isA4 ? 'transform: scale(1.6); transform-origin: center center;' : ''}
+            }
+            .print-hide { display: none !important; }
+            img { max-width: 100%; height: auto; }
+            svg { max-width: 100%; }
+          </style>
+        </head>
+        <body>
+          ${labelHTML}
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                window.close();
+              }, 300);
+            };
+          <\/script>
+        </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
   };
 
   const handleDownloadPDF = async () => {
