@@ -99,26 +99,38 @@ export function ShippingLabelPrint({ data, onClose }: ShippingLabelPrintProps) {
       {/* Print Styles */}
       <style>{`
         @media print {
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+          }
           body * {
             visibility: hidden;
           }
           #shipping-label-print, #shipping-label-print * {
-            visibility: visible;
+            visibility: visible !important;
           }
           #shipping-label-print {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 10cm;
-            height: 15cm;
-            margin: 0;
-            padding: 0;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100mm !important;
+            height: 150mm !important;
+            max-width: 100vw !important;
+            max-height: 100vh !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+            transform: none !important;
+            border: none !important;
+            background: white !important;
           }
           .print-hide {
             display: none !important;
           }
           @page {
-            size: 10cm 15cm;
+            size: 100mm 150mm;
             margin: 0;
           }
         }
