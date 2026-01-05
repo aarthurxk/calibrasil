@@ -21,11 +21,19 @@ import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MapPin, Phone, Mail, Package, CreditCard, Calendar, Truck, Loader2, User, Send, Trash2, Printer } from 'lucide-react';
+import { MapPin, Phone, Mail, Package, CreditCard, Calendar, Truck, Loader2, User, Send, Trash2, Printer, Store } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface OrderItem {
   id: string;
@@ -34,6 +42,7 @@ interface OrderItem {
   quantity: number;
   color?: string;
   model?: string;
+  source_store_id?: string;
 }
 
 interface ShippingAddress {
@@ -128,6 +137,9 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onTrackingCodeSa
   const [isResending, setIsResending] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
+  const { isAdmin, isManager } = useAuth();
+  const queryClient = useQueryClient();
+  const canSeeStoreOrigin = isAdmin || isManager;
 
   // Buscar dados do perfil quando há user_id
   const { data: profile } = useQuery({
@@ -163,6 +175,39 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onTrackingCodeSa
       return data?.email;
     },
     enabled: !!order?.user_id && open,
+  });
+
+  // Fetch stores for admin/manager
+  const { data: stores = [] } = useQuery({
+    queryKey: ['stores'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('stores')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order');
+      if (error) throw error;
+      return data;
+    },
+    enabled: canSeeStoreOrigin && open,
+  });
+
+  // Update source store mutation
+  const updateSourceStoreMutation = useMutation({
+    mutationFn: async ({ itemId, storeId }: { itemId: string; storeId: string }) => {
+      const { error } = await supabase
+        .from('order_items')
+        .update({ source_store_id: storeId })
+        .eq('id', itemId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast({ title: 'Loja de origem atualizada' });
+    },
+    onError: () => {
+      toast({ title: 'Erro ao atualizar loja', variant: 'destructive' });
+    },
   });
 
   useEffect(() => {
@@ -463,7 +508,6 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onTrackingCodeSa
             </>
           )}
 
-          {/* Itens do Pedido */}
           <div>
             <h3 className="font-semibold mb-3">Itens do Pedido</h3>
             <div className="space-y-3">
@@ -472,7 +516,7 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onTrackingCodeSa
                   key={item.id}
                   className="flex justify-between items-start p-3 bg-muted/50 rounded-lg"
                 >
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium">{item.product_name}</p>
                     <div className="text-sm text-muted-foreground">
                       {item.color && <span>Cor: {item.color}</span>}
@@ -482,6 +526,27 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onTrackingCodeSa
                     <p className="text-sm text-muted-foreground">
                       Qtd: {item.quantity} × {formatPrice(item.price)}
                     </p>
+                    {/* Loja de origem - só visível para admin/manager */}
+                    {canSeeStoreOrigin && stores.length > 0 && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <Store className="h-3 w-3 text-muted-foreground" />
+                        <Select
+                          value={item.source_store_id || ''}
+                          onValueChange={(value) => updateSourceStoreMutation.mutate({ itemId: item.id, storeId: value })}
+                        >
+                          <SelectTrigger className="h-7 w-[140px] text-xs">
+                            <SelectValue placeholder="Selecionar loja" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {stores.map((store: any) => (
+                              <SelectItem key={store.id} value={store.id}>
+                                {store.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                   <p className="font-medium">
                     {formatPrice(item.price * item.quantity)}
