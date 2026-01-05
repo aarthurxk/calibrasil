@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Package, ArrowLeftRight, Search, RefreshCw } from 'lucide-react';
+import { Package, ArrowLeftRight, Search, RefreshCw, ChevronRight, ChevronDown } from 'lucide-react';
 import { StockTransferModal } from '@/components/admin/StockTransferModal';
 import { StockTransferList } from '@/components/admin/StockTransferList';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Table,
   TableBody,
@@ -43,11 +44,19 @@ interface StockItem {
   stocks: StoreStock[];
 }
 
+interface ProductGroup {
+  product_id: string;
+  product_name: string;
+  variants: StockItem[];
+  totalStock: number;
+}
+
 const Stock = () => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState<StockItem | null>(null);
+  const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
 
   // Fetch stores
   const { data: stores = [] } = useQuery({
@@ -160,6 +169,38 @@ const Stock = () => {
     return item.stocks.reduce((sum, s) => sum + (s.quantity - s.reserved_quantity), 0);
   };
 
+  // Group items by product
+  const groupedProducts = useMemo(() => {
+    const groups: Record<string, ProductGroup> = {};
+    
+    filteredItems.forEach(item => {
+      if (!groups[item.product_id]) {
+        groups[item.product_id] = {
+          product_id: item.product_id,
+          product_name: item.product_name,
+          variants: [],
+          totalStock: 0,
+        };
+      }
+      groups[item.product_id].variants.push(item);
+      groups[item.product_id].totalStock += getTotalStock(item);
+    });
+    
+    return Object.values(groups);
+  }, [filteredItems]);
+
+  const toggleProduct = (productId: string) => {
+    setExpandedProducts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(productId)) {
+        newSet.delete(productId);
+      } else {
+        newSet.add(productId);
+      }
+      return newSet;
+    });
+  };
+
   const handleStockChange = (variantId: string, storeId: string, value: string) => {
     const quantity = parseInt(value, 10);
     if (isNaN(quantity) || quantity < 0) return;
@@ -212,94 +253,120 @@ const Stock = () => {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="min-w-[200px]">Produto</TableHead>
-                      <TableHead>Cor</TableHead>
-                      <TableHead>Modelo</TableHead>
-                      {stores.map((store) => (
-                        <TableHead key={store.id} className="text-center min-w-[100px]">
-                          {store.name}
-                        </TableHead>
-                      ))}
-                      <TableHead className="text-center">Total</TableHead>
-                      <TableHead className="text-center">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isLoading ? (
-                      <TableRow>
-                        <TableCell colSpan={stores.length + 5} className="text-center py-8">
-                          Carregando...
-                        </TableCell>
-                      </TableRow>
-                    ) : filteredItems.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={stores.length + 5} className="text-center py-8">
-                          Nenhum produto encontrado
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredItems.map((item) => {
-                        const total = getTotalStock(item);
-                        return (
-                          <TableRow key={item.variant_id}>
-                            <TableCell className="font-medium">
-                              <div>
-                                <p className="truncate max-w-[200px]">{item.product_name}</p>
-                                {item.codigo_variacao && (
-                                  <p className="text-xs text-muted-foreground">{item.codigo_variacao}</p>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>{item.color || '-'}</TableCell>
-                            <TableCell>{item.model || '-'}</TableCell>
-                            {stores.map((store) => {
-                              const qty = getStockForStore(item, store.id);
-                              const reserved = getReservedForStore(item, store.id);
-                              return (
-                                <TableCell key={store.id} className="text-center">
-                                  <div className="flex flex-col items-center gap-1">
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      value={qty}
-                                      onChange={(e) => handleStockChange(item.variant_id, store.id, e.target.value)}
-                                      className="w-20 text-center"
-                                    />
-                                    {reserved > 0 && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        {reserved} reserv.
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              );
-                            })}
-                            <TableCell className="text-center">
-                              <Badge variant={total > 0 ? 'default' : 'destructive'}>
-                                {total}
+              {isLoading ? (
+                <div className="text-center py-8 text-muted-foreground">Carregando...</div>
+              ) : groupedProducts.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">Nenhum produto encontrado</div>
+              ) : (
+                <div className="divide-y">
+                  {groupedProducts.map((group) => {
+                    const isExpanded = expandedProducts.has(group.product_id);
+                    return (
+                      <Collapsible
+                        key={group.product_id}
+                        open={isExpanded}
+                        onOpenChange={() => toggleProduct(group.product_id)}
+                      >
+                        <CollapsibleTrigger className="w-full">
+                          <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                            <div className="flex items-center gap-3">
+                              {isExpanded ? (
+                                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                              )}
+                              <span className="font-medium text-left">{group.product_name}</span>
+                              <Badge variant="secondary" className="text-xs">
+                                {group.variants.length} {group.variants.length === 1 ? 'variante' : 'variantes'}
                               </Badge>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openTransferModal(item)}
-                                disabled={getTotalStock(item) === 0}
-                              >
-                                <ArrowLeftRight className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+                            </div>
+                            <Badge variant={group.totalStock > 0 ? 'default' : 'destructive'}>
+                              {group.totalStock} un.
+                            </Badge>
+                          </div>
+                        </CollapsibleTrigger>
+                        
+                        <CollapsibleContent>
+                          <div className="bg-muted/30 px-4 pb-4">
+                            <div className="overflow-x-auto rounded-md border bg-background">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Cor</TableHead>
+                                    <TableHead>Modelo</TableHead>
+                                    {stores.map((store) => (
+                                      <TableHead key={store.id} className="text-center min-w-[100px]">
+                                        {store.name}
+                                      </TableHead>
+                                    ))}
+                                    <TableHead className="text-center">Total</TableHead>
+                                    <TableHead className="text-center">Ações</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {group.variants.map((item) => {
+                                    const total = getTotalStock(item);
+                                    return (
+                                      <TableRow key={item.variant_id}>
+                                        <TableCell>
+                                          <div>
+                                            <p>{item.color || '-'}</p>
+                                            {item.codigo_variacao && (
+                                              <p className="text-xs text-muted-foreground">{item.codigo_variacao}</p>
+                                            )}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell>{item.model || '-'}</TableCell>
+                                        {stores.map((store) => {
+                                          const qty = getStockForStore(item, store.id);
+                                          const reserved = getReservedForStore(item, store.id);
+                                          return (
+                                            <TableCell key={store.id} className="text-center">
+                                              <div className="flex flex-col items-center gap-1">
+                                                <Input
+                                                  type="number"
+                                                  min="0"
+                                                  value={qty}
+                                                  onChange={(e) => handleStockChange(item.variant_id, store.id, e.target.value)}
+                                                  className="w-20 text-center"
+                                                />
+                                                {reserved > 0 && (
+                                                  <Badge variant="secondary" className="text-xs">
+                                                    {reserved} reserv.
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                            </TableCell>
+                                          );
+                                        })}
+                                        <TableCell className="text-center">
+                                          <Badge variant={total > 0 ? 'default' : 'destructive'}>
+                                            {total}
+                                          </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => openTransferModal(item)}
+                                            disabled={total === 0}
+                                          >
+                                            <ArrowLeftRight className="h-4 w-4" />
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
