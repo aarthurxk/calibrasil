@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import ShippingCalculator from '@/components/shop/ShippingCalculator';
 import ProductReviews from '@/components/reviews/ProductReviews';
+import { formatPrice } from '@/lib/formatters';
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -64,13 +65,6 @@ const ProductDetail = () => {
     },
     enabled: !!id
   });
-
-  const formatPrice = (price: number) => {
-    return price.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    });
-  };
 
   // Parse arrays from database
   const colors: string[] = Array.isArray(product?.color) ? product.color : [];
@@ -246,16 +240,21 @@ const ProductDetail = () => {
             {/* Colors with Visual Swatches */}
             {colors.length > 0 && (
               <div>
-                <p className="font-medium mb-3">
+                <p className="font-medium mb-3" id="color-label">
                   Cor: <span className="text-primary">{selectedColor || 'Selecione'}</span>
                 </p>
-                <div className="flex gap-3 flex-wrap">
+                <div 
+                  className="flex gap-3 flex-wrap"
+                  role="group"
+                  aria-labelledby="color-label"
+                >
                   {colors.map(color => (
                     <button 
                       key={color} 
                       onClick={() => setSelectedColor(color)} 
                       className="group relative flex flex-col items-center gap-1.5"
-                      title={color}
+                      aria-label={`Cor ${color}`}
+                      aria-pressed={selectedColor === color}
                     >
                       <span 
                         className={`w-10 h-10 rounded-full border-2 transition-all ${
@@ -264,6 +263,7 @@ const ProductDetail = () => {
                             : 'border-border hover:border-primary/50'
                         }`}
                         style={{ backgroundColor: colorCodes[color] || '#888888' }}
+                        aria-hidden="true"
                       />
                       <span className="text-xs text-muted-foreground">{color}</span>
                     </button>
@@ -275,10 +275,14 @@ const ProductDetail = () => {
             {/* Phone Models */}
             {models.length > 0 && (
               <div>
-                <p className="font-medium mb-3">
+                <p className="font-medium mb-3" id="model-label">
                   Modelo: <span className="text-primary">{selectedModel || 'Selecione'}</span>
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div 
+                  className="flex flex-wrap gap-2"
+                  role="group"
+                  aria-labelledby="model-label"
+                >
                   {models.map(model => (
                     <button 
                       key={model} 
@@ -288,6 +292,7 @@ const ProductDetail = () => {
                           ? 'border-primary bg-primary/10 text-primary' 
                           : 'border-border hover:border-primary/50'
                       }`}
+                      aria-pressed={selectedModel === model}
                     >
                       {model}
                     </button>
@@ -299,10 +304,14 @@ const ProductDetail = () => {
             {/* Sizes */}
             {sizes.length > 0 && (
               <div>
-                <p className="font-medium mb-3">
+                <p className="font-medium mb-3" id="size-label">
                   Tamanho: <span className="text-primary">{selectedSize || 'Selecione'}</span>
                 </p>
-                <div className="flex gap-2">
+                <div 
+                  className="flex gap-2"
+                  role="group"
+                  aria-labelledby="size-label"
+                >
                   {sizes.map(size => (
                     <button 
                       key={size} 
@@ -312,6 +321,7 @@ const ProductDetail = () => {
                           ? 'border-primary bg-primary/10 text-primary' 
                           : 'border-border hover:border-primary/50'
                       }`}
+                      aria-pressed={selectedSize === size}
                     >
                       {size}
                     </button>
@@ -335,21 +345,28 @@ const ProductDetail = () => {
 
             {/* Quantity */}
             <div>
-              <p className="font-medium mb-3">Quantidade</p>
+              <p className="font-medium mb-3" id="quantity-label">Quantidade</p>
               <div className="flex items-center gap-4">
-                <div className="flex items-center border border-border rounded-lg">
+                <div 
+                  className="flex items-center border border-border rounded-lg"
+                  role="group"
+                  aria-labelledby="quantity-label"
+                >
                   <button 
                     onClick={() => setQuantity(Math.max(1, quantity - 1))} 
                     className="p-3 hover:bg-muted transition-colors"
+                    aria-label="Diminuir quantidade"
+                    disabled={quantity <= 1}
                   >
-                    <Minus className="h-4 w-4" />
+                    <Minus className="h-4 w-4" aria-hidden="true" />
                   </button>
-                  <span className="px-6 font-medium">{quantity}</span>
+                  <span className="px-6 font-medium" aria-live="polite">{quantity}</span>
                   <button 
                     onClick={() => setQuantity(quantity + 1)} 
                     className="p-3 hover:bg-muted transition-colors"
+                    aria-label="Aumentar quantidade"
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
               </div>

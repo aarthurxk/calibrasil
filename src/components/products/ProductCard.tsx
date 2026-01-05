@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
-import { Star, Heart } from "lucide-react";
+import { Star } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
 import { Badge } from "@/components/ui/badge";
 import WishlistButton from "@/components/products/WishlistButton";
+import { formatPrice } from "@/lib/formatters";
 import type { Product } from "@/types/product";
 
 interface ProductCardProps {
@@ -38,10 +39,6 @@ const ProductCard = ({ product }: ProductCardProps) => {
     onSelect();
   }, [emblaApi, onSelect]);
 
-  const formatPrice = (price: number) => {
-    return price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  };
-
   // Format colors display: "Cores Variadas" if > 2, otherwise comma-separated
   const displayColors = () => {
     if (!product.color || !Array.isArray(product.color) || product.color.length === 0) return null;
@@ -60,16 +57,29 @@ const ProductCard = ({ product }: ProductCardProps) => {
     >
       <div className="relative overflow-hidden rounded-xl bg-card border border-border shadow-soft transition-all duration-500 hover:shadow-glow hover:-translate-y-2 hover:border-primary/30">
         {/* Image Carousel Container */}
-        <div className="relative aspect-square overflow-hidden bg-muted">
+        <div 
+          className="relative aspect-square overflow-hidden bg-muted"
+          role="region"
+          aria-label={`Galeria de imagens de ${product.name}`}
+          aria-roledescription="carrossel"
+        >
           <div ref={emblaRef} className="overflow-hidden h-full">
-            <div className="flex h-full">
+            <div className="flex h-full" aria-live="polite">
               {images.map((img, index) => (
-                <div key={index} className="flex-[0_0_100%] min-w-0 h-full overflow-hidden">
+                <div 
+                  key={index} 
+                  className="flex-[0_0_100%] min-w-0 h-full overflow-hidden"
+                  role="group"
+                  aria-roledescription="slide"
+                  aria-label={`Imagem ${index + 1} de ${images.length}`}
+                  aria-hidden={index !== selectedIndex}
+                >
                   <img
                     src={img}
-                    alt={`${product.name} - Imagem ${index + 1}`}
+                    alt={`${product.name} - Imagem ${index + 1} de ${images.length}`}
                     className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
                     loading="lazy"
+                    decoding="async"
                     width={400}
                     height={400}
                   />
@@ -80,10 +90,17 @@ const ProductCard = ({ product }: ProductCardProps) => {
 
           {/* Carousel Indicators */}
           {images.length > 1 && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+            <div 
+              className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10"
+              role="tablist"
+              aria-label="Indicadores de imagem"
+            >
               {images.map((_, index) => (
                 <span
                   key={index}
+                  role="tab"
+                  aria-selected={index === selectedIndex}
+                  aria-label={`Imagem ${index + 1}`}
                   className={`h-2 rounded-full transition-all duration-300 ${
                     index === selectedIndex ? "bg-primary w-4" : "bg-background/60 w-2"
                   }`}
