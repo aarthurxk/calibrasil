@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Filter, Grid3X3, List, Plus, Loader2, X } from 'lucide-react';
@@ -68,11 +68,11 @@ const Shop = () => {
   }, [products]);
 
   // Initialize price range when products load
-  useMemo(() => {
+  useEffect(() => {
     if (!isPriceFilterActive && products.length > 0) {
       setPriceRange([minProductPrice, maxProductPrice]);
     }
-  }, [minProductPrice, maxProductPrice, products.length]);
+  }, [minProductPrice, maxProductPrice, products.length, isPriceFilterActive]);
 
   const filteredProducts = useMemo(() => {
     let result = [...products];
