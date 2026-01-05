@@ -1,3 +1,4 @@
+// Edge Function Deploy - Updated: 2026-01-05
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 

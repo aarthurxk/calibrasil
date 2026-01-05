@@ -1,5 +1,8 @@
 project_id = "vbnazlnwudhewjgftxce"
 
+[functions.generate-sigep-label]
+verify_jwt = true
+
 [functions.confirm-order-received-v2]
 verify_jwt = false
   
