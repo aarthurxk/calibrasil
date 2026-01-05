@@ -2,6 +2,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Package,
+  Warehouse,
   Users,
   ShoppingCart,
   CreditCard,
@@ -119,6 +120,7 @@ const AdminLayout = () => {
       showFor: ['admin', 'manager'],
       subItems: [
         { name: 'Produtos', icon: Package, path: '/admin/products' },
+        { name: 'Estoque', icon: Warehouse, path: '/admin/stock' },
         { name: 'Categorias', icon: Layers, path: '/admin/categories' },
       ]
     },

@@ -338,28 +338,37 @@ export type Database = {
       }
       order_items: {
         Row: {
+          assigned_at: string | null
+          assigned_by: string | null
           id: string
           order_id: string
           price: number
           product_id: string | null
           product_name: string
           quantity: number
+          source_store_id: string | null
         }
         Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
           id?: string
           order_id: string
           price: number
           product_id?: string | null
           product_name: string
           quantity: number
+          source_store_id?: string | null
         }
         Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
           id?: string
           order_id?: string
           price?: number
           product_id?: string | null
           product_name?: string
           quantity?: number
+          source_store_id?: string | null
         }
         Relationships: [
           {
@@ -374,6 +383,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_source_store_id_fkey"
+            columns: ["source_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
             referencedColumns: ["id"]
           },
         ]
@@ -790,6 +806,70 @@ export type Database = {
           },
         ]
       }
+      stock_transfers: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string | null
+          created_by: string | null
+          from_store_id: string
+          id: string
+          notes: string | null
+          product_variant_id: string
+          quantity: number
+          status: string
+          to_store_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          from_store_id: string
+          id?: string
+          notes?: string | null
+          product_variant_id: string
+          quantity: number
+          status?: string
+          to_store_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          from_store_id?: string
+          id?: string
+          notes?: string | null
+          product_variant_id?: string
+          quantity?: number
+          status?: string
+          to_store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_transfers_from_store_id_fkey"
+            columns: ["from_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfers_product_variant_id_fkey"
+            columns: ["product_variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfers_to_store_id_fkey"
+            columns: ["to_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_settings: {
         Row: {
           created_at: string
@@ -856,6 +936,84 @@ export type Database = {
           store_pickup_enabled?: boolean | null
           tax_rate?: number | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      store_stock: {
+        Row: {
+          created_at: string | null
+          id: string
+          product_variant_id: string
+          quantity: number
+          reserved_quantity: number
+          store_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          product_variant_id: string
+          quantity?: number
+          reserved_quantity?: number
+          store_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          product_variant_id?: string
+          quantity?: number
+          reserved_quantity?: number
+          store_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_stock_product_variant_id_fkey"
+            columns: ["product_variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_stock_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stores: {
+        Row: {
+          address: string | null
+          code: string
+          created_at: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          code: string
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          code?: string
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -986,12 +1144,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cancel_stock_transfer: {
+        Args: { p_transfer_id: string; p_user_id: string }
+        Returns: boolean
+      }
       check_webhook_processed: {
         Args: { p_event_id: string; p_provider: string }
         Returns: boolean
       }
+      complete_stock_transfer: {
+        Args: { p_transfer_id: string; p_user_id: string }
+        Returns: boolean
+      }
       create_order_confirm_token: {
         Args: { p_order_id: string }
+        Returns: string
+      }
+      create_stock_transfer: {
+        Args: {
+          p_from_store_id: string
+          p_notes?: string
+          p_quantity: number
+          p_to_store_id: string
+          p_user_id: string
+          p_variant_id: string
+        }
         Returns: string
       }
       generate_next_product_code: { Args: never; Returns: string }
@@ -1008,6 +1185,10 @@ export type Database = {
           free_shipping_threshold: number
           standard_shipping_rate: number
         }[]
+      }
+      get_total_available_stock: {
+        Args: { p_variant_id: string }
+        Returns: number
       }
       has_role: {
         Args: {
@@ -1038,6 +1219,10 @@ export type Database = {
           p_provider: string
         }
         Returns: boolean
+      }
+      select_source_store: {
+        Args: { p_quantity: number; p_variant_id: string }
+        Returns: string
       }
       validate_order_confirm_token: {
         Args: { p_order_id: string; p_token: string }

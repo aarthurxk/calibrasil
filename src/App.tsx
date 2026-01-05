@@ -54,6 +54,7 @@ const OrderMonitor = lazy(() => import("./pages/admin/OrderMonitor"));
 const Diagnostic = lazy(() => import("./pages/admin/Diagnostic"));
 const EmailTests = lazy(() => import("./pages/admin/EmailTests"));
 const Reviews = lazy(() => import("./pages/admin/Reviews"));
+const Stock = lazy(() => import("./pages/admin/Stock"));
 const ShippingLabelPage = lazy(() => import("./pages/admin/ShippingLabelPage"));
 const ShippingLabels = lazy(() => import("./pages/admin/ShippingLabels"));
 
@@ -125,6 +126,7 @@ const App = () => (
                 >
                   <Route index element={<Dashboard />} />
                   <Route path="products" element={<Products />} />
+                  <Route path="stock" element={<Stock />} />
                   <Route path="orders" element={<Orders />} />
                   <Route path="monitor" element={<OrderMonitor />} />
                   <Route path="customers" element={<Customers />} />
