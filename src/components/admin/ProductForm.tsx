@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { X, Upload, Loader2, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -141,21 +141,26 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
   const [customColorHex, setCustomColorHex] = useState('#000000');
   const [customModel, setCustomModel] = useState('');
   const [variantStocks, setVariantStocks] = useState<VariantStock[]>([]);
+  
+  // Refs para controle de estado
   const isVariantsInitialized = useRef(false);
+  const prevInitialDataId = useRef<string | undefined>(undefined);
+  const prevOpen = useRef(false);
 
-  const parseColors = (color: string[] | string | null | undefined): string[] => {
+  const parseColors = useCallback((color: string[] | string | null | undefined): string[] => {
     if (!color) return [];
     if (Array.isArray(color)) return color;
     return [color];
-  };
+  }, []);
 
-  const parseModels = (model: string[] | string | null | undefined): string[] => {
+  const parseModels = useCallback((model: string[] | string | null | undefined): string[] => {
     if (!model) return [];
     if (Array.isArray(model)) return model;
     return [model];
-  };
+  }, []);
 
-  const getInitialFormData = (): ProductFormData => ({
+  // Memoizar dados iniciais baseado no ID
+  const initialFormData = useMemo((): ProductFormData => ({
     codigo_produto: initialData?.codigo_produto || '',
     name: initialData?.name || '',
     description: initialData?.description || '',
@@ -170,9 +175,9 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
     images: initialData?.images || [],
     in_stock: initialData?.in_stock ?? true,
     featured: initialData?.featured ?? false,
-  });
+  }), [initialData?.id, parseColors, parseModels]);
 
-  const [formData, setFormData] = useState<ProductFormData>(getInitialFormData());
+  const [formData, setFormData] = useState<ProductFormData>(initialFormData);
 
   // Fetch existing variants when editing
   const { data: existingVariants = [] } = useQuery({
@@ -186,22 +191,36 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!initialData?.id,
+    enabled: !!initialData?.id && open,
   });
 
+  // Reset form quando dialog abre/fecha ou produto muda
   useEffect(() => {
-    setFormData(getInitialFormData());
-  }, [initialData, open]);
-
-  // Reset initialization flag when dialog closes
-  useEffect(() => {
-    if (!open) {
+    const justOpened = open && !prevOpen.current;
+    const productChanged = initialData?.id !== prevInitialDataId.current;
+    
+    if (open && (justOpened || productChanged)) {
+      // Dialog abriu ou produto mudou - resetar tudo
+      setFormData(initialFormData);
+      setVariantStocks([]);
       isVariantsInitialized.current = false;
+      prevInitialDataId.current = initialData?.id;
     }
-  }, [open]);
+    
+    if (!open && prevOpen.current) {
+      // Dialog fechou - limpar flags
+      isVariantsInitialized.current = false;
+      prevInitialDataId.current = undefined;
+    }
+    
+    prevOpen.current = open;
+  }, [open, initialData?.id, initialFormData]);
 
+  // Inicializar variantes de produto existente
   useEffect(() => {
-    // Initialize variant stocks from existing data
+    if (!open || isVariantsInitialized.current) return;
+    if (!initialData?.id) return;
+    
     if (existingVariants.length > 0) {
       setVariantStocks(existingVariants.map(v => ({
         model: v.model,
@@ -209,56 +228,58 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
         stock_quantity: v.stock_quantity,
       })));
       isVariantsInitialized.current = true;
-    } else if (!initialData?.id) {
-      setVariantStocks([]);
     }
-  }, [existingVariants, initialData?.id]);
+  }, [existingVariants, open, initialData?.id]);
 
-  // Generate variant combinations when colors/models change
-  useEffect(() => {
-    // Don't generate if we're in edit mode and haven't initialized yet
-    if (initialData?.id && !isVariantsInitialized.current) {
-      return;
-    }
-
-    const colors = formData.colors.length > 0 ? formData.colors : [null];
-    const models = formData.models.length > 0 ? formData.models : [null];
+  // Gerar combinações de variantes quando cores/modelos mudam
+  const generateVariants = useCallback((colors: string[], models: string[]) => {
+    const colorList = colors.length > 0 ? colors : [null];
+    const modelList = models.length > 0 ? models : [null];
     
     const newVariants: VariantStock[] = [];
-    for (const color of colors) {
-      for (const model of models) {
-        // Skip if both are null (no variants needed)
+    for (const color of colorList) {
+      for (const model of modelList) {
         if (color === null && model === null) continue;
-        
-        newVariants.push({
-          model,
-          color,
-          stock_quantity: 0,
-        });
+        newVariants.push({ model, color, stock_quantity: 0 });
       }
     }
+    return newVariants;
+  }, []);
+
+  // Atualizar variantes quando cores/modelos mudam (apenas para novos produtos ou após inicialização)
+  useEffect(() => {
+    // Não gerar se dialog fechado
+    if (!open) return;
+    // Não gerar se estamos em modo edição e ainda não inicializamos as variantes existentes
+    if (initialData?.id && !isVariantsInitialized.current) return;
+
+    const newVariants = generateVariants(formData.colors, formData.models);
     
-    // Use callback to preserve existing quantities and avoid unnecessary updates
     setVariantStocks(prev => {
-      if (newVariants.length === 0 && formData.colors.length === 0 && formData.models.length === 0) {
+      // Se não há variantes para gerar, manter vazio
+      if (newVariants.length === 0) {
         return prev.length === 0 ? prev : [];
       }
       
-      // Preserve existing quantities
+      // Preservar quantidades existentes
       const updated = newVariants.map(newV => {
         const existing = prev.find(p => p.color === newV.color && p.model === newV.model);
         return existing ? { ...newV, stock_quantity: existing.stock_quantity } : newV;
       });
       
-      // Check if anything actually changed
-      if (prev.length === updated.length && 
-          prev.every((p, i) => p.color === updated[i].color && p.model === updated[i].model)) {
-        return prev;
+      // Verificar se algo realmente mudou
+      if (prev.length === updated.length) {
+        const same = prev.every((p, i) => 
+          p.color === updated[i].color && 
+          p.model === updated[i].model && 
+          p.stock_quantity === updated[i].stock_quantity
+        );
+        if (same) return prev;
       }
       
       return updated;
     });
-  }, [formData.colors, formData.models, initialData?.id]);
+  }, [formData.colors, formData.models, open, initialData?.id, generateVariants]);
 
   const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
