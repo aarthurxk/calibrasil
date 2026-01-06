@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { X, Upload, Loader2, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -110,6 +110,7 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
   const [customColorHex, setCustomColorHex] = useState('#000000');
   const [customModel, setCustomModel] = useState('');
   const [variantStocks, setVariantStocks] = useState<VariantStock[]>([]);
+  const isVariantsInitialized = useRef(false);
 
   const parseColors = (color: string[] | string | null | undefined): string[] => {
     if (!color) return [];
@@ -161,6 +162,13 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
     setFormData(getInitialFormData());
   }, [initialData, open]);
 
+  // Reset initialization flag when dialog closes
+  useEffect(() => {
+    if (!open) {
+      isVariantsInitialized.current = false;
+    }
+  }, [open]);
+
   useEffect(() => {
     // Initialize variant stocks from existing data
     if (existingVariants.length > 0) {
@@ -169,13 +177,19 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
         color: v.color,
         stock_quantity: v.stock_quantity,
       })));
-    } else {
+      isVariantsInitialized.current = true;
+    } else if (!initialData?.id) {
       setVariantStocks([]);
     }
-  }, [existingVariants]);
+  }, [existingVariants, initialData?.id]);
 
   // Generate variant combinations when colors/models change
   useEffect(() => {
+    // Don't generate if we're in edit mode and haven't initialized yet
+    if (initialData?.id && !isVariantsInitialized.current) {
+      return;
+    }
+
     const colors = formData.colors.length > 0 ? formData.colors : [null];
     const models = formData.models.length > 0 ? formData.models : [null];
     
@@ -185,22 +199,35 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
         // Skip if both are null (no variants needed)
         if (color === null && model === null) continue;
         
-        // Check if variant already exists
-        const existing = variantStocks.find(
-          v => v.color === color && v.model === model
-        );
         newVariants.push({
           model,
           color,
-          stock_quantity: existing?.stock_quantity ?? 0,
+          stock_quantity: 0,
         });
       }
     }
     
-    if (newVariants.length > 0 || (formData.colors.length > 0 || formData.models.length > 0)) {
-      setVariantStocks(newVariants);
-    }
-  }, [formData.colors, formData.models]);
+    // Use callback to preserve existing quantities and avoid unnecessary updates
+    setVariantStocks(prev => {
+      if (newVariants.length === 0 && formData.colors.length === 0 && formData.models.length === 0) {
+        return prev.length === 0 ? prev : [];
+      }
+      
+      // Preserve existing quantities
+      const updated = newVariants.map(newV => {
+        const existing = prev.find(p => p.color === newV.color && p.model === newV.model);
+        return existing ? { ...newV, stock_quantity: existing.stock_quantity } : newV;
+      });
+      
+      // Check if anything actually changed
+      if (prev.length === updated.length && 
+          prev.every((p, i) => p.color === updated[i].color && p.model === updated[i].model)) {
+        return prev;
+      }
+      
+      return updated;
+    });
+  }, [formData.colors, formData.models, initialData?.id]);
 
   const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
