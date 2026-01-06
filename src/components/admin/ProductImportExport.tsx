@@ -21,11 +21,18 @@ type FileFormat = 'xlsx' | 'csv';
 // Tipos de template
 type TemplateType = 'simples' | 'variacoes' | 'completo';
 
+// IDs das lojas (ordem: Case 1, Cali, Case 2)
+const STORE_IDS = {
+  case1: 'f5384a27-294f-41ec-ad28-9cb0d06a7295',
+  cali: 'd2c3af32-b663-43c6-ada8-4781e0767e14',
+  case2: 'b3f25752-21da-4ad1-b61c-be73cbc92201',
+};
+
 // Colunas por tipo de template
 const TEMPLATE_COLUMNS: Record<TemplateType, string[]> = {
   simples: ['codigo_produto', 'nome_produto', 'categoria', 'status', 'preco', 'destaque'],
-  variacoes: ['codigo_produto', 'nome_produto', 'categoria', 'status', 'preco', 'destaque', 'modelo_variacao', 'cor_variacao', 'sku_variacao', 'preco_variacao', 'estoque_variacao'],
-  completo: ['id_produto', 'codigo_produto', 'nome_produto', 'categoria', 'status', 'preco', 'destaque', 'url_imagem', 'modelo_variacao', 'cor_variacao', 'sku_variacao', 'preco_variacao', 'estoque_variacao'],
+  variacoes: ['codigo_produto', 'nome_produto', 'categoria', 'status', 'preco', 'destaque', 'modelo_variacao', 'cor_variacao', 'sku_variacao', 'preco_variacao', 'estoque_case1', 'estoque_cali', 'estoque_case2'],
+  completo: ['id_produto', 'codigo_produto', 'nome_produto', 'categoria', 'status', 'preco', 'destaque', 'url_imagem', 'modelo_variacao', 'cor_variacao', 'sku_variacao', 'preco_variacao', 'estoque_case1', 'estoque_cali', 'estoque_case2'],
 };
 
 // Mapeamento PT-BR para colunas internas
@@ -42,6 +49,10 @@ const COLUMN_MAP: Record<string, string> = {
   'cor_variacao': 'variant_color',
   'sku_variacao': 'variant_sku',
   'preco_variacao': 'variant_price',
+  'estoque_case1': 'stock_case1',
+  'estoque_cali': 'stock_cali',
+  'estoque_case2': 'stock_case2',
+  // Backwards compatibility - estoque_variacao maps to total across stores
   'estoque_variacao': 'variant_stock',
   // Also support english columns
   'product_id': 'product_id',
@@ -55,6 +66,9 @@ const COLUMN_MAP: Record<string, string> = {
   'variant_color': 'variant_color',
   'variant_sku': 'variant_sku',
   'variant_price': 'variant_price',
+  'stock_case1': 'stock_case1',
+  'stock_cali': 'stock_cali',
+  'stock_case2': 'stock_case2',
   'variant_stock': 'variant_stock',
 };
 
@@ -79,7 +93,9 @@ const EXAMPLE_ROWS: Record<TemplateType, Record<string, string>> = {
     cor_variacao: 'Azul',
     sku_variacao: 'CAM-M-AZL',
     preco_variacao: '89.90',
-    estoque_variacao: '10',
+    estoque_case1: '10',
+    estoque_cali: '5',
+    estoque_case2: '8',
   },
   completo: {
     id_produto: '',
@@ -94,7 +110,9 @@ const EXAMPLE_ROWS: Record<TemplateType, Record<string, string>> = {
     cor_variacao: 'Preta',
     sku_variacao: 'CAM-G-PRT',
     preco_variacao: '129.90',
-    estoque_variacao: '15',
+    estoque_case1: '15',
+    estoque_cali: '10',
+    estoque_case2: '12',
   },
 };
 
@@ -113,6 +131,11 @@ interface ParsedRow {
   variantColor?: string;
   variantSku?: string;
   variantPrice: number;
+  // Estoque por loja
+  stockCase1: number;
+  stockCali: number;
+  stockCase2: number;
+  // Total para exibição
   variantStock: number;
   warnings: string[];
   errors: string[];
@@ -323,8 +346,14 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
       const variantModel = (row.variant_model || '').trim() || undefined;
       const variantColor = (row.variant_color || '').trim() || undefined;
       let variantSku = (row.variant_sku || '').trim() || undefined;
-      const variantStockRaw = (row.variant_stock || '').trim();
       const variantPriceRaw = (row.variant_price || '').trim();
+
+      // Estoque por loja
+      const stockCase1Raw = (row.stock_case1 || '').trim();
+      const stockCaliRaw = (row.stock_cali || '').trim();
+      const stockCase2Raw = (row.stock_case2 || '').trim();
+      // Fallback para estoque_variacao antigo
+      const variantStockRaw = (row.variant_stock || '').trim();
 
       // Determinar se tem variação
       const hasVariant = Boolean(variantModel || variantColor || variantSku);
@@ -342,16 +371,27 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
         warnings.push(`Preço da variação vazio: usando preço do produto (R$ ${price.toFixed(2)})`);
       }
 
-      // Estoque da variação
-      let variantStock = 0;
-      if (variantStockRaw) {
-        const parsedVS = parseInt(variantStockRaw, 10);
-        if (isNaN(parsedVS)) {
-          errors.push(`Estoque da variação inválido na linha ${index + 2}: "${variantStockRaw}"`);
-        } else {
-          variantStock = parsedVS;
-        }
+      // Parsear estoques por loja
+      const parseStock = (raw: string): number => {
+        if (!raw) return 0;
+        const parsed = parseInt(raw, 10);
+        return isNaN(parsed) ? 0 : parsed;
+      };
+
+      let stockCase1 = parseStock(stockCase1Raw);
+      let stockCali = parseStock(stockCaliRaw);
+      let stockCase2 = parseStock(stockCase2Raw);
+      
+      // Se não há colunas por loja mas tem estoque_variacao, distribuir igualmente (fallback)
+      if (!stockCase1Raw && !stockCaliRaw && !stockCase2Raw && variantStockRaw) {
+        const totalStock = parseStock(variantStockRaw);
+        stockCase1 = totalStock;
+        stockCali = 0;
+        stockCase2 = 0;
+        warnings.push(`Usando estoque_variacao legado (${totalStock}) apenas para Case 1`);
       }
+
+      const variantStock = stockCase1 + stockCali + stockCase2;
 
       // Gerar SKU se variação existe mas SKU está vazio
       if (hasVariant && !variantSku && productName && (variantModel || variantColor)) {
@@ -384,6 +424,9 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
         variantColor,
         variantSku,
         variantPrice,
+        stockCase1,
+        stockCali,
+        stockCase2,
         variantStock,
         warnings,
         errors,
@@ -632,8 +675,12 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
               .eq('color', row.variantColor || '')
               .maybeSingle();
 
+            let variantId: string;
+
             if (existingVariant) {
-              // Atualizar variação
+              variantId = existingVariant.id;
+              
+              // Atualizar variação (stock_quantity será calculado a partir de store_stock)
               await supabase
                 .from('product_variants')
                 .update({
@@ -664,6 +711,7 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
                 .single();
 
               if (error) throw error;
+              variantId = newVariant.id;
               variantsCreated++;
 
               jobItems.push({
@@ -673,6 +721,62 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
                 previous_state: null,
                 new_state: newVariant,
               });
+            }
+
+            // Atualizar store_stock para cada loja
+            const storeStocks = [
+              { store_id: STORE_IDS.case1, quantity: row.stockCase1 },
+              { store_id: STORE_IDS.cali, quantity: row.stockCali },
+              { store_id: STORE_IDS.case2, quantity: row.stockCase2 },
+            ];
+
+            for (const ss of storeStocks) {
+              // Verificar se já existe registro de estoque para esta loja
+              const { data: existingStock } = await supabase
+                .from('store_stock')
+                .select('*')
+                .eq('product_variant_id', variantId)
+                .eq('store_id', ss.store_id)
+                .maybeSingle();
+
+              if (existingStock) {
+                // Atualizar estoque existente
+                await supabase
+                  .from('store_stock')
+                  .update({ quantity: ss.quantity })
+                  .eq('id', existingStock.id);
+
+                jobItems.push({
+                  entity_type: 'store_stock',
+                  entity_id: existingStock.id,
+                  action: 'updated',
+                  previous_state: existingStock,
+                  new_state: { ...existingStock, quantity: ss.quantity },
+                });
+              } else {
+                // Criar novo registro de estoque
+                const { data: newStock, error: stockError } = await supabase
+                  .from('store_stock')
+                  .insert({
+                    product_variant_id: variantId,
+                    store_id: ss.store_id,
+                    quantity: ss.quantity,
+                  })
+                  .select('*')
+                  .single();
+
+                if (stockError) {
+                  console.error('Erro ao criar estoque:', stockError);
+                } else if (newStock) {
+                  jobItems.push({
+                    entity_type: 'store_stock',
+                    entity_id: newStock.id,
+                    action: 'created',
+                    previous_state: null,
+                    new_state: newStock,
+                  });
+                }
+              }
             }
           }
         }
@@ -742,6 +846,26 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
 
       if (variantsError) throw variantsError;
 
+      // Buscar estoques por loja
+      const { data: storeStocks, error: stocksError } = await supabase
+        .from('store_stock')
+        .select('product_variant_id, store_id, quantity');
+
+      if (stocksError) throw stocksError;
+
+      // Criar mapa de estoques por variante e loja
+      const stockMap = new Map<string, Record<string, number>>();
+      for (const ss of storeStocks || []) {
+        if (!stockMap.has(ss.product_variant_id)) {
+          stockMap.set(ss.product_variant_id, {});
+        }
+        stockMap.get(ss.product_variant_id)![ss.store_id] = ss.quantity;
+      }
+
+      const getStockForStore = (variantId: string, storeId: string): number => {
+        return stockMap.get(variantId)?.[storeId] ?? 0;
+      };
+
       // Construir linhas de exportação
       const exportRows: Record<string, string>[] = [];
       const columns = TEMPLATE_COLUMNS.completo;
@@ -764,7 +888,9 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
             cor_variacao: '',
             sku_variacao: '',
             preco_variacao: '',
-            estoque_variacao: '',
+            estoque_case1: '',
+            estoque_cali: '',
+            estoque_case2: '',
           });
         } else {
           // Produto com variações
@@ -782,7 +908,9 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
               cor_variacao: variant.color || '',
               sku_variacao: variant.codigo_variacao || generateSku(product.name, variant.model || '', variant.color || ''),
               preco_variacao: String(product.price),
-              estoque_variacao: String(variant.stock_quantity),
+              estoque_case1: String(getStockForStore(variant.id, STORE_IDS.case1)),
+              estoque_cali: String(getStockForStore(variant.id, STORE_IDS.cali)),
+              estoque_case2: String(getStockForStore(variant.id, STORE_IDS.case2)),
             });
           }
         }
@@ -858,7 +986,16 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
         try {
           if (item.action === 'created') {
             // Deletar entidade criada
-            const table = item.entity_type === 'product' ? 'products' : 'product_variants';
+            let table: 'products' | 'product_variants' | 'store_stock';
+            if (item.entity_type === 'product') {
+              table = 'products';
+            } else if (item.entity_type === 'product_variant') {
+              table = 'product_variants';
+            } else if (item.entity_type === 'store_stock') {
+              table = 'store_stock';
+            } else {
+              continue;
+            }
             
             // Verificar se ainda existe
             const { data: existing } = await supabase
@@ -872,12 +1009,36 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
               continue;
             }
 
-            // Se for produto, deletar variações associadas primeiro
+            // Se for produto, deletar variações e estoques associados primeiro
             if (item.entity_type === 'product') {
+              // Buscar variações do produto
+              const { data: productVariants } = await supabase
+                .from('product_variants')
+                .select('id')
+                .eq('product_id', item.entity_id);
+              
+              // Deletar estoques das variações
+              if (productVariants && productVariants.length > 0) {
+                const variantIds = productVariants.map(v => v.id);
+                await supabase
+                  .from('store_stock')
+                  .delete()
+                  .in('product_variant_id', variantIds);
+              }
+              
+              // Deletar variações
               await supabase
                 .from('product_variants')
                 .delete()
                 .eq('product_id', item.entity_id);
+            }
+
+            // Se for variação, deletar estoques associados primeiro
+            if (item.entity_type === 'product_variant') {
+              await supabase
+                .from('store_stock')
+                .delete()
+                .eq('product_variant_id', item.entity_id);
             }
 
             const { error: deleteError } = await supabase
@@ -889,7 +1050,16 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
             report.removed++;
           } else if (item.action === 'updated' && item.previous_state) {
             // Restaurar estado anterior
-            const table = item.entity_type === 'product' ? 'products' : 'product_variants';
+            let table: 'products' | 'product_variants' | 'store_stock';
+            if (item.entity_type === 'product') {
+              table = 'products';
+            } else if (item.entity_type === 'product_variant') {
+              table = 'product_variants';
+            } else if (item.entity_type === 'store_stock') {
+              table = 'store_stock';
+            } else {
+              continue;
+            }
             
             // Verificar se ainda existe
             const { data: existing } = await supabase
@@ -907,8 +1077,13 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
             const currentState = JSON.stringify(existing);
             const importedState = JSON.stringify(item.new_state);
             if (currentState !== importedState) {
+              const entityLabel = item.entity_type === 'product' 
+                ? 'Produto' 
+                : item.entity_type === 'product_variant' 
+                ? 'Variação' 
+                : 'Estoque';
               report.modifiedWarnings.push(
-                `${item.entity_type === 'product' ? 'Produto' : 'Variação'} alterado após importação: ${item.entity_id.slice(0, 8)}...`
+                `${entityLabel} alterado após importação: ${item.entity_id.slice(0, 8)}...`
               );
             }
 
