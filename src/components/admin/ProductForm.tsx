@@ -36,7 +36,15 @@ interface ProductFormData {
 interface VariantStock {
   model: string | null;
   color: string | null;
-  stock_quantity: number;
+  variant_id?: string;
+  stocks: Record<string, number>; // { store_id: quantidade }
+}
+
+interface Store {
+  id: string;
+  name: string;
+  code: string;
+  display_order: number | null;
 }
 
 interface ProductFormProps {
@@ -179,17 +187,51 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
 
   const [formData, setFormData] = useState<ProductFormData>(initialFormData);
 
+  // Fetch stores
+  const { data: stores = [] } = useQuery({
+    queryKey: ['stores'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('stores')
+        .select('id, name, code, display_order')
+        .eq('is_active', true)
+        .order('display_order');
+      if (error) throw error;
+      return data as Store[];
+    },
+  });
+
   // Fetch existing variants when editing
   const { data: existingVariants = [] } = useQuery({
-    queryKey: ['product-variants', initialData?.id],
+    queryKey: ['product-variants-with-stock', initialData?.id],
     queryFn: async () => {
       if (!initialData?.id) return [];
-      const { data, error } = await supabase
+      
+      const { data: variants, error: variantError } = await supabase
         .from('product_variants')
-        .select('*')
+        .select('id, model, color, stock_quantity')
         .eq('product_id', initialData.id);
-      if (error) throw error;
-      return data;
+      
+      if (variantError) throw variantError;
+      if (!variants || variants.length === 0) return [];
+      
+      const { data: stockData, error: stockError } = await supabase
+        .from('store_stock')
+        .select('product_variant_id, store_id, quantity')
+        .in('product_variant_id', variants.map(v => v.id));
+      
+      if (stockError) throw stockError;
+      
+      return variants.map(v => ({
+        variant_id: v.id,
+        model: v.model,
+        color: v.color,
+        stocks: Object.fromEntries(
+          (stockData || [])
+            .filter(s => s.product_variant_id === v.id)
+            .map(s => [s.store_id, s.quantity])
+        ),
+      }));
     },
     enabled: !!initialData?.id && open,
   });
@@ -223,9 +265,10 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
     
     if (existingVariants.length > 0) {
       setVariantStocks(existingVariants.map(v => ({
+        variant_id: v.variant_id,
         model: v.model,
         color: v.color,
-        stock_quantity: v.stock_quantity,
+        stocks: v.stocks || {},
       })));
       isVariantsInitialized.current = true;
     }
@@ -236,20 +279,24 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
     const colorList = colors.length > 0 ? colors : [null];
     const modelList = models.length > 0 ? models : [null];
     
+    const emptyStocks = Object.fromEntries(stores.map(s => [s.id, 0]));
+    
     const newVariants: VariantStock[] = [];
     for (const color of colorList) {
       for (const model of modelList) {
         if (color === null && model === null) continue;
-        newVariants.push({ model, color, stock_quantity: 0 });
+        newVariants.push({ model, color, stocks: { ...emptyStocks } });
       }
     }
     return newVariants;
-  }, []);
+  }, [stores]);
 
   // Atualizar variantes quando cores/modelos mudam (apenas para novos produtos ou após inicialização)
   useEffect(() => {
     // Não gerar se dialog fechado
     if (!open) return;
+    // Não gerar se lojas ainda não carregaram
+    if (stores.length === 0) return;
     // Não gerar se estamos em modo edição e ainda não inicializamos as variantes existentes
     if (initialData?.id && !isVariantsInitialized.current) return;
 
@@ -264,22 +311,30 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
       // Preservar quantidades existentes
       const updated = newVariants.map(newV => {
         const existing = prev.find(p => p.color === newV.color && p.model === newV.model);
-        return existing ? { ...newV, stock_quantity: existing.stock_quantity } : newV;
+        if (existing) {
+          // Merge: manter stocks existentes, adicionar novas lojas com 0
+          const mergedStocks = { ...newV.stocks };
+          Object.entries(existing.stocks).forEach(([storeId, qty]) => {
+            mergedStocks[storeId] = qty;
+          });
+          return { ...newV, variant_id: existing.variant_id, stocks: mergedStocks };
+        }
+        return newV;
       });
       
       // Verificar se algo realmente mudou
       if (prev.length === updated.length) {
         const same = prev.every((p, i) => 
           p.color === updated[i].color && 
-          p.model === updated[i].model && 
-          p.stock_quantity === updated[i].stock_quantity
+          p.model === updated[i].model &&
+          JSON.stringify(p.stocks) === JSON.stringify(updated[i].stocks)
         );
         if (same) return prev;
       }
       
       return updated;
     });
-  }, [formData.colors, formData.models, open, initialData?.id, generateVariants]);
+  }, [formData.colors, formData.models, open, initialData?.id, generateVariants, stores]);
 
   const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -456,12 +511,16 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
     setCustomModel('');
   };
 
-  const updateVariantStock = (model: string | null, color: string | null, quantity: number) => {
+  const updateVariantStock = (model: string | null, color: string | null, storeId: string, quantity: number) => {
     setVariantStocks(prev => prev.map(v => 
       v.model === model && v.color === color
-        ? { ...v, stock_quantity: quantity }
+        ? { ...v, stocks: { ...v.stocks, [storeId]: quantity } }
         : v
     ));
+  };
+
+  const getVariantTotal = (variant: VariantStock) => {
+    return Object.values(variant.stocks).reduce((sum, qty) => sum + qty, 0);
   };
 
   // Validar formato do código do produto
@@ -578,6 +637,19 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
 
       // Save variant stocks
       if (productId && variantStocks.length > 0) {
+        // Delete existing store_stock for this product's variants
+        const { data: existingVars } = await supabase
+          .from('product_variants')
+          .select('id')
+          .eq('product_id', productId);
+        
+        if (existingVars && existingVars.length > 0) {
+          await supabase
+            .from('store_stock')
+            .delete()
+            .in('product_variant_id', existingVars.map(v => v.id));
+        }
+        
         // Delete existing variants
         await supabase.from('product_variants').delete().eq('product_id', productId);
         
@@ -586,16 +658,41 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
           product_id: productId,
           model: v.model ? normalizeModelName(v.model) : null,
           color: v.color,
-          stock_quantity: v.stock_quantity,
+          stock_quantity: getVariantTotal(v), // Total for backwards compatibility
         }));
         
-        const { error: variantError } = await supabase
+        const { data: savedVariants, error: variantError } = await supabase
           .from('product_variants')
-          .insert(variantsToInsert);
+          .insert(variantsToInsert)
+          .select('id, model, color');
         
         if (variantError) {
           console.error('Variant save error:', variantError);
           toast.error('Produto salvo, mas erro ao salvar estoque por variação');
+        } else if (savedVariants) {
+          // Insert store_stock records
+          const storeStockData = savedVariants.flatMap(savedV => {
+            const variantStock = variantStocks.find(
+              vs => vs.model === savedV.model && vs.color === savedV.color
+            );
+            return stores.map(store => ({
+              product_variant_id: savedV.id,
+              store_id: store.id,
+              quantity: variantStock?.stocks[store.id] || 0,
+              reserved_quantity: 0,
+            }));
+          });
+          
+          if (storeStockData.length > 0) {
+            const { error: stockError } = await supabase
+              .from('store_stock')
+              .insert(storeStockData);
+            
+            if (stockError) {
+              console.error('Store stock save error:', stockError);
+              toast.error('Erro ao salvar estoque por loja');
+            }
+          }
         }
       }
 
@@ -886,21 +983,26 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
           </div>
 
           {/* Stock per Variant */}
-          {variantStocks.length > 0 && (
+          {variantStocks.length > 0 && stores.length > 0 && (
             <div className="space-y-3">
-              <Label>Estoque por Variação</Label>
+              <Label>Estoque por Variação e Loja</Label>
               <div className="border border-border rounded-lg overflow-hidden">
-                <div className="max-h-60 overflow-y-auto">
+                <div className="max-h-80 overflow-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-muted sticky top-0">
                       <tr>
                         {formData.colors.length > 0 && (
-                          <th className="text-left px-3 py-2 font-medium">Cor</th>
+                          <th className="text-left px-3 py-2 font-medium whitespace-nowrap">Cor</th>
                         )}
                         {formData.models.length > 0 && (
-                          <th className="text-left px-3 py-2 font-medium">Modelo</th>
+                          <th className="text-left px-3 py-2 font-medium whitespace-nowrap">Modelo</th>
                         )}
-                        <th className="text-left px-3 py-2 font-medium">Quantidade</th>
+                        {stores.map(store => (
+                          <th key={store.id} className="text-center px-2 py-2 font-medium whitespace-nowrap">
+                            {store.name}
+                          </th>
+                        ))}
+                        <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Total</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -910,28 +1012,34 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
                             <td className="px-3 py-2">
                               <div className="flex items-center gap-2">
                                 <span
-                                  className="w-4 h-4 rounded-full border border-border"
+                                  className="w-4 h-4 rounded-full border border-border flex-shrink-0"
                                   style={{ backgroundColor: formData.color_codes[variant.color || ''] || '#888' }}
                                 />
-                                {variant.color}
+                                <span className="whitespace-nowrap">{variant.color}</span>
                               </div>
                             </td>
                           )}
                           {formData.models.length > 0 && (
-                            <td className="px-3 py-2">{variant.model}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">{variant.model}</td>
                           )}
-                          <td className="px-3 py-2">
-                            <Input
-                              type="number"
-                              min="0"
-                              value={variant.stock_quantity}
-                              onChange={(e) => updateVariantStock(
-                                variant.model,
-                                variant.color,
-                                parseInt(e.target.value) || 0
-                              )}
-                              className="w-24 h-8"
-                            />
+                          {stores.map(store => (
+                            <td key={store.id} className="px-2 py-2">
+                              <Input
+                                type="number"
+                                min="0"
+                                value={variant.stocks[store.id] || 0}
+                                onChange={(e) => updateVariantStock(
+                                  variant.model,
+                                  variant.color,
+                                  store.id,
+                                  parseInt(e.target.value) || 0
+                                )}
+                                className="w-16 h-8 text-center"
+                              />
+                            </td>
+                          ))}
+                          <td className="px-3 py-2 text-center font-medium">
+                            {getVariantTotal(variant)}
                           </td>
                         </tr>
                       ))}
