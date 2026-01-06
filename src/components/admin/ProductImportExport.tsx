@@ -213,6 +213,36 @@ const normalizeProductCode = (code: string): string => {
   return trimmed;
 };
 
+// Normalizar nome do modelo (capitalização consistente)
+// Ex: "iphone 12 pro max" -> "iPhone 12 Pro Max"
+const normalizeModelName = (model: string): string => {
+  if (!model) return '';
+  const trimmed = model.trim();
+  if (!trimmed) return '';
+  
+  // Palavras com capitalização especial
+  const specialWords: Record<string, string> = {
+    'iphone': 'iPhone',
+    'ipad': 'iPad',
+    'macbook': 'MacBook',
+    'airpods': 'AirPods',
+    'pro': 'Pro',
+    'max': 'Max',
+    'mini': 'Mini',
+    'plus': 'Plus',
+    'ultra': 'Ultra',
+    'se': 'SE',
+  };
+  
+  return trimmed.split(' ').map(word => {
+    const lower = word.toLowerCase();
+    if (specialWords[lower]) return specialWords[lower];
+    // Mantém números como estão, capitaliza primeira letra de outras palavras
+    if (/^\d+$/.test(word)) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  }).join(' ');
+};
+
 // Normalizar colunas do CSV para formato interno
 const normalizeRow = (row: Record<string, string>): Record<string, string> => {
   const normalized: Record<string, string> = {};
@@ -342,8 +372,8 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
         }
       }
 
-      // Campos de variação
-      const variantModel = (row.variant_model || '').trim() || undefined;
+      // Campos de variação - normalizar modelo para evitar duplicatas por capitalização
+      const variantModel = normalizeModelName(row.variant_model || '') || undefined;
       const variantColor = (row.variant_color || '').trim() || undefined;
       let variantSku = (row.variant_sku || '').trim() || undefined;
       const variantPriceRaw = (row.variant_price || '').trim();
@@ -666,13 +696,13 @@ const ProductImportExport = ({ open, onOpenChange }: ProductImportExportProps) =
         // Processar variações
         for (const row of rows) {
           if (row.hasVariant && row.variantSku) {
-            // Verificar se variação existe
+            // Verificar se variação existe (case-insensitive para evitar duplicatas)
             const { data: existingVariant } = await supabase
               .from('product_variants')
               .select('*')
               .eq('product_id', productId)
-              .eq('model', row.variantModel || '')
-              .eq('color', row.variantColor || '')
+              .ilike('model', row.variantModel || '')
+              .ilike('color', row.variantColor || '')
               .maybeSingle();
 
             let variantId: string;
