@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Star, ShoppingCart, Heart, Truck, Shield, ArrowLeft, Minus, Plus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import MainLayout from '@/components/layout/MainLayout';
@@ -12,6 +12,8 @@ import { toast } from 'sonner';
 import ShippingCalculator from '@/components/shop/ShippingCalculator';
 import ProductReviews from '@/components/reviews/ProductReviews';
 import { formatPrice } from '@/lib/formatters';
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from '@/components/ui/carousel';
+import Autoplay from 'embla-carousel-autoplay';
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -20,6 +22,13 @@ const ProductDetail = () => {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  const [currentSlide, setCurrentSlide] = useState(0);
+  
+  // Plugin de autoplay
+  const autoplayPlugin = useRef(
+    Autoplay({ delay: 3000, stopOnInteraction: false, stopOnMouseEnter: true })
+  );
 
   const { data: product, isLoading, error } = useQuery({
     queryKey: ['product', id],
@@ -71,6 +80,52 @@ const ProductDetail = () => {
   const colorCodes: Record<string, string> = product?.color_codes as Record<string, string> || {};
   const models: string[] = Array.isArray(product?.model) ? product.model : [];
   const sizes: string[] = product?.sizes || [];
+
+  // Array de imagens do produto
+  const productImages = useMemo(() => {
+    if (product?.images && product.images.length > 0) {
+      return product.images;
+    }
+    return [product?.image || '/placeholder.svg'];
+  }, [product?.images, product?.image]);
+
+  // Mapeamento de cor para índice de imagem (as primeiras N imagens correspondem às N cores)
+  const colorToImageIndex = useMemo(() => {
+    const map: Record<string, number> = {};
+    colors.forEach((color, index) => {
+      if (index < productImages.length) {
+        map[color] = index;
+      }
+    });
+    return map;
+  }, [colors, productImages.length]);
+
+  // Atualizar estado quando slide mudar
+  useEffect(() => {
+    if (!carouselApi) return;
+    
+    const onSelect = () => {
+      setCurrentSlide(carouselApi.selectedScrollSnap());
+    };
+    
+    carouselApi.on('select', onSelect);
+    onSelect(); // Inicializar
+    
+    return () => { 
+      carouselApi.off('select', onSelect); 
+    };
+  }, [carouselApi]);
+
+  // Função para selecionar cor e navegar para imagem correspondente
+  const handleColorSelect = useCallback((color: string) => {
+    setSelectedColor(color);
+    
+    // Navegar para a imagem da cor
+    const imageIndex = colorToImageIndex[color];
+    if (carouselApi && imageIndex !== undefined && imageIndex < productImages.length) {
+      carouselApi.scrollTo(imageIndex);
+    }
+  }, [carouselApi, colorToImageIndex, productImages.length]);
 
   // Get stock for selected variant
   const getSelectedVariantStock = (): number | null => {
@@ -185,17 +240,52 @@ const ProductDetail = () => {
         </Link>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Image */}
-          <div className="relative aspect-square rounded-2xl overflow-hidden bg-muted">
-            <img 
-              src={product.image || '/placeholder.svg'} 
-              alt={product.name} 
-              className="h-full w-full object-cover" 
-            />
+          {/* Image Carousel */}
+          <div className="relative">
+            <Carousel
+              setApi={setCarouselApi}
+              plugins={[autoplayPlugin.current]}
+              opts={{ loop: true }}
+              className="w-full"
+            >
+              <CarouselContent>
+                {productImages.map((img, index) => (
+                  <CarouselItem key={index}>
+                    <div className="relative aspect-square rounded-2xl overflow-hidden bg-muted">
+                      <img 
+                        src={img} 
+                        alt={`${product.name} - Foto ${index + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+            </Carousel>
+            
+            {/* Badge de desconto */}
             {discount > 0 && (
-              <Badge className="absolute top-4 left-4 bg-accent text-accent-foreground text-lg px-4 py-2">
+              <Badge className="absolute top-4 left-4 z-10 bg-accent text-accent-foreground text-lg px-4 py-2">
                 -{discount}% OFF
               </Badge>
+            )}
+            
+            {/* Indicadores de slide (bolinhas) */}
+            {productImages.length > 1 && (
+              <div className="flex justify-center gap-2 mt-4">
+                {productImages.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => carouselApi?.scrollTo(index)}
+                    className={`h-2 rounded-full transition-all ${
+                      currentSlide === index 
+                        ? 'bg-primary w-6' 
+                        : 'bg-muted-foreground/30 w-2 hover:bg-muted-foreground/50'
+                    }`}
+                    aria-label={`Ir para foto ${index + 1}`}
+                  />
+                ))}
+              </div>
             )}
           </div>
 
@@ -251,7 +341,7 @@ const ProductDetail = () => {
                   {colors.map(color => (
                     <button 
                       key={color} 
-                      onClick={() => setSelectedColor(color)} 
+                      onClick={() => handleColorSelect(color)}
                       className="group relative flex flex-col items-center gap-1.5"
                       aria-label={`Cor ${color}`}
                       aria-pressed={selectedColor === color}
