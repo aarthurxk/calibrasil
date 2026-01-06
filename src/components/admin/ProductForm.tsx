@@ -102,6 +102,37 @@ const PHONE_MODELS = [
   'Xiaomi 13',
 ];
 
+// Normalizar nome do modelo (capitalização consistente)
+// Ex: "iphone 12 pro max" -> "iPhone 12 Pro Max"
+const normalizeModelName = (model: string): string => {
+  if (!model) return '';
+  const trimmed = model.trim();
+  if (!trimmed) return '';
+  
+  const specialWords: Record<string, string> = {
+    'iphone': 'iPhone',
+    'ipad': 'iPad',
+    'macbook': 'MacBook',
+    'airpods': 'AirPods',
+    'pro': 'Pro',
+    'max': 'Max',
+    'mini': 'Mini',
+    'plus': 'Plus',
+    'ultra': 'Ultra',
+    'se': 'SE',
+    'galaxy': 'Galaxy',
+    'samsung': 'Samsung',
+    'xiaomi': 'Xiaomi',
+  };
+  
+  return trimmed.split(' ').map(word => {
+    const lower = word.toLowerCase();
+    if (specialWords[lower]) return specialWords[lower];
+    if (/^\d+$/.test(word)) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  }).join(' ');
+};
+
 const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -383,20 +414,22 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
   };
 
   const handleModelToggle = (model: string) => {
+    const normalizedModel = normalizeModelName(model);
     setFormData(prev => ({
       ...prev,
-      models: prev.models.includes(model)
-        ? prev.models.filter(m => m !== model)
-        : [...prev.models, model],
+      models: prev.models.includes(normalizedModel)
+        ? prev.models.filter(m => m !== normalizedModel)
+        : [...prev.models, normalizedModel],
     }));
   };
 
   const handleAddCustomModel = () => {
     if (!customModel.trim()) return;
-    if (!formData.models.includes(customModel.trim())) {
+    const normalizedModel = normalizeModelName(customModel.trim());
+    if (!formData.models.includes(normalizedModel)) {
       setFormData(prev => ({
         ...prev,
-        models: [...prev.models, customModel.trim()],
+        models: [...prev.models, normalizedModel],
       }));
     }
     setCustomModel('');
@@ -527,10 +560,10 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
         // Delete existing variants
         await supabase.from('product_variants').delete().eq('product_id', productId);
         
-        // Insert new variants
+        // Insert new variants with normalized model names
         const variantsToInsert = variantStocks.map(v => ({
           product_id: productId,
-          model: v.model,
+          model: v.model ? normalizeModelName(v.model) : null,
           color: v.color,
           stock_quantity: v.stock_quantity,
         }));
