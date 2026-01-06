@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
-import { X, Upload, Loader2, Plus } from 'lucide-react';
+import { X, Upload, Loader2, Plus, GripVertical } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const MAX_IMAGES = 6;
 
@@ -139,6 +142,82 @@ const normalizeModelName = (model: string): string => {
     if (/^\d+$/.test(word)) return word;
     return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
   }).join(' ');
+};
+
+// Sortable Image Component
+interface SortableImageItemProps {
+  id: string;
+  src: string;
+  index: number;
+  color?: string;
+  colorHex?: string;
+  onRemove: () => void;
+}
+
+const SortableImageItem = ({ id, src, index, color, colorHex, onRemove }: SortableImageItemProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative w-24 h-24 rounded-lg overflow-hidden border ${
+        isDragging ? 'border-primary shadow-lg' : 'border-border'
+      } group`}
+    >
+      {/* Position and Color Indicator */}
+      <div className="absolute top-1 left-1 z-10 flex items-center gap-1">
+        <span className="bg-background/90 text-foreground text-xs font-medium rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-border">
+          {index + 1}
+        </span>
+        {color && (
+          <span
+            className="w-4 h-4 rounded-full border-2 border-background shadow-sm"
+            style={{ backgroundColor: colorHex || '#ccc' }}
+            title={color}
+          />
+        )}
+      </div>
+      
+      {/* Drag Handle */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="absolute inset-0 cursor-grab active:cursor-grabbing"
+      >
+        <img src={src} alt={`Produto ${index + 1}`} className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+          <GripVertical className="h-6 w-6 text-white opacity-0 group-hover:opacity-70 transition-opacity drop-shadow-md" />
+        </div>
+      </div>
+      
+      {/* Remove Button */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded-full hover:bg-destructive/90 z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </div>
+  );
 };
 
 const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
@@ -453,6 +532,28 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
     });
   };
 
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setFormData(prev => {
+        const oldIndex = prev.images.findIndex(img => img === active.id);
+        const newIndex = prev.images.findIndex(img => img === over.id);
+        const newImages = arrayMove(prev.images, oldIndex, newIndex);
+        return {
+          ...prev,
+          images: newImages,
+          image: newImages[0] || '',
+        };
+      });
+    }
+  };
+
   const handleSizeToggle = (size: string) => {
     setFormData(prev => ({
       ...prev,
@@ -725,48 +826,54 @@ const ProductForm = ({ open, onOpenChange, initialData }: ProductFormProps) => {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Image Upload */}
+          {/* Image Upload with Drag and Drop */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>Fotos do Produto</Label>
+              <div>
+                <Label>Fotos do Produto</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">Arraste para reordenar • A ordem das fotos segue a ordem das cores</p>
+              </div>
               <span className={`text-sm ${imageCount >= MAX_IMAGES ? 'text-destructive' : 'text-muted-foreground'}`}>
                 {imageCount}/{MAX_IMAGES} fotos
               </span>
             </div>
-            <div className="flex flex-wrap gap-3">
-              {formData.images.map((img, index) => (
-                <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border border-border">
-                  <img src={img} alt={`Produto ${index + 1}`} className="w-full h-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(index)}
-                    className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded-full hover:bg-destructive/90"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-              {canAddMoreImages && (
-                <label className="w-24 h-24 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors">
-                  {uploadingImages ? (
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  ) : (
-                    <>
-                      <Upload className="h-6 w-6 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground mt-1">Adicionar</span>
-                    </>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={formData.images} strategy={rectSortingStrategy}>
+                <div className="flex flex-wrap gap-3">
+                  {formData.images.map((img, index) => (
+                    <SortableImageItem
+                      key={img}
+                      id={img}
+                      src={img}
+                      index={index}
+                      color={formData.colors[index]}
+                      colorHex={formData.color_codes[formData.colors[index]]}
+                      onRemove={() => removeImage(index)}
+                    />
+                  ))}
+                  {canAddMoreImages && (
+                    <label className="w-24 h-24 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors">
+                      {uploadingImages ? (
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      ) : (
+                        <>
+                          <Upload className="h-6 w-6 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground mt-1">Adicionar</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        disabled={uploadingImages || !canAddMoreImages}
+                      />
+                    </label>
                   )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    disabled={uploadingImages || !canAddMoreImages}
-                  />
-                </label>
-              )}
-            </div>
+                </div>
+              </SortableContext>
+            </DndContext>
           </div>
 
           {/* Name, Category and Code */}
