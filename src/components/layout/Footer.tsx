@@ -1,10 +1,86 @@
 import { Link } from 'react-router-dom';
 import { Instagram, Twitter, Facebook, Mail } from 'lucide-react';
 import caliLogo from '@/assets/cali-logo.jpeg';
+
 const Footer = () => {
-  return <footer className="bg-cali-ocean-dark text-sidebar-foreground mt-auto">
-      <div className="container py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+  return (
+    <footer className="bg-cali-ocean-dark text-sidebar-foreground mt-auto">
+      <div className="container py-8 sm:py-12">
+        {/* Mobile Layout */}
+        <div className="sm:hidden space-y-6">
+          {/* Brand */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <img 
+                src={caliLogo} 
+                alt="Cali" 
+                className="h-8 w-8 rounded-lg object-cover" 
+                loading="lazy"
+                width={32}
+                height={32}
+              />
+              <span className="text-lg font-bold text-sidebar-primary">Cali</span>
+            </div>
+            <p className="text-xs text-sidebar-foreground/70 line-clamp-2">
+              Onde estilo encontra tecnologia. Produtos sustentáveis e inovadores.
+            </p>
+            <div className="flex gap-4">
+              <a href="#" className="text-sidebar-foreground/70 hover:text-sidebar-primary transition-colors" aria-label="Instagram">
+                <Instagram className="h-5 w-5" />
+              </a>
+              <a href="#" className="text-sidebar-foreground/70 hover:text-sidebar-primary transition-colors" aria-label="Twitter">
+                <Twitter className="h-5 w-5" />
+              </a>
+              <a href="#" className="text-sidebar-foreground/70 hover:text-sidebar-primary transition-colors" aria-label="Facebook">
+                <Facebook className="h-5 w-5" />
+              </a>
+            </div>
+          </div>
+
+          {/* Shop + Support side by side */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <h3 className="font-semibold text-sm mb-2">Loja</h3>
+              <ul className="space-y-1.5 text-xs text-sidebar-foreground/70">
+                <li><Link to="/shop" className="hover:text-sidebar-primary transition-colors">Todos os Produtos</Link></li>
+                <li><Link to="/shop?category=tech" className="hover:text-sidebar-primary transition-colors">Tech</Link></li>
+                <li><Link to="/shop?category=acessorios" className="hover:text-sidebar-primary transition-colors">Acessórios</Link></li>
+                <li><Link to="/shop?sale=true" className="hover:text-sidebar-primary transition-colors">Promoções</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm mb-2">Suporte</h3>
+              <ul className="space-y-1.5 text-xs text-sidebar-foreground/70">
+                <li><Link to="/contact" className="hover:text-sidebar-primary transition-colors">Fala com a Gente</Link></li>
+                <li><Link to="/faq" className="hover:text-sidebar-primary transition-colors">FAQ</Link></li>
+                <li><Link to="/shipping" className="hover:text-sidebar-primary transition-colors">Entrega</Link></li>
+                <li><Link to="/returns" className="hover:text-sidebar-primary transition-colors">Trocas</Link></li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Newsletter */}
+          <div className="space-y-2">
+            <h3 className="font-semibold text-sm">Fica Ligado!</h3>
+            <p className="text-xs text-sidebar-foreground/70">
+              Receba ofertas exclusivas no seu e-mail!
+            </p>
+            <div className="flex gap-2">
+              <input 
+                type="email" 
+                placeholder="Seu e-mail" 
+                aria-label="Seu e-mail para newsletter" 
+                className="flex-1 px-3 py-2 text-sm rounded-lg bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/50 border border-sidebar-border focus:outline-none focus:ring-2 focus:ring-sidebar-primary" 
+              />
+              <button className="px-3 py-2 bg-gradient-ocean text-primary-foreground rounded-lg hover:opacity-90 transition-opacity" aria-label="Assinar newsletter">
+                <Mail className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop Layout */}
+        <div className="hidden sm:grid sm:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
@@ -19,8 +95,7 @@ const Footer = () => {
               <span className="text-xl font-bold text-sidebar-primary">Cali</span>
             </div>
             <p className="text-sm text-sidebar-foreground/70">
-               Onde estilo encontra tecnologia. Produtos sustentáveis e inovadores criados para quem vive com liberdade, conforto e autenticidade. 
- 
+              Onde estilo encontra tecnologia. Produtos sustentáveis e inovadores criados para quem vive com liberdade, conforto e autenticidade.
             </p>
             <div className="flex gap-4">
               <a href="#" className="text-sidebar-foreground/70 hover:text-sidebar-primary transition-colors" aria-label="Instagram">
@@ -64,7 +139,12 @@ const Footer = () => {
               Cadastra aí e recebe ofertas exclusivas e novidades quentinhas direto no seu e-mail!
             </p>
             <div className="flex gap-2">
-              <input type="email" placeholder="Seu melhor e-mail" aria-label="Seu e-mail para newsletter" className="flex-1 px-3 py-2 text-sm rounded-lg bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/50 border border-sidebar-border focus:outline-none focus:ring-2 focus:ring-sidebar-primary" />
+              <input 
+                type="email" 
+                placeholder="Seu melhor e-mail" 
+                aria-label="Seu e-mail para newsletter" 
+                className="flex-1 px-3 py-2 text-sm rounded-lg bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/50 border border-sidebar-border focus:outline-none focus:ring-2 focus:ring-sidebar-primary" 
+              />
               <button className="px-4 py-2 bg-gradient-ocean text-primary-foreground rounded-lg hover:opacity-90 transition-opacity" aria-label="Assinar newsletter">
                 <Mail className="h-4 w-4" />
               </button>
@@ -72,10 +152,12 @@ const Footer = () => {
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-sidebar-border text-center text-sm text-sidebar-foreground/50">
+        <div className="mt-6 sm:mt-12 pt-6 sm:pt-8 border-t border-sidebar-border text-center text-xs sm:text-sm text-sidebar-foreground/50">
           <p>&copy; 2022 Cali. Todos os direitos reservados.</p>
         </div>
       </div>
-    </footer>;
+    </footer>
+  );
 };
+
 export default Footer;
