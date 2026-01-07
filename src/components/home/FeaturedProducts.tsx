@@ -25,10 +25,10 @@ const FeaturedProducts = () => {
   });
 
   return (
-    <section className="py-12 sm:py-16 md:py-20 bg-background" ref={ref as React.RefObject<HTMLElement>}>
+    <section className="py-8 sm:py-12 md:py-16 bg-background" ref={ref as React.RefObject<HTMLElement>}>
       <div className="container">
         <div
-          className={`flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 sm:gap-4 mb-6 sm:mb-8 md:mb-12 transition-all duration-700 ${
+          className={`flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 md:mb-8 transition-all duration-700 ${
             isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
