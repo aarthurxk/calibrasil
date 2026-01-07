@@ -121,11 +121,21 @@ All colors MUST be HSL.
 }
 
 @layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
   * {
     @apply border-border;
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground leading-relaxed;
+  }
+
+  h1, h2, h3 {
+    @apply font-heading;
   }
 }
