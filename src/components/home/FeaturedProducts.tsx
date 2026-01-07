@@ -25,42 +25,43 @@ const FeaturedProducts = () => {
   });
 
   return (
-    <section className="py-20 bg-background" ref={ref as React.RefObject<HTMLElement>}>
+    <section className="py-12 sm:py-16 md:py-20 bg-background" ref={ref as React.RefObject<HTMLElement>}>
       <div className="container">
         <div
-          className={`flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-12 transition-all duration-700 ${
+          className={`flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 sm:gap-4 mb-6 sm:mb-8 md:mb-12 transition-all duration-700 ${
             isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
           <div>
-            <p className="text-sm font-medium text-accent uppercase tracking-widest mb-2">
+            <p className="text-xs sm:text-sm font-medium text-accent uppercase tracking-widest mb-1 sm:mb-2">
               Seleção Especial
             </p>
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">
               Os Queridinhos 🔥
             </h2>
           </div>
           <Link to="/shop">
             <Button
               variant="ghost"
-              className="text-primary hover:text-primary/80 group transition-all hover:translate-x-1"
+              size="sm"
+              className="text-primary hover:text-primary/80 group transition-all hover:translate-x-1 text-sm"
             >
               Ver Tudo
-              <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+              <ArrowRight className="ml-1.5 h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Button>
           </Link>
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="flex justify-center py-8 sm:py-12">
+            <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary" />
           </div>
         ) : featuredProducts.length === 0 ? (
-          <p className="text-center text-muted-foreground py-12">
+          <p className="text-center text-muted-foreground py-8 sm:py-12 text-sm sm:text-base">
             Nenhum produto em destaque ainda.
           </p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
             {featuredProducts.map((product, index) => (
               <div
                 key={product.id}

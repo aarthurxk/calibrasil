@@ -55,7 +55,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="relative overflow-hidden rounded-xl bg-card border border-border shadow-soft transition-all duration-500 hover:shadow-glow hover:-translate-y-2 hover:border-primary/30">
+      <div className="relative overflow-hidden rounded-lg sm:rounded-xl bg-card border border-border shadow-soft transition-all duration-500 hover:shadow-glow hover:-translate-y-1 sm:hover:-translate-y-2 hover:border-primary/30">
         {/* Image Carousel Container */}
         <div 
           className="relative aspect-square overflow-hidden bg-muted"
@@ -91,7 +91,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
           {/* Carousel Indicators */}
           {images.length > 1 && (
             <div 
-              className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10"
+              className="absolute bottom-2 sm:bottom-3 left-1/2 -translate-x-1/2 flex gap-1 sm:gap-1.5 z-10"
               role="tablist"
               aria-label="Indicadores de imagem"
             >
@@ -101,8 +101,8 @@ const ProductCard = ({ product }: ProductCardProps) => {
                   role="tab"
                   aria-selected={index === selectedIndex}
                   aria-label={`Imagem ${index + 1}`}
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    index === selectedIndex ? "bg-primary w-4" : "bg-background/60 w-2"
+                  className={`h-1.5 sm:h-2 rounded-full transition-all duration-300 ${
+                    index === selectedIndex ? "bg-primary w-3 sm:w-4" : "bg-background/60 w-1.5 sm:w-2"
                   }`}
                 />
               ))}
@@ -111,20 +111,20 @@ const ProductCard = ({ product }: ProductCardProps) => {
 
           {/* Discount Badge with Pulse */}
           {discount > 0 && (
-            <Badge className="absolute top-3 left-3 bg-accent text-accent-foreground z-10 animate-badge-pulse">
+            <Badge className="absolute top-2 left-2 sm:top-3 sm:left-3 bg-accent text-accent-foreground z-10 animate-badge-pulse text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5">
               -{discount}%
             </Badge>
           )}
           {product.featured && !discount && (
-            <Badge className="absolute top-3 left-3 bg-primary text-primary-foreground z-10 animate-badge-pulse">
+            <Badge className="absolute top-2 left-2 sm:top-3 sm:left-3 bg-primary text-primary-foreground z-10 animate-badge-pulse text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5">
               Destaque
             </Badge>
           )}
 
           {/* Wishlist Button with Slide-in Animation */}
           <div
-            className={`absolute top-3 right-3 z-10 transition-all duration-300 ${
-              isHovered ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4"
+            className={`absolute top-2 right-2 sm:top-3 sm:right-3 z-10 transition-all duration-300 ${
+              isHovered ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4 sm:opacity-0"
             }`}
           >
             <WishlistButton productId={product.id} />
@@ -139,23 +139,23 @@ const ProductCard = ({ product }: ProductCardProps) => {
         </div>
 
         {/* Content */}
-        <div className="p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">{product.category}</p>
-            {colorsText && <p className="text-xs text-muted-foreground">{colorsText}</p>}
+        <div className="p-2 sm:p-4 space-y-1 sm:space-y-2">
+          <div className="flex items-center justify-between gap-1">
+            <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide truncate">{product.category}</p>
+            {colorsText && <p className="text-[10px] sm:text-xs text-muted-foreground hidden xs:block truncate">{colorsText}</p>}
           </div>
-          <h3 className="font-semibold text-card-foreground line-clamp-1 group-hover:text-primary transition-colors duration-300">
+          <h3 className="text-sm sm:text-base font-semibold text-card-foreground line-clamp-1 group-hover:text-primary transition-colors duration-300">
             {product.name}
           </h3>
           {product.description && (
-            <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground line-clamp-2 hidden sm:block">{product.description}</p>
           )}
           {product.rating !== null && product.rating !== undefined && product.rating > 0 && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5 sm:gap-1">
               {[...Array(5)].map((_, i) => (
                 <Star
                   key={i}
-                  className={`h-4 w-4 transition-all duration-300 ${
+                  className={`h-3 w-3 sm:h-4 sm:w-4 transition-all duration-300 ${
                     i < Math.round(product.rating || 0)
                       ? "fill-accent text-accent"
                       : "fill-transparent text-muted-foreground/30"
@@ -163,25 +163,25 @@ const ProductCard = ({ product }: ProductCardProps) => {
                   style={{ transitionDelay: `${i * 50}ms` }}
                 />
               ))}
-              <span className="text-sm font-medium ml-1">{product.rating}</span>
+              <span className="text-xs sm:text-sm font-medium ml-0.5 sm:ml-1">{product.rating}</span>
             </div>
           )}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
             <span
-              className={`font-bold text-lg text-primary transition-all duration-300 ${
-                isHovered ? "scale-110" : "scale-100"
+              className={`font-bold text-sm sm:text-lg text-primary transition-all duration-300 ${
+                isHovered ? "scale-105 sm:scale-110" : "scale-100"
               }`}
             >
               {formatPrice(product.price)}
             </span>
             {product.original_price && (
-              <span className="text-sm text-muted-foreground line-through">
+              <span className="text-[10px] sm:text-sm text-muted-foreground line-through">
                 {formatPrice(product.original_price)}
               </span>
             )}
           </div>
           {!product.in_stock && (
-            <Badge variant="secondary" className="mt-2">
+            <Badge variant="secondary" className="mt-1 sm:mt-2 text-[10px] sm:text-xs">
               Esgotado
             </Badge>
           )}
